@@ -38,7 +38,7 @@ function Navbar() {
 
 export default function Header() {
   return (
-    <div className="bg-gray-800">
+    <div className="bg-gray-800 w-screen">
       <HeaderTitle />
       <Navbar />
     </div>
