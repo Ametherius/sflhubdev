@@ -1,13 +1,24 @@
 "use client";
-import { useState } from "react";
-import Dashboard from "./dashboard/page";
-import Login from "./login/page";
+import { createClient } from "@/lib/supabase/client";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 export default function Home() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  return (
-    <div className="w-screen h-screen flex justify-center items-center">
-      {isLoggedIn ? <Dashboard /> : <Login />}
-    </div>
-  );
+  const router = useRouter();
+  const supabase = createClient();
+
+  useEffect(() => {
+    const checkSession = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (session) {
+        router.push("/dashboard");
+      } else {
+        router.push("/login");
+      }
+    };
+    checkSession();
+  }, []);
+  return null;
 }
