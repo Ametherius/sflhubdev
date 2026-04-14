@@ -4,7 +4,7 @@ import Image from "next/image";
 import { FaUser } from "react-icons/fa";
 import { FaLock } from "react-icons/fa";
 import CircleIcon from "../components/circleIcon";
-import SquareButton from "../components/squareButton";
+import BtnWhite from "../components/btnWhite";
 import { FaCheck } from "react-icons/fa";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
@@ -71,7 +71,7 @@ export default function Login() {
             />
           </div>
           <div className="flex justify-center">
-            <SquareButton text="Login" type="submit" Icon={FaCheck} />
+            <BtnWhite text="Login" type="submit" Icon={FaCheck} />
           </div>
           {error && <p className="text-red font-bold text-cener">{error}</p>}
         </form>

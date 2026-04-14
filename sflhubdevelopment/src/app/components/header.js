@@ -53,7 +53,7 @@ function LogoutButton() {
 function Navbar() {
   const pathname = usePathname();
   return (
-    <div className="bg-black flex">
+    <div className="bg-black flex w-full">
       {navLinks.map((link) => {
         const classes =
           pathname === link.href
@@ -72,7 +72,7 @@ function Navbar() {
 
 export default function Header() {
   return (
-    <div className="bg-gray-800 w-screen">
+    <div className="bg-gray-800 w-full">
       <HeaderTitle />
       <Navbar />
     </div>
