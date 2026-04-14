@@ -90,10 +90,12 @@ export default function Schedule() {
   const [driversShowing, setDriversShowing] = useState(false);
 
   function toggleUnitMenu() {
+    if (driversShowing) setDriversShowing(false);
     setUnitsShowing(!unitsShowing);
   }
 
   function toggleDriverMenu() {
+    if (unitsShowing) setUnitsShowing(false);
     setDriversShowing(!driversShowing);
   }
 

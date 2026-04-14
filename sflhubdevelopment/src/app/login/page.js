@@ -47,7 +47,7 @@ export default function Login() {
         </h2>
         <form className="flex flex-col z-10" onSubmit={handleLogin}>
           <div className="flex h-14 mb-3">
-            <div className="bg-white text-3xl text-green-950 p-3">
+            <div className="bg-white text-3xl border-2 border-green-950 text-green-950 p-3">
               <FaEnvelope />
             </div>
             <input
@@ -55,11 +55,11 @@ export default function Login() {
               placeholder="Email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="text-center border p-6 bg-white"
+              className="text-center border-2 text-green-950 border-green-950 p-6 bg-white"
             />
           </div>
           <div className="flex h-14 mb-3">
-            <div className="bg-white text-3xl text-green-950 p-3">
+            <div className="bg-white text-3xl border-2 border-green-950 text-green-950 p-3">
               <FaLock />
             </div>
             <input
@@ -67,7 +67,7 @@ export default function Login() {
               placeholder="Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="text-center border p-6 bg-white"
+              className="text-center border-2 border-green-950 text-green-950 p-6 bg-white"
             />
           </div>
           <div className="flex justify-center">
