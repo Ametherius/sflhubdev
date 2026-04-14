@@ -55,7 +55,7 @@ export default function Login() {
               placeholder="Email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="text-center border p-6"
+              className="text-center border p-6 bg-white"
             />
           </div>
           <div className="flex h-14 mb-3">
@@ -67,7 +67,7 @@ export default function Login() {
               placeholder="Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="text-center border p-6"
+              className="text-center border p-6 bg-white"
             />
           </div>
           <div className="flex justify-center">
