@@ -9,20 +9,47 @@ import BtnWhite from "../components/btnWhite";
 import { FaTruck } from "react-icons/fa";
 import { FaUser } from "react-icons/fa";
 import { useDrivers } from "@/hooks/useDrivers";
+import { FaEdit } from "react-icons/fa";
 
 function DriverCard({ name, phone, user, pass, pin, division }) {
   return (
-    <div className="p-3 border-2 m-3 shadow-lg rounded lg w-80 bg-gray-500">
+    <div className="p-3 border-2 m-3 shadow-lg rounded-lg w-96 bg-gray-500">
       <div className="mb-3 bg-gray-900 border-2 p-2">
         <h3 className="text-center text-white font-bold p-3">{name}</h3>
       </div>
       <div className="grid grid-cols-2 border">
-        <div className="p-3 border">
-          <p className="text-center">{phone}</p>
+        <div className="p-3 border flex justify-center">
+          <p className="text-center mr-2 my-auto">{phone}</p>
+          <button className="my-auto text-2xl py-auto cursor-pointer hover:text-green-950">
+            <FaEdit />
+          </button>
         </div>
-        <div className="p-3 border">
-          <p className="text-center">{division}</p>
+        <div className="p-3 border flex justify-center">
+          <p className="text-center mr-4 my-auto">{division}</p>
+          <button className="my-auto text-2xl py-auto cursor-pointer hover:text-green-950">
+            <FaEdit />
+          </button>
         </div>
+      </div>
+      <div className="grid grid-cols-2 border">
+        <div className="p-3 border flex justify-center">
+          <p className="text-center my-auto mr-2">{user}</p>
+          <button className="my-auto text-2xl py-auto cursor-pointer hover:text-green-950">
+            <FaEdit />
+          </button>
+        </div>
+        <div className="p-3 border flex justify-center">
+          <p className="text-center my-auto mr-4">{pass}</p>
+          <button className="my-auto text-2xl py-auto cursor-pointer hover:text-green-950">
+            <FaEdit />
+          </button>
+        </div>
+      </div>
+      <div className="p-3 border flex justify-center">
+        <p className="text-center my-auto mr-2">{pin}</p>
+        <button className="my-auto text-3xl py-auto cursor-pointer hover:text-green-950">
+          <FaEdit />
+        </button>
       </div>
     </div>
   );
@@ -74,7 +101,7 @@ export default function Schedule() {
   return (
     <div className="w-full relative">
       <Header />
-      <div className={`my-8 text-white text-center text-3xl font-bold`}>
+      <div className={`my-10 text-white text-center text-3xl font-bold`}>
         <h2>Weekly Schedule</h2>
       </div>
       <div
@@ -94,7 +121,7 @@ export default function Schedule() {
         })}
       </div>
       <div
-        className={`w-96 bg-white overflow-y-scroll max-h-screen absolute top-0 right-0 mx-0 p-3 border-2 flex flex-wrap ${driversShowing ? "" : "hidden"} justify-center`}
+        className={`w-100 bg-white overflow-y-scroll max-h-screen absolute top-0 right-0 mx-0 p-3 border-2 flex flex-wrap ${driversShowing ? "" : "hidden"} justify-center`}
       >
         {drivers.map((d) => (
           <DriverCard
@@ -108,7 +135,7 @@ export default function Schedule() {
           />
         ))}
       </div>
-      <div className="fixed bottom-0 left-0 flex">
+      <div className="fixed bottom-0 left-1/2 transform -translate-x-1/2 flex">
         <BtnWhite text="Units" Icon={FaTruck} onClick={toggleUnitMenu} />
         <BtnWhite text="Drivers" Icon={FaUser} onClick={toggleDriverMenu} />
         {/* <SquareButton text="Units" type="button" /> */}
