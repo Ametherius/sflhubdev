@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { use, useEffect, useState } from "react";
 import Header from "../components/header";
 import { useUnits } from "@/hooks/useUnits";
 import ButtonDark from "../components/buttonDark";
@@ -88,6 +88,11 @@ export default function Schedule() {
   const [units] = useUnits();
   const [unitsShowing, setUnitsShowing] = useState(false);
   const [driversShowing, setDriversShowing] = useState(false);
+  const [searchResults, setSearchResults] = useState("");
+
+  const searchedDrivers = drivers.filter((d) => {
+    d.name.toLowerCase().includes(searchResults.toLowerCase());
+  });
 
   function toggleUnitMenu() {
     if (driversShowing) setDriversShowing(false);
@@ -99,7 +104,6 @@ export default function Schedule() {
     setDriversShowing(!driversShowing);
   }
 
-  console.log(units);
   return (
     <div className="w-full relative">
       <Header />
@@ -125,7 +129,15 @@ export default function Schedule() {
       <div
         className={`w-100 bg-white overflow-y-scroll max-h-screen absolute top-0 right-0 mx-0 p-3 border-2 flex flex-wrap ${driversShowing ? "" : "hidden"} justify-center`}
       >
-        {drivers.map((d) => (
+        <div>
+          <input
+            type="search"
+            value={searchResults}
+            placeholder="Search Drivers..."
+            onChange={(e) => setSearchResults(e.target.value)}
+          />
+        </div>
+        {searchedDrivers.map((d) => (
           <DriverCard
             key={d.id}
             name={d.name}
