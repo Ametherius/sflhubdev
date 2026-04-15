@@ -91,8 +91,13 @@ export default function Schedule() {
   const [searchResults, setSearchResults] = useState("");
 
   const searchedDrivers = drivers.filter((d) => {
-    d.name.toLowerCase().includes(searchResults.toLowerCase());
+    return d.name.toLowerCase().includes(searchResults.toLowerCase());
   });
+
+  const searchedUnits = units.filter((u) => {
+    return String(u.unit).toLowerCase().includes(searchResults.toLowerCase());
+  });
+  console.log(drivers);
 
   function toggleUnitMenu() {
     if (driversShowing) setDriversShowing(false);
@@ -113,7 +118,16 @@ export default function Schedule() {
       <div
         className={`w-96 bg-white overflow-y-scroll max-h-screen absolute top-0 right-0 mx-0 p-3 border-2 flex flex-wrap ${unitsShowing ? "" : "hidden"} justify-center`}
       >
-        {units.map((u) => {
+        <div>
+          <input
+            type="search"
+            value={searchResults}
+            placeholder="Search Units..."
+            onChange={(e) => setSearchResults(e.target.value)}
+            className="bg-gray-700 p-4 w-80 text-white rounded-lg"
+          />
+        </div>
+        {searchedUnits.map((u) => {
           return (
             <UnitCard
               key={u.id}
@@ -135,6 +149,7 @@ export default function Schedule() {
             value={searchResults}
             placeholder="Search Drivers..."
             onChange={(e) => setSearchResults(e.target.value)}
+            className="bg-gray-700 p-4 w-80 text-white rounded-lg"
           />
         </div>
         {searchedDrivers.map((d) => (
