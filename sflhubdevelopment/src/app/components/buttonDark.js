@@ -3,6 +3,7 @@ export default function ButtonDark({ onClick, text, type }) {
     <button
       type={type}
       className="bg-green-950 mt-3 py-2 px-3 shadow-lg rounded-full cursor-pointer mx-2"
+      onClick={onClick}
     >
       {text}
     </button>
