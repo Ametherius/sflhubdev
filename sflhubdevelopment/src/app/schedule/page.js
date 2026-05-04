@@ -26,7 +26,9 @@ export default function Schedule() {
   const [assigned, refreshAssigned] = useAssigned();
   const [unitsShowing, setUnitsShowing] = useState(false);
   const [driversShowing, setDriversShowing] = useState(false);
-  const [searchResults, setSearchResults] = useState("");
+  const [searchDrivers, setSearchDrivers] = useState("");
+  const [searchUnits, setSearchUnits] = useState("");
+  const [searchAssigned, setSearchAssigned] = useState("");
   const [assignModal, setAssignModal] = useState(false);
   const [driverValue, setDriverValue] = useState("");
   const [unitValue, setUnitValue] = useState("");
@@ -61,11 +63,15 @@ export default function Schedule() {
   }
 
   const searchedDrivers = drivers.filter((d) => {
-    return d.name.toLowerCase().includes(searchResults.toLowerCase());
+    return d.name.toLowerCase().includes(searchDrivers.toLowerCase());
   });
 
   const searchedUnits = units.filter((u) => {
-    return String(u.unit).toLowerCase().includes(searchResults.toLowerCase());
+    return String(u.unit).toLowerCase().includes(searchUnits.toLowerCase());
+  });
+
+  const searchedAssigned = assignedUnits.filter((a) => {
+    return a.division.includes(searchAssigned);
   });
 
   function toggleUnitMenu() {
@@ -168,9 +174,9 @@ export default function Schedule() {
         <div>
           <input
             type="search"
-            value={searchResults}
+            value={searchUnits}
             placeholder="Search Units..."
-            onChange={(e) => setSearchResults(e.target.value)}
+            onChange={(e) => setSearchUnits(e.target.value)}
             className="bg-gray-700 p-4 w-80 mt-8 text-white rounded-lg"
           />
         </div>
@@ -200,9 +206,9 @@ export default function Schedule() {
         <div>
           <input
             type="search"
-            value={searchResults}
+            value={searchDrivers}
             placeholder="Search Drivers..."
-            onChange={(e) => setSearchResults(e.target.value)}
+            onChange={(e) => setSearchDrivers(e.target.value)}
             className="bg-gray-700 p-4 w-80 mt-8 text-white rounded-lg"
           />
         </div>
@@ -229,7 +235,14 @@ export default function Schedule() {
         />
       </div>
       <div className="w-screen mx-6 overflow-y-scroll">
-        {assignedUnits.map((a) => (
+        <input
+          type="search"
+          value={searchAssigned}
+          placeholder="Search By Division"
+          onChange={(e) => setSearchAssigned(e.target.value)}
+          className="bg-white placeholder:text-green-950 p-2 rounded-xl ml-16 mb-4 text-green-950"
+        />
+        {searchedAssigned.map((a) => (
           <AssignedCard
             key={a.assignedID}
             name={a.name}
