@@ -1,11 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Header from "../components/header";
 import { useUnits } from "@/hooks/useUnits";
-import BtnRed from "../components/btnRed";
 import BtnWhite from "../components/btnWhite";
-import { FaPlus, FaTimes, FaTruck } from "react-icons/fa";
+import { FaCalendar, FaPlus, FaTimes, FaTruck } from "react-icons/fa";
 import { FaUser } from "react-icons/fa";
 import { useDrivers } from "@/hooks/useDrivers";
 import { FaEdit } from "react-icons/fa";
@@ -16,14 +15,27 @@ import Modal from "../components/modal";
 import FormSelect from "../components/formSelect";
 import ButtonDark from "../components/buttonDark";
 import { useAssigned } from "@/hooks/useAssigned";
+import { useScheduleWeeks } from "@/hooks/useScheduleWeeks";
 import { useUser } from "@/hooks/useUser";
 import { createClient } from "@/lib/supabase/client";
+import NewWeekModal from "../components/newWeekModal";
 
 export default function Schedule() {
   const [drivers] = useDrivers();
   const [units] = useUnits();
   const [activeUser] = useUser();
   const [assigned, refreshAssigned] = useAssigned();
+  const [weeks, , createWeek] = useScheduleWeeks();
+  const [selectedWeekId, setSelectedWeekId] = useState(null);
+  const [newWeekModalKey, setNewWeekModalKey] = useState(0);
+  const resolvedWeekId = useMemo(() => {
+    if (weeks.length === 0) return null;
+    if (selectedWeekId && weeks.some((w) => w.id === selectedWeekId)) {
+      return selectedWeekId;
+    }
+    return weeks[0].id;
+  }, [weeks, selectedWeekId]);
+  const [newWeekModalOpen, setNewWeekModalOpen] = useState(false);
   const [unitsShowing, setUnitsShowing] = useState(false);
   const [driversShowing, setDriversShowing] = useState(false);
   const [searchDrivers, setSearchDrivers] = useState("");
@@ -32,7 +44,7 @@ export default function Schedule() {
   const [assignModal, setAssignModal] = useState(false);
   const [driverValue, setDriverValue] = useState("");
   const [unitValue, setUnitValue] = useState("");
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   const assignedUnits = useMemo(() => {
     return assigned
@@ -53,6 +65,40 @@ export default function Schedule() {
       }));
   }, [assigned]);
 
+  const selectedWeek = useMemo(
+    () => weeks.find((w) => w.id === resolvedWeekId) ?? null,
+    [weeks, resolvedWeekId],
+  );
+
+  const assignmentIdsKey = useMemo(
+    () =>
+      assigned
+        .filter((row) => row.driver && row.unit)
+        .map((row) => String(row.id))
+        .sort()
+        .join(","),
+    [assigned],
+  );
+
+  useEffect(() => {
+    if (!resolvedWeekId || !assignmentIdsKey) return;
+    void (async () => {
+      const { error } = await supabase.rpc("ensure_schedule_loads_for_week", {
+        p_week_id: resolvedWeekId,
+      });
+      if (error) {
+        if (
+          /load_slot_id|in_use_unit_id|column .* does not exist|function .* does not exist/i.test(
+            error.message,
+          )
+        ) {
+          return;
+        }
+        console.error(error.message);
+      }
+    })();
+  }, [resolvedWeekId, assignmentIdsKey, supabase]);
+
   async function handleDelete(id) {
     const { error } = await supabase.from("in_use_units").delete().eq("id", id);
 
@@ -71,8 +117,16 @@ export default function Schedule() {
   });
 
   const searchedAssigned = assignedUnits.filter((a) => {
-    return a.division.includes(searchAssigned);
+    const q = searchAssigned.trim().toLowerCase();
+    if (!q) return true;
+    return (a.division ?? "").toLowerCase().includes(q);
   });
+
+  async function handleCreateWeek(weekStartISO) {
+    const { error, weekId } = await createWeek(weekStartISO);
+    if (weekId) setSelectedWeekId(weekId);
+    return { error };
+  }
 
   function toggleUnitMenu() {
     if (driversShowing) setDriversShowing(false);
@@ -127,6 +181,44 @@ export default function Schedule() {
       <div className={`my-10 text-white text-center text-3xl font-bold`}>
         <h2>Weekly Schedule</h2>
       </div>
+
+      <NewWeekModal
+        key={newWeekModalKey}
+        open={newWeekModalOpen}
+        onClose={() => setNewWeekModalOpen(false)}
+        onCreate={handleCreateWeek}
+      />
+
+      <div className="mx-6 mb-6 flex flex-wrap items-center gap-3 text-white">
+        <label className="flex items-center gap-2 text-sm font-medium">
+          <span className="text-white/80">Active week</span>
+          <select
+            className="rounded-lg border border-white/20 bg-neutral-800 px-3 py-2 text-white"
+            value={resolvedWeekId ?? ""}
+            onChange={(e) => setSelectedWeekId(e.target.value || null)}
+          >
+            {weeks.length === 0 ? (
+              <option value="">No weeks yet</option>
+            ) : (
+              weeks.map((w) => (
+                <option key={w.id} value={w.id}>
+                  Week of{" "}
+                  {new Date(`${w.week_start_date}T12:00:00`).toLocaleDateString(
+                    undefined,
+                    {
+                      weekday: "short",
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    },
+                  )}
+                </option>
+              ))
+            )}
+          </select>
+        </label>
+      </div>
+
       <Modal
         className={`fixed p-6 rounded-lg bottom-0 right-0 ${assignModal ? "" : "hidden"}`}
       >
@@ -232,6 +324,14 @@ export default function Schedule() {
           Icon={FaPlus}
           text="Assign Unit"
           onClick={() => setAssignModal(!assignModal)}
+        />
+        <BtnWhite
+          Icon={FaCalendar}
+          text="New week"
+          onClick={() => {
+            setNewWeekModalKey((k) => k + 1);
+            setNewWeekModalOpen(true);
+          }}
         />
       </div>
       <div className="w-screen mx-6 overflow-y-scroll">

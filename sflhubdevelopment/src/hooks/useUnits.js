@@ -1,28 +1,36 @@
-import { useState, useEffect } from "react";
+"use client";
+
 import { createClient } from "@/lib/supabase/client";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { usePostgresRealtime } from "./usePostgresRealtime";
 
 export function useUnits() {
   const [units, setUnits] = useState([]);
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
+
+  const refreshUnits = useCallback(async () => {
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+    if (userError || !user) {
+      console.log("No User");
+      return;
+    }
+    const { data, error } = await supabase.from("units").select("*");
+    if (error) {
+      console.error("Error Fetching Units");
+      return;
+    }
+    setUnits(data ?? []);
+  }, [supabase]);
 
   useEffect(() => {
-    async function fetchUnits() {
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
-      if (userError || !user) {
-        console.log("No User");
-        return;
-      }
-      const { data, error } = await supabase.from("units").select("*");
-      if (error) {
-        console.error("Error Fetching Units");
-        return;
-      }
-      setUnits(data);
-    }
-    fetchUnits();
-  }, []);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- async fetch updates state in refreshUnits
+    void refreshUnits();
+  }, [refreshUnits]);
+
+  usePostgresRealtime(supabase, "units", undefined, refreshUnits);
+
   return [units];
 }

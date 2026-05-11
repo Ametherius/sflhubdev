@@ -1,6 +1,7 @@
 "use client";
 import { createClient } from "@/lib/supabase/client";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { usePostgresRealtime } from "./usePostgresRealtime";
 
 const ASSIGN_SELECT =
   "id, driverid, unitid, driver: driverid (id, name, phone, user, pass, pin, division), unit: unitid (id, unit, petro, petroPIN, ufa, ufaPIN)";
@@ -29,8 +30,11 @@ export function useAssigned() {
   }, [supabase]);
 
   useEffect(() => {
-    refreshAssigned();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- async fetch updates state in refreshAssigned
+    void refreshAssigned();
   }, [refreshAssigned]);
+
+  usePostgresRealtime(supabase, "in_use_units", undefined, refreshAssigned);
 
   return [assignedUnits, refreshAssigned];
 }
