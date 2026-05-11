@@ -162,7 +162,7 @@ export default function Schedule() {
         </form>
       </Modal>
       <div
-        className={`w-96 bg-white overflow-y-scroll max-h-screen absolute top-0 right-0 mx-0 p-3 border-2 flex flex-wrap ${unitsShowing ? "" : "hidden"} justify-center`}
+        className={`w-96 bg-white overflow-y-scroll max-h-screen fixed top-0 right-0 mx-0 p-3 border-2 flex flex-wrap ${unitsShowing ? "" : "hidden"} justify-center`}
       >
         <button
           type="button"
@@ -194,7 +194,7 @@ export default function Schedule() {
         })}
       </div>
       <div
-        className={`w-130 bg-white overflow-y-scroll max-h-screen absolute top-0 right-0 mx-0 p-3 border-2 flex flex-wrap ${driversShowing ? "" : "hidden"} justify-center`}
+        className={`w-130 bg-white overflow-y-scroll max-h-screen fixed top-0 right-0 mx-0 p-3 border-2 flex flex-wrap ${driversShowing ? "" : "hidden"} justify-center`}
       >
         <button
           type="button"
