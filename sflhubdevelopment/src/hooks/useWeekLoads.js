@@ -4,7 +4,14 @@ import { createClient } from "@/lib/supabase/client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePostgresRealtime } from "./usePostgresRealtime";
 
-const LOAD_SELECT_MODERN = "id, week_id, load_date, load_slot_id, in_use_unit_id";
+const LOAD_SELECT_MODERN =
+  "id, week_id, load_date, load_slot_id, in_use_unit_id, load_note, origin, end_user, mt, rate, load_total, loadsheet_id, load_number, fsc";
+const LOAD_SELECT_MODERN_NO_LOADSHEET =
+  "id, week_id, load_date, load_slot_id, in_use_unit_id, load_note, origin, end_user, mt, rate, load_total";
+const LOAD_SELECT_MODERN_NO_DETAIL =
+  "id, week_id, load_date, load_slot_id, in_use_unit_id, load_note";
+const LOAD_SELECT_MODERN_NO_NOTE =
+  "id, week_id, load_date, load_slot_id, in_use_unit_id";
 const LOAD_SELECT_MODERN_NO_UNIT = "id, week_id, load_date, load_slot_id";
 const LOAD_SELECT_LEGACY = "id, week_id, load_date, slot_index";
 
@@ -88,6 +95,45 @@ export function useWeekLoads(weekId) {
       .eq("week_id", weekId)
       .order("load_date", { ascending: true })
       .order("load_slot_id", { ascending: true });
+
+    if (
+      modern.error &&
+      /loadsheet_id|load_number|\bfsc\b/i.test(modern.error.message ?? "") &&
+      /does not exist/i.test(modern.error.message ?? "")
+    ) {
+      modern = await supabase
+        .from("schedule_loads")
+        .select(LOAD_SELECT_MODERN_NO_LOADSHEET)
+        .eq("week_id", weekId)
+        .order("load_date", { ascending: true })
+        .order("load_slot_id", { ascending: true });
+    }
+
+    if (
+      modern.error &&
+      /"(origin|end_user|mt|rate|load_total)"/i.test(modern.error.message ?? "") &&
+      /does not exist/i.test(modern.error.message ?? "")
+    ) {
+      modern = await supabase
+        .from("schedule_loads")
+        .select(LOAD_SELECT_MODERN_NO_DETAIL)
+        .eq("week_id", weekId)
+        .order("load_date", { ascending: true })
+        .order("load_slot_id", { ascending: true });
+    }
+
+    if (
+      modern.error &&
+      /\bload_note\b/i.test(modern.error.message ?? "") &&
+      /does not exist/i.test(modern.error.message ?? "")
+    ) {
+      modern = await supabase
+        .from("schedule_loads")
+        .select(LOAD_SELECT_MODERN_NO_NOTE)
+        .eq("week_id", weekId)
+        .order("load_date", { ascending: true })
+        .order("load_slot_id", { ascending: true });
+    }
 
     if (
       modern.error &&
@@ -208,6 +254,13 @@ export function useWeekLoads(weekId) {
     supabase,
     weekId ? "schedule_loads" : null,
     loadsFilter,
+    refreshLoads,
+  );
+  // Slot label/metadata lives on load_slots; schedule_loads rows do not change when slots are renamed.
+  usePostgresRealtime(
+    supabase,
+    weekId ? "load_slots" : null,
+    undefined,
     refreshLoads,
   );
 

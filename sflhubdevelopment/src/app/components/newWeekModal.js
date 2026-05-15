@@ -105,8 +105,9 @@ export default function NewWeekModal({ open, onClose, onCreate }) {
         </h2>
         <p className="mb-4 text-sm text-green-900/80">
           Pick the week start date. The week is created empty; for each unit on the
-          board, the app fills seven days with three load slots per day (from your
-          first three <code className="text-green-950">load_slots</code> rows).
+          board, the app fills seven days with three load rows per day, using the three
+          canonical <code className="text-green-950">load_slots</code> rows (sort_order
+          1–3). Those are seeded by migration — you do not need to manage slots in the UI.
         </p>
 
         <div className="mb-4 flex items-center justify-between">

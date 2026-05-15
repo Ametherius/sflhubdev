@@ -18,17 +18,27 @@ export function addDays(d, n) {
   return x;
 }
 
+/** e.g. "Sunday (22)" for schedule column headers. */
+export function dayColumnTitle(iso) {
+  const day = parseISODateLocal(iso);
+  const weekday = day.toLocaleDateString(undefined, { weekday: "long" });
+  const num = day.getDate();
+  return `${weekday} (${num})`;
+}
+
 export function weekDayLabels(weekStartISO) {
   const start = parseISODateLocal(weekStartISO);
   return Array.from({ length: 7 }, (_, i) => {
     const day = addDays(start, i);
+    const iso = toISODate(day);
     return {
-      iso: toISODate(day),
+      iso,
       label: day.toLocaleDateString(undefined, {
         weekday: "short",
         month: "short",
         day: "numeric",
       }),
+      columnTitle: dayColumnTitle(iso),
     };
   });
 }

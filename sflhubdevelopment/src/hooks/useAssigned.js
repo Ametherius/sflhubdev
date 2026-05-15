@@ -35,6 +35,9 @@ export function useAssigned() {
   }, [refreshAssigned]);
 
   usePostgresRealtime(supabase, "in_use_units", undefined, refreshAssigned);
+  // Joined driver/unit rows must refresh when those tables change (not only in_use_units).
+  usePostgresRealtime(supabase, "drivers", undefined, refreshAssigned);
+  usePostgresRealtime(supabase, "units", undefined, refreshAssigned);
 
   return [assignedUnits, refreshAssigned];
 }

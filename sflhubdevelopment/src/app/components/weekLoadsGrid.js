@@ -5,7 +5,8 @@ import { weekDayLabels } from "@/lib/weekDates";
 
 function slotLabel(slot) {
   if (slot?.name != null && String(slot.name).trim() !== "") return slot.name;
-  if (slot?.label != null && String(slot.label).trim() !== "") return slot.label;
+  if (slot?.label != null && String(slot.label).trim() !== "")
+    return slot.label;
   return `Load ${slot?.sort_order ?? "?"}`;
 }
 
@@ -77,8 +78,8 @@ export default function WeekLoadsGrid({
       <p className="mb-6 text-sm text-amber-200/90">
         No load slots found. Add rows to the{" "}
         <code className="rounded bg-black/30 px-1">load_slots</code> table (with{" "}
-        <code className="rounded bg-black/30 px-1">sort_order</code>) and refresh,
-        or run the migration that links{" "}
+        <code className="rounded bg-black/30 px-1">sort_order</code>) and
+        refresh, or run the migration that links{" "}
         <code className="rounded bg-black/30 px-1">schedule_loads</code> to{" "}
         <code className="rounded bg-black/30 px-1">load_slots</code>.
       </p>
@@ -86,7 +87,7 @@ export default function WeekLoadsGrid({
   }
 
   return (
-    <div className="mb-8 overflow-x-auto rounded-xl border border-white/10 bg-white/5 p-4">
+    <div className="mb-8 overflow-x-scroll rounded-xl border border-white/10 bg-white/5 p-4">
       <h3 className="mb-3 text-lg font-semibold text-white">Loads this week</h3>
       <div
         className="grid min-w-[720px] gap-2"

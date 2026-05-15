@@ -32,5 +32,5 @@ export function useDrivers() {
 
   usePostgresRealtime(supabase, "drivers", undefined, refreshDrivers);
 
-  return [drivers];
+  return [drivers, refreshDrivers];
 }

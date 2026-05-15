@@ -4,8 +4,25 @@ import { createClient } from "@/lib/supabase/client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePostgresRealtime } from "./usePostgresRealtime";
 
+// Schedule uses exactly three loads per day (see ensure_schedule_loads_for_week limit 3).
+// We only keep the first three load_slots rows by sort_order in client state (option 1: fixed slots).
+const SCHEDULE_SLOT_COUNT = 3;
+
 // Add more columns (e.g. name, label) if your load_slots table has them.
 const SLOT_SELECT = "id, sort_order, name, label";
+
+function takeCanonicalScheduleSlots(rows) {
+  const list = rows ?? [];
+  const hasSort = list.some((r) => r.sort_order != null);
+  const sorted = [...list].sort((a, b) => {
+    if (hasSort) {
+      const o = (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0);
+      if (o !== 0) return o;
+    }
+    return String(a.id).localeCompare(String(b.id));
+  });
+  return sorted.slice(0, SCHEDULE_SLOT_COUNT);
+}
 
 function isMissingSortOrderColumn(message) {
   return /\bsort_order\b/i.test(message ?? "") && /does not exist/i.test(message ?? "");
@@ -21,7 +38,11 @@ export function useLoadSlots() {
       data: { user },
       error: userError,
     } = await supabase.auth.getUser();
-    if (userError || !user) return;
+    if (userError || !user) {
+      setSlotsTableAvailable(false);
+      setSlots([]);
+      return;
+    }
 
     let res = await supabase
       .from("load_slots")
@@ -54,7 +75,7 @@ export function useLoadSlots() {
       const msg = error.message ?? "";
       if (/schema cache|does not exist|PGRST205/i.test(msg)) {
         console.warn(
-          "[load_slots] Table missing or not exposed. Create it in Supabase, then refresh.",
+          "[load_slots] Table missing or not exposed. Apply migrations (e.g. ensure_three_canonical_load_slots), then refresh.",
         );
       } else {
         console.error(error.message);
@@ -63,13 +84,19 @@ export function useLoadSlots() {
     }
 
     setSlotsTableAvailable(true);
-    setSlots(data ?? []);
+    setSlots(takeCanonicalScheduleSlots(data));
   }, [supabase]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- async fetch updates state in refreshSlots
     void refreshSlots();
-  }, [refreshSlots]);
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(() => {
+      void refreshSlots();
+    });
+    return () => subscription.unsubscribe();
+  }, [refreshSlots, supabase]);
 
   usePostgresRealtime(
     supabase,

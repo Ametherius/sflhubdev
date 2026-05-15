@@ -32,5 +32,5 @@ export function useUnits() {
 
   usePostgresRealtime(supabase, "units", undefined, refreshUnits);
 
-  return [units];
+  return [units, refreshUnits];
 }

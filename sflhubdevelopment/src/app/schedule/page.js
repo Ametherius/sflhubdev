@@ -4,25 +4,29 @@ import { useEffect, useMemo, useState } from "react";
 import Header from "../components/header";
 import { useUnits } from "@/hooks/useUnits";
 import BtnWhite from "../components/btnWhite";
-import { FaCalendar, FaPlus, FaTimes, FaTruck } from "react-icons/fa";
-import { FaUser } from "react-icons/fa";
+import { FaCalendar, FaPlus, FaTimes, FaTruck, FaUser } from "react-icons/fa";
 import { useDrivers } from "@/hooks/useDrivers";
-import { FaEdit } from "react-icons/fa";
 import DriverCard from "../components/driverCard";
 import UnitCard from "../components/unitCard";
-import AssignedCard from "../components/assignedCard";
 import Modal from "../components/modal";
 import FormSelect from "../components/formSelect";
 import ButtonDark from "../components/buttonDark";
+import EditDriverModal from "../components/editDriverModal";
+import EditUnitModal from "../components/editUnitModal";
 import { useAssigned } from "@/hooks/useAssigned";
 import { useScheduleWeeks } from "@/hooks/useScheduleWeeks";
 import { useUser } from "@/hooks/useUser";
 import { createClient } from "@/lib/supabase/client";
 import NewWeekModal from "../components/newWeekModal";
+import NewLoadsheetModal from "../components/newLoadsheetModal";
+import { useWeekLoads } from "@/hooks/useWeekLoads";
+import { useLoadSlots } from "@/hooks/useLoadSlots";
+import { useLoadSheets } from "@/hooks/useLoadSheets";
+import ScheduleRow from "../components/scheduleRow";
 
 export default function Schedule() {
-  const [drivers] = useDrivers();
-  const [units] = useUnits();
+  const [drivers, refreshDrivers] = useDrivers();
+  const [units, refreshUnits] = useUnits();
   const [activeUser] = useUser();
   const [assigned, refreshAssigned] = useAssigned();
   const [weeks, , createWeek] = useScheduleWeeks();
@@ -36,6 +40,7 @@ export default function Schedule() {
     return weeks[0].id;
   }, [weeks, selectedWeekId]);
   const [newWeekModalOpen, setNewWeekModalOpen] = useState(false);
+  const [newLoadsheetModalOpen, setNewLoadsheetModalOpen] = useState(false);
   const [unitsShowing, setUnitsShowing] = useState(false);
   const [driversShowing, setDriversShowing] = useState(false);
   const [searchDrivers, setSearchDrivers] = useState("");
@@ -44,26 +49,21 @@ export default function Schedule() {
   const [assignModal, setAssignModal] = useState(false);
   const [driverValue, setDriverValue] = useState("");
   const [unitValue, setUnitValue] = useState("");
+  const [editDriver, setEditDriver] = useState(null);
+  const [editUnit, setEditUnit] = useState(null);
   const supabase = useMemo(() => createClient(), []);
+  const [loads, refreshLoads] = useWeekLoads(resolvedWeekId);
+  const [loadSlots] = useLoadSlots();
+  const [loadSheets, refreshLoadSheets] = useLoadSheets();
 
-  const assignedUnits = useMemo(() => {
-    return assigned
-      .filter((row) => row.driver && row.unit)
-      .map((row) => ({
-        assignedID: row.id,
-        name: row.driver.name,
-        pin: row.driver.pin,
-        user: row.driver.user,
-        pass: row.driver.pass,
-        division: row.driver.division,
-        phone: row.driver.phone,
-        unit: row.unit.unit,
-        petro: row.unit.petro,
-        petroPIN: row.unit.petroPIN,
-        ufa: row.unit.ufa,
-        ufaPIN: row.unit.ufaPIN,
-      }));
-  }, [assigned]);
+  const assignedRowsForDisplay = useMemo(() => {
+    const rows = assigned.filter((row) => row.driver && row.unit);
+    const q = searchAssigned.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter((r) =>
+      (r.driver?.division ?? "").toLowerCase().includes(q),
+    );
+  }, [assigned, searchAssigned]);
 
   const selectedWeek = useMemo(
     () => weeks.find((w) => w.id === resolvedWeekId) ?? null,
@@ -96,8 +96,9 @@ export default function Schedule() {
         }
         console.error(error.message);
       }
+      await refreshLoads();
     })();
-  }, [resolvedWeekId, assignmentIdsKey, supabase]);
+  }, [resolvedWeekId, assignmentIdsKey, supabase, refreshLoads]);
 
   async function handleDelete(id) {
     const { error } = await supabase.from("in_use_units").delete().eq("id", id);
@@ -114,12 +115,6 @@ export default function Schedule() {
 
   const searchedUnits = units.filter((u) => {
     return String(u.unit).toLowerCase().includes(searchUnits.toLowerCase());
-  });
-
-  const searchedAssigned = assignedUnits.filter((a) => {
-    const q = searchAssigned.trim().toLowerCase();
-    if (!q) return true;
-    return (a.division ?? "").toLowerCase().includes(q);
   });
 
   async function handleCreateWeek(weekStartISO) {
@@ -176,9 +171,11 @@ export default function Schedule() {
     setAssignModal(false);
   }
   return (
-    <div className="w-full relative">
-      <Header />
-      <div className={`my-10 text-white text-center text-3xl font-bold`}>
+    <div className="flex h-dvh min-h-0 w-full max-w-full flex-col overflow-hidden">
+      <div className="shrink-0">
+        <Header />
+      </div>
+      <div className="shrink-0 py-6 text-center text-3xl font-bold text-white">
         <h2>Weekly Schedule</h2>
       </div>
 
@@ -189,7 +186,7 @@ export default function Schedule() {
         onCreate={handleCreateWeek}
       />
 
-      <div className="mx-6 mb-6 flex flex-wrap items-center gap-3 text-white">
+      <div className="mb-4 flex w-full min-w-0 shrink-0 flex-wrap items-center gap-3 px-4 text-white">
         <label className="flex items-center gap-2 text-sm font-medium">
           <span className="text-white/80">Active week</span>
           <select
@@ -220,7 +217,7 @@ export default function Schedule() {
       </div>
 
       <Modal
-        className={`fixed p-6 rounded-lg bottom-0 right-0 ${assignModal ? "" : "hidden"}`}
+        className={`fixed p-6 z-50 rounded-lg bottom-0 right-0 ${assignModal ? "" : "hidden"}`}
       >
         <button
           type="button"
@@ -254,7 +251,7 @@ export default function Schedule() {
         </form>
       </Modal>
       <div
-        className={`w-96 bg-white overflow-y-scroll max-h-screen fixed top-0 right-0 mx-0 p-3 border-2 flex flex-wrap ${unitsShowing ? "" : "hidden"} justify-center`}
+        className={`w-96 bg-white overflow-y-scroll max-h-screen z-50 fixed top-0 right-0 mx-0 p-3 border-2 flex flex-wrap ${unitsShowing ? "" : "hidden"} justify-center`}
       >
         <button
           type="button"
@@ -276,17 +273,14 @@ export default function Schedule() {
           return (
             <UnitCard
               key={u.id}
-              unit={u.unit}
-              petro={u.petro}
-              petroPin={u.petroPIN}
-              ufa={u.ufa}
-              ufaPin={u.ufaPIN}
+              unit={u}
+              onEdit={(unitRow) => setEditUnit(unitRow)}
             />
           );
         })}
       </div>
       <div
-        className={`w-130 bg-white overflow-y-scroll max-h-screen fixed top-0 right-0 mx-0 p-3 border-2 flex flex-wrap ${driversShowing ? "" : "hidden"} justify-center`}
+        className={`w-130 bg-white overflow-y-scroll max-h-screen fixed top-0 right-0 mx-0 p-3 z-50 border-2 flex flex-wrap ${driversShowing ? "" : "hidden"} justify-center`}
       >
         <button
           type="button"
@@ -301,23 +295,18 @@ export default function Schedule() {
             value={searchDrivers}
             placeholder="Search Drivers..."
             onChange={(e) => setSearchDrivers(e.target.value)}
-            className="bg-gray-700 p-4 w-80 mt-8 text-white rounded-lg"
+            className="bg-gray-700 p-4 w-80 mt-8 text-white rounded-lg z-10"
           />
         </div>
         {searchedDrivers.map((d) => (
           <DriverCard
             key={d.id}
-            name={d.name}
-            phone={d.phone}
-            user={d.user}
-            pass={d.pass}
-            pin={d.pin}
-            division={d.division}
-            Icon={FaEdit}
+            driver={d}
+            onEdit={(drv) => setEditDriver(drv)}
           />
         ))}
       </div>
-      <div className="fixed bottom-0 left-1/2 transform -translate-x-1/2 flex">
+      <div className="fixed z-10 bottom-0 left-1/2 transform -translate-x-1/2 flex">
         <BtnWhite text="Units" Icon={FaTruck} onClick={toggleUnitMenu} />
         <BtnWhite text="Drivers" Icon={FaUser} onClick={toggleDriverMenu} />
         <BtnWhite
@@ -333,33 +322,63 @@ export default function Schedule() {
             setNewWeekModalOpen(true);
           }}
         />
-      </div>
-      <div className="w-screen mx-6 overflow-y-scroll">
-        <input
-          type="search"
-          value={searchAssigned}
-          placeholder="Search By Division"
-          onChange={(e) => setSearchAssigned(e.target.value)}
-          className="bg-white placeholder:text-green-950 p-2 rounded-xl ml-16 mb-4 text-green-950"
+        <BtnWhite
+          Icon={FaPlus}
+          text="New load sheet"
+          onClick={() => setNewLoadsheetModalOpen(true)}
         />
-        {searchedAssigned.map((a) => (
-          <AssignedCard
-            key={a.assignedID}
-            name={a.name}
-            phone={a.phone}
-            pin={a.pin}
-            user={a.user}
-            pass={a.pass}
-            division={a.division}
-            unit={a.unit}
-            petro={a.petro}
-            petroPIN={a.petroPIN}
-            ufa={a.ufa}
-            ufaPIN={a.ufaPIN}
-            onDelete={() => handleDelete(a.assignedID)}
-          />
-        ))}
       </div>
+      <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-4 pb-28">
+          <input
+            type="search"
+            value={searchAssigned}
+            placeholder="Search By Division"
+            onChange={(e) => setSearchAssigned(e.target.value)}
+            className="mb-4 w-full max-w-md rounded-xl bg-white p-2 text-green-950 placeholder:text-green-950"
+          />
+          {assignedRowsForDisplay.map((row) => (
+            <ScheduleRow
+              key={row.id}
+              assignment={row}
+              weekStartISO={selectedWeek?.week_start_date ?? null}
+              weekId={resolvedWeekId}
+              loads={loads.filter(
+                (l) => String(l.in_use_unit_id) === String(row.id),
+              )}
+              loadSlots={loadSlots}
+              loadSheets={loadSheets}
+              onDelete={() => handleDelete(row.id)}
+              onLoadsUpdated={refreshLoads}
+              onLoadSheetsUpdated={refreshLoadSheets}
+            />
+          ))}
+        </div>
+      </main>
+
+      <NewLoadsheetModal
+        open={newLoadsheetModalOpen}
+        onClose={() => setNewLoadsheetModalOpen(false)}
+        onCreated={refreshLoadSheets}
+      />
+      <EditDriverModal
+        open={editDriver != null}
+        driver={editDriver}
+        onClose={() => setEditDriver(null)}
+        onSaved={async () => {
+          await refreshDrivers();
+          await refreshAssigned();
+        }}
+      />
+      <EditUnitModal
+        open={editUnit != null}
+        unit={editUnit}
+        onClose={() => setEditUnit(null)}
+        onSaved={async () => {
+          await refreshUnits();
+          await refreshAssigned();
+        }}
+      />
     </div>
   );
 }

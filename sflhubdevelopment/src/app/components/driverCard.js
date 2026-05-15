@@ -1,61 +1,42 @@
-export default function DriverCard({
-  name,
-  phone,
-  user,
-  pass,
-  pin,
-  division,
-  Icon,
-}) {
+export default function DriverCard({ driver, onEdit }) {
+  if (!driver) return null;
+  const { name, phone, user, pass, pin, division } = driver;
+
   return (
-    <div className="p-3 border-2 m-3 shadow-lg rounded-lg w-120 bg-gray-500">
-      <div className="mb-3 bg-gray-900 border-2 p-2">
-        <h3 className="text-center text-white font-bold p-3">{name}</h3>
+    <div className="m-3 w-120 rounded-lg border-2 bg-gray-500 p-3 shadow-lg">
+      <div className="mb-3 border-2 bg-gray-900 p-2">
+        <h3 className="p-3 text-center font-bold text-white">{name}</h3>
       </div>
       <div className="grid grid-cols-2 border">
-        <div className="p-2 border grid grid-cols-2 auto-cols-auto">
-          <p className="text-center text-sm mr-2 my-auto">{phone}</p>
-          <div className="flex justify-end">
-            <button className="my-auto flex mr-1 text-3xl py-auto cursor-pointer hover:text-green-950">
-              <Icon />
-            </button>
-          </div>
+        <div className="border p-2">
+          <p className="text-center text-sm text-white">{phone}</p>
         </div>
-        <div className="p-3 border grid grid-cols-2">
-          <p className="text-center mr-4 my-auto">{division}</p>
-          <div className="flex justify-end">
-            <button className="my-auto flex ml-10 text-3xl py-auto cursor-pointer hover:text-green-950">
-              <Icon />
-            </button>
-          </div>
+        <div className="border p-2">
+          <p className="text-center text-sm text-white">{division}</p>
         </div>
       </div>
       <div className="grid grid-cols-2 border">
-        <div className="p-3 border grid grid-cols-2">
-          <p className="text-center my-auto mr-2">{user}</p>
-          <div className="flex justify-end">
-            <button className="my-auto flex ml-10 text-3xl py-auto cursor-pointer hover:text-green-950">
-              <Icon />
-            </button>
-          </div>
+        <div className="border p-3">
+          <p className="text-center text-sm text-white">{user}</p>
         </div>
-        <div className="p-3 border grid grid-cols-2">
-          <p className="text-center my-auto mr-4">{pass}</p>
-          <div className="flex justify-end">
-            <button className="my-auto flex ml-10 text-3xl py-auto cursor-pointer hover:text-green-950">
-              <Icon />
-            </button>
-          </div>
+        <div className="border p-3">
+          <p className="text-center text-sm text-white">{pass}</p>
         </div>
       </div>
-      <div className="p-3 border grid grid-cols-2">
-        <p className="text-right my-auto mr-2">{pin}</p>
-        <div className="flex justify-end">
-          <button className="my-auto flex ml-10 text-3xl py-auto cursor-pointer hover:text-green-950">
-            <Icon />
+      <div className="border p-3">
+        <p className="text-center text-sm text-white">{pin}</p>
+      </div>
+      {typeof onEdit === "function" ? (
+        <div className="mt-3 flex justify-center">
+          <button
+            type="button"
+            className="rounded-lg border border-white/30 bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800"
+            onClick={() => onEdit(driver)}
+          >
+            Edit info
           </button>
         </div>
-      </div>
+      ) : null}
     </div>
   );
 }
