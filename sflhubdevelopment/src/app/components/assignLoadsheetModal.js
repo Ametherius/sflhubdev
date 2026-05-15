@@ -78,16 +78,18 @@ export default function AssignLoadsheetModal({
 
   useEffect(() => {
     if (!open) return;
-    setLoadsheetId("");
-    const first = sortedSlots[0]?.id ? String(sortedSlots[0].id) : "";
-    const want =
-      initialSlotId != null && String(initialSlotId).trim() !== ""
-        ? String(initialSlotId)
-        : "";
-    const valid =
-      want &&
-      sortedSlots.slice(0, LOADS_PER_DAY).some((s) => String(s.id) === want);
-    setSlotId(valid ? want : first);
+    queueMicrotask(() => {
+      setLoadsheetId("");
+      const first = sortedSlots[0]?.id ? String(sortedSlots[0].id) : "";
+      const want =
+        initialSlotId != null && String(initialSlotId).trim() !== ""
+          ? String(initialSlotId)
+          : "";
+      const valid =
+        want &&
+        sortedSlots.slice(0, LOADS_PER_DAY).some((s) => String(s.id) === want);
+      setSlotId(valid ? want : first);
+    });
   }, [open, sortedSlots, initialSlotId]);
 
   const selectedSheet = useMemo(

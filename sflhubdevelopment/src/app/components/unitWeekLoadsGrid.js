@@ -100,25 +100,25 @@ function LoadSplitCard({
   );
 
   useEffect(() => {
-    /* eslint-disable react-hooks/set-state-in-effect -- mirror schedule_loads row into local inputs */
-    if (!row) {
-      setOrigin("");
-      setEndUser("");
-      setFsc("");
-      setMt("");
-      setRate("");
-      setLoadNote("");
-      setLoadsheetId("");
-      return;
-    }
-    setOrigin(row.origin != null ? String(row.origin) : "");
-    setEndUser(row.end_user != null ? String(row.end_user) : "");
-    setFsc(row.fsc != null ? String(row.fsc) : "");
-    setMt(row.mt != null ? String(row.mt) : "");
-    setRate(row.rate != null ? String(row.rate) : "");
-    setLoadNote(row.load_note != null ? String(row.load_note) : "");
-    setLoadsheetId(row.loadsheet_id != null ? String(row.loadsheet_id) : "");
-    /* eslint-enable react-hooks/set-state-in-effect */
+    queueMicrotask(() => {
+      if (!row) {
+        setOrigin("");
+        setEndUser("");
+        setFsc("");
+        setMt("");
+        setRate("");
+        setLoadNote("");
+        setLoadsheetId("");
+        return;
+      }
+      setOrigin(row.origin != null ? String(row.origin) : "");
+      setEndUser(row.end_user != null ? String(row.end_user) : "");
+      setFsc(row.fsc != null ? String(row.fsc) : "");
+      setMt(row.mt != null ? String(row.mt) : "");
+      setRate(row.rate != null ? String(row.rate) : "");
+      setLoadNote(row.load_note != null ? String(row.load_note) : "");
+      setLoadsheetId(row.loadsheet_id != null ? String(row.loadsheet_id) : "");
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- depend on row field primitives, not row object identity
   }, [
     row?.id,

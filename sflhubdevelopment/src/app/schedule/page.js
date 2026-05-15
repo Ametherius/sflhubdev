@@ -226,7 +226,7 @@ export default function Schedule() {
         >
           <FaTimes />
         </button>
-        <form className="flex flex-col">
+        <div className="flex flex-col">
           <div className="flex">
             <FormSelect
               label="Select Driver"
@@ -248,7 +248,7 @@ export default function Schedule() {
             type="button"
             onClick={createAssigned}
           />
-        </form>
+        </div>
       </Modal>
       <div
         className={`w-96 bg-white overflow-y-scroll max-h-screen z-50 fixed top-0 right-0 mx-0 p-3 border-2 flex flex-wrap ${unitsShowing ? "" : "hidden"} justify-center`}

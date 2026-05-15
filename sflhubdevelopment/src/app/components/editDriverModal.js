@@ -29,24 +29,34 @@ export default function EditDriverModal({ open, onClose, driver, onSaved }) {
     e.preventDefault();
     if (saving || !driver?.id) return;
     setSaving(true);
-    const { error } = await supabase
-      .from("drivers")
-      .update({
-        name: name.trim() || null,
-        phone: phone.trim() || null,
-        user: user.trim() || null,
-        pass: pass.trim() || null,
-        pin: pin.trim() || null,
-        division: division.trim() || null,
-      })
-      .eq("id", driver.id);
-    setSaving(false);
-    if (error) {
-      alert(error.message);
-      return;
+    try {
+      const { data, error } = await supabase
+        .from("drivers")
+        .update({
+          name: name.trim() || null,
+          phone: phone.trim() || null,
+          user: user.trim() || null,
+          pass: pass.trim() || null,
+          pin: pin.trim() || null,
+          division: division.trim() || null,
+        })
+        .eq("id", driver.id)
+        .select("id")
+        .maybeSingle();
+      if (error) {
+        alert(error.message);
+        return;
+      }
+      if (!data) {
+        console.warn(
+          "[editDriver] Update returned no row (RLS or no match). Refreshing lists anyway.",
+        );
+      }
+      await onSaved?.();
+      onClose();
+    } finally {
+      setSaving(false);
     }
-    await onSaved?.();
-    onClose();
   }
 
   if (!open || !driver) return null;
@@ -111,7 +121,11 @@ export default function EditDriverModal({ open, onClose, driver, onSaved }) {
             >
               Cancel
             </button>
-            <ButtonDark type="submit" text={saving ? "Saving…" : "Save"} />
+            <ButtonDark
+              type="submit"
+              text={saving ? "Saving…" : "Save"}
+              disabled={saving}
+            />
           </div>
         </form>
       </div>

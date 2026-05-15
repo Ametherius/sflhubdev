@@ -5,6 +5,17 @@ import { FaTimes } from "react-icons/fa";
 import ButtonDark from "./buttonDark";
 import { createClient } from "@/lib/supabase/client";
 
+function hasOwn(obj, key) {
+  return obj != null && Object.prototype.hasOwnProperty.call(obj, key);
+}
+
+/** DB may expose camelCase or snake_case for the same logical columns. */
+function unitPinColumnKeys(unit) {
+  const petroPin = hasOwn(unit, "petro_pin") ? "petro_pin" : "petroPIN";
+  const ufaPin = hasOwn(unit, "ufa_pin") ? "ufa_pin" : "ufaPIN";
+  return { petroPin, ufaPin };
+}
+
 export default function EditUnitModal({ open, onClose, unit, onSaved }) {
   const supabase = useMemo(() => createClient(), []);
   const [unitNum, setUnitNum] = useState("");
@@ -16,34 +27,49 @@ export default function EditUnitModal({ open, onClose, unit, onSaved }) {
 
   useEffect(() => {
     if (!open || !unit) return;
+    const { petroPin, ufaPin } = unitPinColumnKeys(unit);
     setUnitNum(unit.unit != null ? String(unit.unit) : "");
     setPetro(unit.petro != null ? String(unit.petro) : "");
-    setPetroPIN(unit.petroPIN != null ? String(unit.petroPIN) : "");
+    setPetroPIN(
+      unit[petroPin] != null ? String(unit[petroPin]) : "",
+    );
     setUfa(unit.ufa != null ? String(unit.ufa) : "");
-    setUfaPIN(unit.ufaPIN != null ? String(unit.ufaPIN) : "");
+    setUfaPIN(unit[ufaPin] != null ? String(unit[ufaPin]) : "");
   }, [open, unit]);
 
   async function handleSubmit(e) {
     e.preventDefault();
     if (saving || !unit?.id) return;
     setSaving(true);
-    const { error } = await supabase
-      .from("units")
-      .update({
+    try {
+      const { petroPin, ufaPin } = unitPinColumnKeys(unit);
+      const patch = {
         unit: unitNum.trim() || null,
         petro: petro.trim() || null,
-        petroPIN: petroPIN.trim() || null,
         ufa: ufa.trim() || null,
-        ufaPIN: ufaPIN.trim() || null,
-      })
-      .eq("id", unit.id);
-    setSaving(false);
-    if (error) {
-      alert(error.message);
-      return;
+        [petroPin]: petroPIN.trim() || null,
+        [ufaPin]: ufaPIN.trim() || null,
+      };
+      const { data, error } = await supabase
+        .from("units")
+        .update(patch)
+        .eq("id", unit.id)
+        .select("id")
+        .maybeSingle();
+      if (error) {
+        alert(error.message);
+        return;
+      }
+      if (!data) {
+        console.warn(
+          "[editUnit] Update returned no row (RLS or no match). Refreshing lists anyway.",
+        );
+      }
+      await onSaved?.();
+      onClose();
+    } finally {
+      setSaving(false);
     }
-    await onSaved?.();
-    onClose();
   }
 
   if (!open || !unit) return null;
@@ -104,7 +130,11 @@ export default function EditUnitModal({ open, onClose, unit, onSaved }) {
             >
               Cancel
             </button>
-            <ButtonDark type="submit" text={saving ? "Saving…" : "Save"} />
+            <ButtonDark
+              type="submit"
+              text={saving ? "Saving…" : "Save"}
+              disabled={saving}
+            />
           </div>
         </form>
       </div>

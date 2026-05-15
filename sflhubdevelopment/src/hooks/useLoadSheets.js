@@ -46,7 +46,9 @@ export function useLoadSheets() {
   }, [supabase]);
 
   useEffect(() => {
-    void refreshSheets();
+    queueMicrotask(() => {
+      void refreshSheets();
+    });
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(() => {
