@@ -62,12 +62,33 @@ export default function Schedule() {
   const [loadSheets, refreshLoadSheets] = useLoadSheets();
 
   const assignedRowsForDisplay = useMemo(() => {
-    const rows = assigned.filter((row) => row.driver && row.unit);
+    let rows = assigned.filter((row) => row.driver && row.unit);
     const q = searchAssigned.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter((r) =>
-      (r.driver?.division ?? "").toLowerCase().includes(q),
-    );
+    if (q) {
+      rows = rows.filter((r) =>
+        (r.driver?.division ?? "").toLowerCase().includes(q),
+      );
+    }
+    return rows.sort((a, b) => {
+      const byName = (a.driver?.name ?? "")
+        .trim()
+        .localeCompare((b.driver?.name ?? "").trim(), undefined, {
+          sensitivity: "base",
+        });
+      if (byName !== 0) return byName;
+
+      const unitA = a.unit?.unit;
+      const unitB = b.unit?.unit;
+      const numA = Number(unitA);
+      const numB = Number(unitB);
+      if (Number.isFinite(numA) && Number.isFinite(numB)) {
+        return numA - numB;
+      }
+      return String(unitA ?? "").localeCompare(String(unitB ?? ""), undefined, {
+        numeric: true,
+        sensitivity: "base",
+      });
+    });
   }, [assigned, searchAssigned]);
 
   const selectedWeek = useMemo(
