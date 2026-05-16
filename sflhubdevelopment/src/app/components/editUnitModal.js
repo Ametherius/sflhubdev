@@ -4,6 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 import { FaTimes } from "react-icons/fa";
 import ButtonDark from "./buttonDark";
 import { createClient } from "@/lib/supabase/client";
+import {
+  entitySaveFailedMessage,
+  isEmptyUpdateResult,
+  updateEntityRow,
+} from "@/lib/entityUpdate";
 
 function hasOwn(obj, key) {
   return obj != null && Object.prototype.hasOwnProperty.call(obj, key);
@@ -11,9 +16,40 @@ function hasOwn(obj, key) {
 
 /** DB may expose camelCase or snake_case for the same logical columns. */
 function unitPinColumnKeys(unit) {
-  const petroPin = hasOwn(unit, "petro_pin") ? "petro_pin" : "petroPIN";
-  const ufaPin = hasOwn(unit, "ufa_pin") ? "ufa_pin" : "ufaPIN";
-  return { petroPin, ufaPin };
+  if (hasOwn(unit, "petro_pin")) {
+    return {
+      petroPin: "petro_pin",
+      ufaPin: hasOwn(unit, "ufa_pin") ? "ufa_pin" : "ufaPIN",
+    };
+  }
+  if (hasOwn(unit, "petroPIN")) {
+    return {
+      petroPin: "petroPIN",
+      ufaPin: hasOwn(unit, "ufa_pin") ? "ufa_pin" : "ufaPIN",
+    };
+  }
+  return { petroPin: "petro_pin", ufaPin: "ufa_pin" };
+}
+
+function buildUnitPatches(unit, values) {
+  const primary = unitPinColumnKeys(unit);
+  const patch = {
+    unit: values.unit,
+    petro: values.petro,
+    ufa: values.ufa,
+    [primary.petroPin]: values.petroPIN,
+    [primary.ufaPin]: values.ufaPIN,
+  };
+  const altPetro = primary.petroPin === "petro_pin" ? "petroPIN" : "petro_pin";
+  const altUfa = primary.ufaPin === "ufa_pin" ? "ufaPIN" : "ufa_pin";
+  const alt = {
+    unit: values.unit,
+    petro: values.petro,
+    ufa: values.ufa,
+    [altPetro]: values.petroPIN,
+    [altUfa]: values.ufaPIN,
+  };
+  return { patch, alt };
 }
 
 export default function EditUnitModal({ open, onClose, unit, onSaved }) {
@@ -42,28 +78,28 @@ export default function EditUnitModal({ open, onClose, unit, onSaved }) {
     if (saving || !unit?.id) return;
     setSaving(true);
     try {
-      const { petroPin, ufaPin } = unitPinColumnKeys(unit);
-      const patch = {
+      const values = {
         unit: unitNum.trim() || null,
         petro: petro.trim() || null,
         ufa: ufa.trim() || null,
-        [petroPin]: petroPIN.trim() || null,
-        [ufaPin]: ufaPIN.trim() || null,
+        petroPIN: petroPIN.trim() || null,
+        ufaPIN: ufaPIN.trim() || null,
       };
-      const { data, error } = await supabase
-        .from("units")
-        .update(patch)
-        .eq("id", unit.id)
-        .select("id")
-        .maybeSingle();
+      const { patch, alt } = buildUnitPatches(unit, values);
+      const { data, error } = await updateEntityRow(
+        supabase,
+        "units",
+        unit.id,
+        patch,
+        alt,
+      );
       if (error) {
         alert(error.message);
         return;
       }
-      if (!data) {
-        console.warn(
-          "[editUnit] Update returned no row (RLS or no match). Refreshing lists anyway.",
-        );
+      if (isEmptyUpdateResult(data)) {
+        alert(entitySaveFailedMessage("unit"));
+        return;
       }
       await onSaved?.();
       onClose();
@@ -79,7 +115,7 @@ export default function EditUnitModal({ open, onClose, unit, onSaved }) {
 
   return (
     <div
-      className="fixed inset-0 z-100 flex items-center justify-center bg-black/60 p-4"
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-4"
       role="presentation"
       onClick={onClose}
     >

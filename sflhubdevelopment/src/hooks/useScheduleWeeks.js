@@ -1,6 +1,7 @@
 "use client";
 
 import { createClient } from "@/lib/supabase/client";
+import { normalizeRpcUuid } from "@/lib/scheduleLoadsPersist";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePostgresRealtime } from "./usePostgresRealtime";
 
@@ -33,7 +34,13 @@ export function useScheduleWeeks() {
         p_week_start: weekStartISO,
       });
       if (error) return { error: error.message, weekId: null };
-      const weekId = Array.isArray(data) ? data[0] : data;
+      const weekId = normalizeRpcUuid(data);
+      if (!weekId) {
+        return {
+          error: "Could not create or find schedule week. Try again.",
+          weekId: null,
+        };
+      }
       await refreshWeeks();
       return { error: null, weekId };
     },

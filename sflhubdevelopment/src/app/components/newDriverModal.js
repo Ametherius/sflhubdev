@@ -6,11 +6,11 @@ import ButtonDark from "./buttonDark";
 import { createClient } from "@/lib/supabase/client";
 import {
   entitySaveFailedMessage,
+  insertEntityRow,
   isEmptyUpdateResult,
-  updateEntityRow,
 } from "@/lib/entityUpdate";
 
-export default function EditDriverModal({ open, onClose, driver, onSaved }) {
+export default function NewDriverModal({ open, onClose, onCreated }) {
   const supabase = useMemo(() => createClient(), []);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -21,34 +21,33 @@ export default function EditDriverModal({ open, onClose, driver, onSaved }) {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (!open || !driver) return;
-    setName(driver.name != null ? String(driver.name) : "");
-    setPhone(driver.phone != null ? String(driver.phone) : "");
-    setUser(driver.user != null ? String(driver.user) : "");
-    setPass(driver.pass != null ? String(driver.pass) : "");
-    setPin(driver.pin != null ? String(driver.pin) : "");
-    setDivision(driver.division != null ? String(driver.division) : "");
-  }, [open, driver]);
+    if (!open) return;
+    setName("");
+    setPhone("");
+    setUser("");
+    setPass("");
+    setPin("");
+    setDivision("");
+  }, [open]);
 
   async function handleSubmit(e) {
     e.preventDefault();
-    if (saving || !driver?.id) return;
+    if (saving) return;
+    if (!name.trim()) {
+      alert("Driver name is required.");
+      return;
+    }
     setSaving(true);
     try {
-      const patch = {
-        name: name.trim() || null,
+      const row = {
+        name: name.trim(),
         phone: phone.trim() || null,
         user: user.trim() || null,
         pass: pass.trim() || null,
         pin: pin.trim() || null,
         division: division.trim() || null,
       };
-      const { data, error } = await updateEntityRow(
-        supabase,
-        "drivers",
-        driver.id,
-        patch,
-      );
+      const { data, error } = await insertEntityRow(supabase, "drivers", row);
       if (error) {
         alert(error.message);
         return;
@@ -57,14 +56,14 @@ export default function EditDriverModal({ open, onClose, driver, onSaved }) {
         alert(entitySaveFailedMessage("driver"));
         return;
       }
-      await onSaved?.();
+      await onCreated?.();
       onClose();
     } finally {
       setSaving(false);
     }
   }
 
-  if (!open || !driver) return null;
+  if (!open) return null;
 
   const inputClass =
     "mt-1 w-full rounded-lg border border-green-950/25 bg-white px-3 py-2 text-sm text-green-950 outline-none focus:border-green-950/50";
@@ -79,7 +78,7 @@ export default function EditDriverModal({ open, onClose, driver, onSaved }) {
         className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6 text-green-950 shadow-xl"
         role="dialog"
         aria-modal="true"
-        aria-labelledby="edit-driver-title"
+        aria-labelledby="new-driver-title"
         onClick={(ev) => ev.stopPropagation()}
       >
         <button
@@ -90,13 +89,18 @@ export default function EditDriverModal({ open, onClose, driver, onSaved }) {
         >
           <FaTimes />
         </button>
-        <h2 id="edit-driver-title" className="mb-4 text-xl font-bold">
-          Edit driver
+        <h2 id="new-driver-title" className="mb-4 text-xl font-bold">
+          Add driver
         </h2>
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
           <label className="block text-sm font-medium">
-            Name
-            <input className={inputClass} value={name} onChange={(e) => setName(e.target.value)} />
+            Name <span className="text-red-700">*</span>
+            <input
+              className={inputClass}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+            />
           </label>
           <label className="block text-sm font-medium">
             Phone
@@ -128,7 +132,7 @@ export default function EditDriverModal({ open, onClose, driver, onSaved }) {
             </button>
             <ButtonDark
               type="submit"
-              text={saving ? "Saving…" : "Save"}
+              text={saving ? "Adding…" : "Add driver"}
               disabled={saving}
             />
           </div>

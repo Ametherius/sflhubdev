@@ -4,6 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import { FaTimes } from "react-icons/fa";
 import ButtonDark from "./buttonDark";
 import { createClient } from "@/lib/supabase/client";
+import {
+  persistScheduleLoad,
+  scheduleLoadErrorMessage,
+} from "@/lib/scheduleLoadsPersist";
 
 const LOADS_PER_DAY = 3;
 
@@ -148,39 +152,28 @@ export default function AssignLoadsheetModal({
       fsc: nullIfEmpty(selectedSheet.fsc),
     };
 
-    if (row?.id) {
-      const { error } = await supabase
-        .from("schedule_loads")
-        .update(payload)
-        .eq("id", row.id);
-      setSaving(false);
-      if (error) {
-        if (
-          /loadsheet_id|load_number|\bfsc\b|\bload_note\b|column .* does not exist/i.test(
-            error.message ?? "",
-          )
-        ) {
-          alert(
-            "Apply the latest Supabase migration (loadsheets + schedule_loads columns), then try again.",
-          );
-        } else {
-          alert(error.message);
-        }
-        return;
+    const { error } = await persistScheduleLoad(supabase, {
+      scheduleLoadId: row?.id ?? null,
+      weekId,
+      loadDate: dk,
+      loadSlotId: slotId,
+      inUseUnitId,
+      payload,
+    });
+    setSaving(false);
+    if (error) {
+      if (
+        /loadsheet_id|load_number|\bfsc\b|\bload_note\b|column .* does not exist/i.test(
+          error.message ?? "",
+        )
+      ) {
+        alert(
+          "Apply the latest Supabase migration (loadsheets + schedule_loads columns), then try again.",
+        );
+      } else {
+        alert(scheduleLoadErrorMessage(error.message));
       }
-    } else {
-      const { error } = await supabase.from("schedule_loads").insert({
-        week_id: weekId,
-        load_date: dk,
-        load_slot_id: slotId,
-        in_use_unit_id: inUseUnitId,
-        ...payload,
-      });
-      setSaving(false);
-      if (error) {
-        alert(error.message);
-        return;
-      }
+      return;
     }
 
     await onAssigned?.();

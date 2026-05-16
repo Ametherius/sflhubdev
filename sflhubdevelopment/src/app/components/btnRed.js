@@ -1,8 +1,9 @@
 export default function BtnRed({ onClick, text, type }) {
   return (
     <button
-      className="bg-red-800 py-2 px-3 rounded-full mt-3 cursor-pointer"
+      className="bg-red-800 py-1.5 font-bold px-3 m-1 rounded-full cursor-pointer"
       type={type}
+      onClick={onClick}
     >
       {text}
     </button>

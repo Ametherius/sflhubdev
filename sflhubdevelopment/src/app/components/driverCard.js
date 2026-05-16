@@ -1,4 +1,6 @@
-export default function DriverCard({ driver, onEdit }) {
+import BtnRed from "./btnRed";
+
+export default function DriverCard({ driver, onEdit, onDelete }) {
   if (!driver) return null;
   const { name, phone, user, pass, pin, division } = driver;
 
@@ -27,14 +29,15 @@ export default function DriverCard({ driver, onEdit }) {
         <p className="text-center text-sm text-white">{pin}</p>
       </div>
       {typeof onEdit === "function" ? (
-        <div className="mt-3 flex justify-center">
+        <div className="mt-3 flex justify-center items-center">
           <button
             type="button"
-            className="rounded-lg border border-white/30 bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800"
+            className="rounded-full border border-white/30 bg-green-950 h-fit px-4 py-2 my-auto text-sm font-semibold text-white hover:bg-gray-800"
             onClick={() => onEdit(driver)}
           >
             Edit info
           </button>
+          <BtnRed text="Delete Driver" onClick={onDelete} type="button" />
         </div>
       ) : null}
     </div>

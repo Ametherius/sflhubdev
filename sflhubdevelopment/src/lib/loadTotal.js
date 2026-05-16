@@ -8,7 +8,7 @@ export function parseMetricNum(s) {
   return Number.isFinite(n) ? n : null;
 }
 
-/** Total = MT × rate; if FSC is non-empty, total = MT × rate × FSC (FSC as multiplier). */
+/** Total = MT × rate; if FSC is non-empty, total = (MT × rate) + FSC. */
 export function computeLoadTotalDisplay(mt, rate, fsc) {
   const m = parseMetricNum(mt);
   const r = parseMetricNum(rate);
@@ -18,7 +18,7 @@ export function computeLoadTotalDisplay(mt, rate, fsc) {
   const f = parseMetricNum(fsc);
   let total = base;
   if (fRaw !== "" && f != null) {
-    total = base * f;
+    total = base + f;
   }
   const rounded = Math.round(total * 100) / 100;
   return String(rounded);

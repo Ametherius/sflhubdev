@@ -293,20 +293,20 @@ export default function EditLoadsheetModal({
           <label className="block text-sm font-medium">
             FSC{" "}
             <span className="font-normal text-green-900/60">
-              (optional, multiplier on MT × rate when filled)
+              (optional, added to MT × rate when filled)
             </span>
             <input
               className={inputClass}
               value={fsc}
               onChange={(e) => setFsc(e.target.value)}
-              placeholder="e.g. 1.05"
+              placeholder="e.g. 150"
               disabled={!selectedId}
             />
           </label>
           <label className="block text-sm font-medium">
             Total{" "}
             <span className="font-normal text-green-900/60">
-              (matches schedule cells: MT × rate × FSC)
+              (matches schedule cells: MT × rate + FSC)
             </span>
             <input
               className={`${inputClass} cursor-not-allowed bg-neutral-100 text-neutral-700`}

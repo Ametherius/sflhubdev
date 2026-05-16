@@ -13,6 +13,8 @@ import FormSelect from "../components/formSelect";
 import ButtonDark from "../components/buttonDark";
 import EditDriverModal from "../components/editDriverModal";
 import EditUnitModal from "../components/editUnitModal";
+import NewDriverModal from "../components/newDriverModal";
+import NewUnitModal from "../components/newUnitModal";
 import { useAssigned } from "@/hooks/useAssigned";
 import { useScheduleWeeks } from "@/hooks/useScheduleWeeks";
 import { useUser } from "@/hooks/useUser";
@@ -23,13 +25,14 @@ import { useWeekLoads } from "@/hooks/useWeekLoads";
 import { useLoadSlots } from "@/hooks/useLoadSlots";
 import { useLoadSheets } from "@/hooks/useLoadSheets";
 import ScheduleRow from "../components/scheduleRow";
+import { isScheduleWeekFkError } from "@/lib/scheduleLoadsPersist";
 
 export default function Schedule() {
   const [drivers, refreshDrivers] = useDrivers();
   const [units, refreshUnits] = useUnits();
   const [activeUser] = useUser();
   const [assigned, refreshAssigned] = useAssigned();
-  const [weeks, , createWeek] = useScheduleWeeks();
+  const [weeks, refreshWeeks, createWeek] = useScheduleWeeks();
   const [selectedWeekId, setSelectedWeekId] = useState(null);
   const [newWeekModalKey, setNewWeekModalKey] = useState(0);
   const resolvedWeekId = useMemo(() => {
@@ -51,6 +54,8 @@ export default function Schedule() {
   const [unitValue, setUnitValue] = useState("");
   const [editDriver, setEditDriver] = useState(null);
   const [editUnit, setEditUnit] = useState(null);
+  const [newDriverModalOpen, setNewDriverModalOpen] = useState(false);
+  const [newUnitModalOpen, setNewUnitModalOpen] = useState(false);
   const supabase = useMemo(() => createClient(), []);
   const [loads, refreshLoads] = useWeekLoads(resolvedWeekId);
   const [loadSlots] = useLoadSlots();
@@ -94,6 +99,12 @@ export default function Schedule() {
         ) {
           return;
         }
+        if (isScheduleWeekFkError(error.message)) {
+          setSelectedWeekId(null);
+          await refreshWeeks();
+          console.error(error.message);
+          return;
+        }
         console.error(error.message);
       }
       await refreshLoads();
@@ -106,6 +117,17 @@ export default function Schedule() {
     if (error) {
       console.error(error.message);
     }
+    await refreshAssigned();
+  }
+
+  async function handleDeleteDriver(id) {
+    if (!confirm("Delete this driver from the database?")) return;
+    const { error } = await supabase.from("drivers").delete().eq("id", id);
+    if (error) {
+      alert(error.message);
+      return;
+    }
+    await refreshDrivers();
     await refreshAssigned();
   }
 
@@ -260,13 +282,22 @@ export default function Schedule() {
         >
           <FaTimes />
         </button>
-        <div>
+        <div className="mt-8 flex w-80 items-center gap-2">
+          <button
+            type="button"
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-green-950 text-xl text-white shadow-md hover:bg-green-900"
+            onClick={() => setNewUnitModalOpen(true)}
+            aria-label="Add unit"
+            title="Add unit"
+          >
+            <FaPlus />
+          </button>
           <input
             type="search"
             value={searchUnits}
             placeholder="Search Units..."
             onChange={(e) => setSearchUnits(e.target.value)}
-            className="bg-gray-700 p-4 w-80 mt-8 text-white rounded-lg"
+            className="min-w-0 flex-1 rounded-lg bg-gray-700 p-4 text-white"
           />
         </div>
         {searchedUnits.map((u) => {
@@ -289,13 +320,22 @@ export default function Schedule() {
         >
           <FaTimes />
         </button>
-        <div>
+        <div className="mt-8 flex w-80 items-center gap-2">
+          <button
+            type="button"
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-green-950 text-xl text-white shadow-md hover:bg-green-900"
+            onClick={() => setNewDriverModalOpen(true)}
+            aria-label="Add driver"
+            title="Add driver"
+          >
+            <FaPlus />
+          </button>
           <input
             type="search"
             value={searchDrivers}
             placeholder="Search Drivers..."
             onChange={(e) => setSearchDrivers(e.target.value)}
-            className="bg-gray-700 p-4 w-80 mt-8 text-white rounded-lg z-10"
+            className="min-w-0 flex-1 rounded-lg bg-gray-700 p-4 text-white z-10"
           />
         </div>
         {searchedDrivers.map((d) => (
@@ -303,6 +343,7 @@ export default function Schedule() {
             key={d.id}
             driver={d}
             onEdit={(drv) => setEditDriver(drv)}
+            onDelete={() => handleDeleteDriver(d.id)}
           />
         ))}
       </div>
@@ -378,6 +419,16 @@ export default function Schedule() {
           await refreshUnits();
           await refreshAssigned();
         }}
+      />
+      <NewDriverModal
+        open={newDriverModalOpen}
+        onClose={() => setNewDriverModalOpen(false)}
+        onCreated={refreshDrivers}
+      />
+      <NewUnitModal
+        open={newUnitModalOpen}
+        onClose={() => setNewUnitModalOpen(false)}
+        onCreated={refreshUnits}
       />
     </div>
   );

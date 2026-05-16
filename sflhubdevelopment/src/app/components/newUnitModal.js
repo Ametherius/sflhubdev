@@ -5,66 +5,64 @@ import { FaTimes } from "react-icons/fa";
 import ButtonDark from "./buttonDark";
 import { createClient } from "@/lib/supabase/client";
 import {
+  buildNewUnitRows,
   entitySaveFailedMessage,
+  insertEntityRow,
   isEmptyUpdateResult,
-  updateEntityRow,
 } from "@/lib/entityUpdate";
 
-export default function EditDriverModal({ open, onClose, driver, onSaved }) {
+export default function NewUnitModal({ open, onClose, onCreated }) {
   const supabase = useMemo(() => createClient(), []);
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [user, setUser] = useState("");
-  const [pass, setPass] = useState("");
-  const [pin, setPin] = useState("");
-  const [division, setDivision] = useState("");
+  const [unitNum, setUnitNum] = useState("");
+  const [petro, setPetro] = useState("");
+  const [petroPIN, setPetroPIN] = useState("");
+  const [ufa, setUfa] = useState("");
+  const [ufaPIN, setUfaPIN] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (!open || !driver) return;
-    setName(driver.name != null ? String(driver.name) : "");
-    setPhone(driver.phone != null ? String(driver.phone) : "");
-    setUser(driver.user != null ? String(driver.user) : "");
-    setPass(driver.pass != null ? String(driver.pass) : "");
-    setPin(driver.pin != null ? String(driver.pin) : "");
-    setDivision(driver.division != null ? String(driver.division) : "");
-  }, [open, driver]);
+    if (!open) return;
+    setUnitNum("");
+    setPetro("");
+    setPetroPIN("");
+    setUfa("");
+    setUfaPIN("");
+  }, [open]);
 
   async function handleSubmit(e) {
     e.preventDefault();
-    if (saving || !driver?.id) return;
+    if (saving) return;
+    if (!unitNum.trim()) {
+      alert("Unit number is required.");
+      return;
+    }
     setSaving(true);
     try {
-      const patch = {
-        name: name.trim() || null,
-        phone: phone.trim() || null,
-        user: user.trim() || null,
-        pass: pass.trim() || null,
-        pin: pin.trim() || null,
-        division: division.trim() || null,
+      const values = {
+        unit: unitNum.trim(),
+        petro: petro.trim() || null,
+        ufa: ufa.trim() || null,
+        petroPIN: petroPIN.trim() || null,
+        ufaPIN: ufaPIN.trim() || null,
       };
-      const { data, error } = await updateEntityRow(
-        supabase,
-        "drivers",
-        driver.id,
-        patch,
-      );
+      const { row, alt } = buildNewUnitRows(values);
+      const { data, error } = await insertEntityRow(supabase, "units", row, alt);
       if (error) {
         alert(error.message);
         return;
       }
       if (isEmptyUpdateResult(data)) {
-        alert(entitySaveFailedMessage("driver"));
+        alert(entitySaveFailedMessage("unit"));
         return;
       }
-      await onSaved?.();
+      await onCreated?.();
       onClose();
     } finally {
       setSaving(false);
     }
   }
 
-  if (!open || !driver) return null;
+  if (!open) return null;
 
   const inputClass =
     "mt-1 w-full rounded-lg border border-green-950/25 bg-white px-3 py-2 text-sm text-green-950 outline-none focus:border-green-950/50";
@@ -79,7 +77,7 @@ export default function EditDriverModal({ open, onClose, driver, onSaved }) {
         className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6 text-green-950 shadow-xl"
         role="dialog"
         aria-modal="true"
-        aria-labelledby="edit-driver-title"
+        aria-labelledby="new-unit-title"
         onClick={(ev) => ev.stopPropagation()}
       >
         <button
@@ -90,33 +88,34 @@ export default function EditDriverModal({ open, onClose, driver, onSaved }) {
         >
           <FaTimes />
         </button>
-        <h2 id="edit-driver-title" className="mb-4 text-xl font-bold">
-          Edit driver
+        <h2 id="new-unit-title" className="mb-4 text-xl font-bold">
+          Add unit
         </h2>
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
           <label className="block text-sm font-medium">
-            Name
-            <input className={inputClass} value={name} onChange={(e) => setName(e.target.value)} />
+            Unit <span className="text-red-700">*</span>
+            <input
+              className={inputClass}
+              value={unitNum}
+              onChange={(e) => setUnitNum(e.target.value)}
+              required
+            />
           </label>
           <label className="block text-sm font-medium">
-            Phone
-            <input className={inputClass} value={phone} onChange={(e) => setPhone(e.target.value)} />
+            Petro
+            <input className={inputClass} value={petro} onChange={(e) => setPetro(e.target.value)} />
           </label>
           <label className="block text-sm font-medium">
-            Division
-            <input className={inputClass} value={division} onChange={(e) => setDivision(e.target.value)} />
+            Petro PIN
+            <input className={inputClass} value={petroPIN} onChange={(e) => setPetroPIN(e.target.value)} />
           </label>
           <label className="block text-sm font-medium">
-            User
-            <input className={inputClass} value={user} onChange={(e) => setUser(e.target.value)} />
+            UFA
+            <input className={inputClass} value={ufa} onChange={(e) => setUfa(e.target.value)} />
           </label>
           <label className="block text-sm font-medium">
-            Pass
-            <input className={inputClass} value={pass} onChange={(e) => setPass(e.target.value)} />
-          </label>
-          <label className="block text-sm font-medium">
-            PIN
-            <input className={inputClass} value={pin} onChange={(e) => setPin(e.target.value)} />
+            UFA PIN
+            <input className={inputClass} value={ufaPIN} onChange={(e) => setUfaPIN(e.target.value)} />
           </label>
           <div className="mt-2 flex justify-end gap-2 border-t border-green-950/15 pt-4">
             <button
@@ -128,7 +127,7 @@ export default function EditDriverModal({ open, onClose, driver, onSaved }) {
             </button>
             <ButtonDark
               type="submit"
-              text={saving ? "Saving…" : "Save"}
+              text={saving ? "Adding…" : "Add unit"}
               disabled={saving}
             />
           </div>

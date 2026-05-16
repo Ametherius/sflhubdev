@@ -6,6 +6,10 @@ import {
   computeLoadTotalDisplay,
   formatLoadTotalCadGrid,
 } from "@/lib/loadTotal";
+import {
+  persistScheduleLoad,
+  scheduleLoadErrorMessage,
+} from "@/lib/scheduleLoadsPersist";
 import { createClient } from "@/lib/supabase/client";
 import AssignLoadsheetModal from "./assignLoadsheetModal";
 import EditLoadsheetModal from "./editLoadsheetModal";
@@ -229,7 +233,7 @@ function LoadSplitCard({
               aria-label={`${slotTitle} FSC`}
             />
             <div
-              title="MT × rate, or × FSC when FSC is filled (FSC is a multiplier). Total in CAD — scroll if needed."
+              title="(MT × rate) + FSC when FSC is filled. Total in CAD — scroll if needed."
               className={`${fieldCellTotal} cursor-default`}
               aria-label={`${slotTitle} total (auto)`}
             >
@@ -347,47 +351,28 @@ export default function UnitWeekLoadsGrid({
     }) => {
       if (!slotId || !dayIso) return;
 
-      if (scheduleLoadId) {
-        const { error } = await supabase
-          .from("schedule_loads")
-          .update(payload)
-          .eq("id", scheduleLoadId);
-        if (error) {
-          if (
-            /load_note|origin|end_user|\bmt\b|rate|load_total|loadsheet_id|load_number|\bfsc\b|column .* does not exist/i.test(
-              error.message ?? "",
-            )
-          ) {
-            alert(
-              "Apply the latest Supabase migrations for schedule_loads detail columns, then try again.",
-            );
-          } else {
-            console.error(error.message);
-            alert(error.message);
-          }
-          return;
-        }
-        await onUpdated?.();
-        return;
-      }
-
-      if (!wk || !unitId) {
-        console.warn(
-          "Missing week or unit id; cannot create schedule_load row.",
-        );
-        return;
-      }
-
-      const { error } = await supabase.from("schedule_loads").insert({
-        week_id: wk,
-        load_date: dayIso,
-        load_slot_id: slotId,
-        in_use_unit_id: unitId,
-        ...payload,
+      const { error } = await persistScheduleLoad(supabase, {
+        scheduleLoadId,
+        weekId: wk,
+        loadDate: dayIso,
+        loadSlotId: slotId,
+        inUseUnitId: unitId,
+        payload,
       });
+
       if (error) {
-        console.error(error.message);
-        alert(error.message);
+        if (
+          /load_note|origin|end_user|\bmt\b|rate|load_total|loadsheet_id|load_number|\bfsc\b|column .* does not exist/i.test(
+            error.message ?? "",
+          )
+        ) {
+          alert(
+            "Apply the latest Supabase migrations for schedule_loads detail columns, then try again.",
+          );
+        } else {
+          console.error(error.message);
+          alert(scheduleLoadErrorMessage(error.message));
+        }
         return;
       }
       await onUpdated?.();
