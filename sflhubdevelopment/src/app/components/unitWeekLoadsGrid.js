@@ -13,6 +13,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import AssignLoadsheetModal from "./assignLoadsheetModal";
 import EditLoadsheetModal from "./editLoadsheetModal";
+import { FaPlus } from "react-icons/fa";
 
 const LOADS_PER_DAY = 3; // fixed; matches DB ensure_schedule_loads_for_week (limit 3) + canonical load_slots
 
@@ -184,7 +185,9 @@ function LoadSplitCard({
     ? "flex min-h-0 flex-1 flex-row"
     : "flex w-full min-w-0 flex-row";
 
-  const locationFieldClass = loadsheetInvoiced ? fieldStackInvoiced : fieldStack;
+  const locationFieldClass = loadsheetInvoiced
+    ? fieldStackInvoiced
+    : fieldStack;
 
   return (
     <div
@@ -455,7 +458,7 @@ export default function UnitWeekLoadsGrid({
                     type="button"
                     title="Assign a load sheet to this day (copy into schedule)"
                     aria-label="Assign load sheet to this day"
-                    className="absolute right-1 top-1/2 shrink-0 -translate-y-1/2 rounded border border-white/30 bg-white/10 px-1 py-px text-[8px] font-bold uppercase tracking-wide text-white hover:bg-white/20"
+                    className="absolute right-1 top-1/2 shrink-0 -translate-y-1/2 rounded border border-white/30 bg-white/10 px-1 py-px text-[10px] font-bold uppercase tracking-wide text-white hover:bg-white/20"
                     onClick={() =>
                       setAssignTarget({
                         dayIso: d.iso,
@@ -463,7 +466,7 @@ export default function UnitWeekLoadsGrid({
                       })
                     }
                   >
-                    +
+                    <FaPlus />
                   </button>
                 </>
               ) : (
