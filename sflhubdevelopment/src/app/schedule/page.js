@@ -21,6 +21,7 @@ import { useUser } from "@/hooks/useUser";
 import { createClient } from "@/lib/supabase/client";
 import NewWeekModal from "../components/newWeekModal";
 import NewLoadsheetModal from "../components/newLoadsheetModal";
+import { compareAssignedRows } from "@/lib/divisionSort";
 import { useWeekLoads } from "@/hooks/useWeekLoads";
 import { useLoadSlots } from "@/hooks/useLoadSlots";
 import { useLoadSheets } from "@/hooks/useLoadSheets";
@@ -76,26 +77,7 @@ export default function Schedule() {
         (r.driver?.name ?? "").toLowerCase().includes(nameQ),
       );
     }
-    return rows.sort((a, b) => {
-      const byName = (a.driver?.name ?? "")
-        .trim()
-        .localeCompare((b.driver?.name ?? "").trim(), undefined, {
-          sensitivity: "base",
-        });
-      if (byName !== 0) return byName;
-
-      const unitA = a.unit?.unit;
-      const unitB = b.unit?.unit;
-      const numA = Number(unitA);
-      const numB = Number(unitB);
-      if (Number.isFinite(numA) && Number.isFinite(numB)) {
-        return numA - numB;
-      }
-      return String(unitA ?? "").localeCompare(String(unitB ?? ""), undefined, {
-        numeric: true,
-        sensitivity: "base",
-      });
-    });
+    return rows.sort(compareAssignedRows);
   }, [assigned, searchAssigned, searchByName]);
 
   const selectedWeek = useMemo(
