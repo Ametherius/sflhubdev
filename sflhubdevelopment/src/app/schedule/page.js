@@ -60,13 +60,20 @@ export default function Schedule() {
   const [loads, refreshLoads] = useWeekLoads(resolvedWeekId);
   const [loadSlots] = useLoadSlots();
   const [loadSheets, refreshLoadSheets] = useLoadSheets();
+  const [searchByName, setSearchByName] = useState("");
 
   const assignedRowsForDisplay = useMemo(() => {
     let rows = assigned.filter((row) => row.driver && row.unit);
-    const q = searchAssigned.trim().toLowerCase();
-    if (q) {
+    const divisionQ = searchAssigned.trim().toLowerCase();
+    if (divisionQ) {
       rows = rows.filter((r) =>
-        (r.driver?.division ?? "").toLowerCase().includes(q),
+        (r.driver?.division ?? "").toLowerCase().includes(divisionQ),
+      );
+    }
+    const nameQ = searchByName.trim().toLowerCase();
+    if (nameQ) {
+      rows = rows.filter((r) =>
+        (r.driver?.name ?? "").toLowerCase().includes(nameQ),
       );
     }
     return rows.sort((a, b) => {
@@ -89,7 +96,7 @@ export default function Schedule() {
         sensitivity: "base",
       });
     });
-  }, [assigned, searchAssigned]);
+  }, [assigned, searchAssigned, searchByName]);
 
   const selectedWeek = useMemo(
     () => weeks.find((w) => w.id === resolvedWeekId) ?? null,
@@ -398,6 +405,13 @@ export default function Schedule() {
             placeholder="Search By Division"
             onChange={(e) => setSearchAssigned(e.target.value)}
             className="mb-4 w-full max-w-md rounded-xl bg-white p-2 text-green-950 placeholder:text-green-950"
+          />
+          <input
+            type="search"
+            value={searchByName}
+            placeholder="Search By Name"
+            onChange={(e) => setSearchByName(e.target.value)}
+            className="bg-white rounded-xl max-w-md placeholder:text-green-950 p-2 ml-2 text-green-950"
           />
           {assignedRowsForDisplay.map((row) => (
             <ScheduleRow

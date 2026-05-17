@@ -4,7 +4,10 @@ import { createClient } from "@/lib/supabase/client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePostgresRealtime } from "./usePostgresRealtime";
 
-const SELECT = "id, load_number, origin, end_user, mt, rate, fsc, broker";
+const SELECT =
+  "id, load_number, origin, end_user, mt, rate, fsc, broker, invoiced";
+const SELECT_LEGACY =
+  "id, load_number, origin, end_user, mt, rate, fsc, broker";
 
 export function useLoadSheets() {
   const [sheets, setSheets] = useState([]);
@@ -22,10 +25,22 @@ export function useLoadSheets() {
       return;
     }
 
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from("loadsheets")
       .select(SELECT)
       .order("load_number", { ascending: true });
+
+    if (error && /invoiced|column .* does not exist/i.test(error.message ?? "")) {
+      const legacy = await supabase
+        .from("loadsheets")
+        .select(SELECT_LEGACY)
+        .order("load_number", { ascending: true });
+      data = legacy.data;
+      error = legacy.error;
+      if (!error && data) {
+        data = data.map((row) => ({ ...row, invoiced: false }));
+      }
+    }
 
     if (error) {
       setTableAvailable(false);

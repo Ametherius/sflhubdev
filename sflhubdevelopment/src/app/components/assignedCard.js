@@ -17,7 +17,7 @@ export default function AssignedCard({
   embedded = false,
 }) {
   const shell = embedded
-    ? "m-0 flex h-auto min-h-0 w-full min-w-[17rem] max-w-[22rem] shrink-0 flex-col rounded-none border-0 border-r border-green-950/25 bg-white p-5 shadow-none lg:h-full lg:min-h-0 lg:w-auto lg:max-w-[22rem]"
+    ? "m-0 flex h-auto min-h-0 w-[22rem] min-w-[22rem] max-w-[22rem] shrink-0 flex-col rounded-none border-0 border-r border-green-950/25 bg-white p-5 shadow-none lg:h-full"
     : "m-1 ml-3 w-90 rounded-lg rounded-r-none bg-white p-5";
 
   return (

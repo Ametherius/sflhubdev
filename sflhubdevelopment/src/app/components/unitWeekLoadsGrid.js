@@ -61,6 +61,9 @@ function slotsFromLoads(loads) {
 const fieldStack =
   "w-full border-0 border-b border-neutral-300 bg-white px-2.5 py-2 text-left text-sm text-neutral-900 outline-none placeholder:text-neutral-400 focus:bg-neutral-50";
 
+const fieldStackInvoiced =
+  "w-full border-0 border-b border-neutral-300 bg-green-100 px-2.5 py-2 text-left text-sm text-neutral-900 outline-none placeholder:text-neutral-500 focus:bg-green-200";
+
 const fieldCell =
   "min-h-9 h-9 max-h-9 w-full min-w-0 max-w-full border-0 border-r border-neutral-300 bg-white px-1 py-1 text-center text-sm leading-snug text-neutral-900 outline-none placeholder:text-neutral-400 last:border-r-0 focus:bg-neutral-50";
 
@@ -83,6 +86,7 @@ function LoadSplitCard({
   fillColumn,
   onPersist,
   onEditLoadsheet,
+  loadsheetInvoiced = false,
 }) {
   const slotTitle = slotLabel(slot);
   const [origin, setOrigin] = useState("");
@@ -180,6 +184,8 @@ function LoadSplitCard({
     ? "flex min-h-0 flex-1 flex-row"
     : "flex w-full min-w-0 flex-row";
 
+  const locationFieldClass = loadsheetInvoiced ? fieldStackInvoiced : fieldStack;
+
   return (
     <div
       className={`${rootGrow} relative w-full min-w-[260px] overflow-hidden rounded-lg border border-neutral-400/90 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.08)]`}
@@ -188,7 +194,7 @@ function LoadSplitCard({
         <div className="flex w-50 min-h-0 min-w-0 flex-1 flex-col border-r border-neutral-300 bg-white">
           <input
             type="text"
-            className={fieldStack}
+            className={locationFieldClass}
             value={origin}
             onChange={(e) => setOrigin(e.target.value)}
             onBlur={() => void save()}
@@ -197,7 +203,7 @@ function LoadSplitCard({
           />
           <input
             type="text"
-            className={fieldStack}
+            className={locationFieldClass}
             value={endUser}
             onChange={(e) => setEndUser(e.target.value)}
             onBlur={() => void save()}
@@ -340,6 +346,15 @@ export default function UnitWeekLoadsGrid({
     return m;
   }, [loads]);
 
+  const invoicedBySheetId = useMemo(() => {
+    const m = new Map();
+    for (const sheet of loadSheets ?? []) {
+      if (sheet?.id == null) continue;
+      m.set(String(sheet.id), Boolean(sheet.invoiced));
+    }
+    return m;
+  }, [loadSheets]);
+
   const persistRow = useCallback(
     async ({
       scheduleLoadId,
@@ -469,11 +484,16 @@ export default function UnitWeekLoadsGrid({
                   slot.id != null
                     ? loadMap.get(`${d.iso}-${String(slot.id)}`)
                     : undefined;
+                const sheetId =
+                  row?.loadsheet_id != null ? String(row.loadsheet_id) : "";
+                const loadsheetInvoiced =
+                  sheetId.length > 0 && invoicedBySheetId.get(sheetId) === true;
                 return (
                   <LoadSplitCard
                     key={`${d.iso}-${slot.id ?? `pad-${slot.sort_order}`}`}
                     fillColumn={embeddedInRow}
                     row={row}
+                    loadsheetInvoiced={loadsheetInvoiced}
                     scheduleLoadId={row?.id ?? null}
                     dayIso={d.iso}
                     slotId={slot.id}

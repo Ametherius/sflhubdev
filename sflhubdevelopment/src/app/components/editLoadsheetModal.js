@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { FaTimes } from "react-icons/fa";
 import ButtonDark from "./buttonDark";
 import { computeLoadTotalDisplay, formatLoadTotalCad } from "@/lib/loadTotal";
+import { nextCopyLoadNumber } from "@/lib/loadsheetCopy";
 import { createClient } from "@/lib/supabase/client";
 
 function nullIfEmpty(s) {
@@ -35,7 +36,9 @@ export default function EditLoadsheetModal({
   const [rate, setRate] = useState("");
   const [fsc, setFsc] = useState("");
   const [broker, setBroker] = useState("");
+  const [invoiced, setInvoiced] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [copying, setCopying] = useState(false);
   const [unlinking, setUnlinking] = useState(false);
 
   useEffect(() => {
@@ -77,6 +80,7 @@ export default function EditLoadsheetModal({
       setRate("");
       setFsc("");
       setBroker("");
+      setInvoiced(false);
       return;
     }
     setLoadNumber(selected.load_number != null ? String(selected.load_number) : "");
@@ -86,8 +90,74 @@ export default function EditLoadsheetModal({
     setRate(selected.rate != null ? String(selected.rate) : "");
     setFsc(selected.fsc != null ? String(selected.fsc) : "");
     setBroker(selected.broker != null ? String(selected.broker) : "");
+    setInvoiced(Boolean(selected.invoiced));
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [open, selected]);
+
+  async function handleInvoicedChange(checked) {
+    if (!selectedId) return;
+    setInvoiced(checked);
+    const { error } = await supabase
+      .from("loadsheets")
+      .update({ invoiced: checked })
+      .eq("id", selectedId);
+    if (error) {
+      if (/invoiced|column .* does not exist/i.test(error.message ?? "")) {
+        alert(
+          "Invoiced status needs the latest Supabase migration (loadsheets.invoiced). Apply migrations, then try again.",
+        );
+      } else {
+        alert(error.message);
+      }
+      setInvoiced(!checked);
+      return;
+    }
+    await onSaved?.();
+  }
+
+  async function handleCopy() {
+    if (copying || !selectedId) return;
+    const num = loadNumber.trim();
+    if (!num) {
+      alert("Load number is required to copy.");
+      return;
+    }
+    const newNum = nextCopyLoadNumber(num, loadSheets);
+    if (!newNum) {
+      alert("Could not determine a copy load number.");
+      return;
+    }
+    setCopying(true);
+    const { data, error } = await supabase
+      .from("loadsheets")
+      .insert({
+        load_number: newNum,
+        origin: nullIfEmpty(origin),
+        end_user: nullIfEmpty(endUser),
+        mt: nullIfEmpty(mt),
+        rate: nullIfEmpty(rate),
+        fsc: nullIfEmpty(fsc),
+        broker: nullIfEmpty(broker),
+        invoiced: false,
+      })
+      .select("id")
+      .single();
+    setCopying(false);
+    if (error) {
+      if (/does not exist|schema cache|PGRST205/i.test(error.message ?? "")) {
+        alert(
+          "The loadsheets table is not available. Apply migrations, then try again.",
+        );
+      } else {
+        alert(error.message);
+      }
+      return;
+    }
+    setSelectedId(String(data.id));
+    setLoadNumber(newNum);
+    setInvoiced(false);
+    await onSaved?.();
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -112,6 +182,7 @@ export default function EditLoadsheetModal({
         rate: nullIfEmpty(rate),
         fsc: nullIfEmpty(fsc),
         broker: nullIfEmpty(broker),
+        invoiced,
       })
       .eq("id", selectedId);
     setSaving(false);
@@ -227,11 +298,14 @@ export default function EditLoadsheetModal({
               required
             >
               <option value="">Select a load sheet…</option>
-              {loadSheets.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {String(s.load_number ?? "").trim() || s.id}
-                </option>
-              ))}
+              {loadSheets.map((s) => {
+                const label = String(s.load_number ?? "").trim() || s.id;
+                return (
+                  <option key={s.id} value={s.id}>
+                    {s.invoiced ? `${label} (invoiced)` : label}
+                  </option>
+                );
+              })}
             </select>
           </label>
         )}
@@ -327,19 +401,43 @@ export default function EditLoadsheetModal({
             />
           </label>
 
-          <div className="mt-2 flex justify-end gap-2 border-t border-green-950/15 pt-4">
+          <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
+            <input
+              type="checkbox"
+              className="size-4 rounded border-green-950/30 text-green-950 focus:ring-green-950/30"
+              checked={invoiced}
+              disabled={!selectedId}
+              onChange={(e) => void handleInvoicedChange(e.target.checked)}
+            />
+            Mark as invoiced
+            <span className="font-normal text-green-900/60">
+              (light green origin / end user on the schedule)
+            </span>
+          </label>
+
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-green-950/15 pt-4">
             <button
               type="button"
-              className="rounded-full px-4 py-2 text-sm font-semibold text-green-950 hover:bg-green-950/10"
-              onClick={onClose}
+              className="rounded-lg border border-green-950/30 bg-white px-3 py-2 text-sm font-semibold text-green-950 hover:bg-green-950/5 disabled:opacity-50"
+              disabled={!selectedId || copying}
+              onClick={() => void handleCopy()}
             >
-              Cancel
+              {copying ? "Copying…" : "Copy load sheet"}
             </button>
-            <ButtonDark
-              type="submit"
-              text={saving ? "Saving…" : "Save changes"}
-              disabled={!selectedId || loadSheets.length === 0}
-            />
+            <div className="flex gap-2">
+              <button
+                type="button"
+                className="rounded-full px-4 py-2 text-sm font-semibold text-green-950 hover:bg-green-950/10"
+                onClick={onClose}
+              >
+                Cancel
+              </button>
+              <ButtonDark
+                type="submit"
+                text={saving ? "Saving…" : "Save changes"}
+                disabled={!selectedId || loadSheets.length === 0}
+              />
+            </div>
           </div>
         </form>
       </div>
