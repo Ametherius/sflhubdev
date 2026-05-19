@@ -6,14 +6,9 @@ import {
   computeLoadTotalDisplay,
   formatLoadTotalCadGrid,
 } from "@/lib/loadTotal";
-import {
-  persistScheduleLoad,
-  scheduleLoadErrorMessage,
-} from "@/lib/scheduleLoadsPersist";
 import { createClient } from "@/lib/supabase/client";
 import AssignLoadsheetModal from "./assignLoadsheetModal";
 import EditLoadsheetModal from "./editLoadsheetModal";
-import { FaPlus } from "react-icons/fa";
 
 const LOADS_PER_DAY = 3; // fixed; matches DB ensure_schedule_loads_for_week (limit 3) + canonical load_slots
 
@@ -63,7 +58,7 @@ const fieldStack =
   "w-full border-0 border-b border-neutral-300 bg-white px-2.5 py-2 text-left text-sm text-neutral-900 outline-none placeholder:text-neutral-400 focus:bg-neutral-50";
 
 const fieldStackInvoiced =
-  "w-full border-0 border-b border-neutral-300 bg-green-100 px-2.5 py-2 text-left text-sm text-neutral-900 outline-none placeholder:text-neutral-500 focus:bg-green-200";
+  "w-full border-0 border-b border-neutral-300 bg-green-300 px-2.5 py-2 text-left text-sm text-neutral-900 outline-none placeholder:text-neutral-500 focus:bg-green-300";
 
 const fieldCell =
   "min-h-9 h-9 max-h-9 w-full min-w-0 max-w-full border-0 border-r border-neutral-300 bg-white px-1 py-1 text-center text-sm leading-snug text-neutral-900 outline-none placeholder:text-neutral-400 last:border-r-0 focus:bg-neutral-50";
@@ -109,25 +104,25 @@ function LoadSplitCard({
   );
 
   useEffect(() => {
-    queueMicrotask(() => {
-      if (!row) {
-        setOrigin("");
-        setEndUser("");
-        setFsc("");
-        setMt("");
-        setRate("");
-        setLoadNote("");
-        setLoadsheetId("");
-        return;
-      }
-      setOrigin(row.origin != null ? String(row.origin) : "");
-      setEndUser(row.end_user != null ? String(row.end_user) : "");
-      setFsc(row.fsc != null ? String(row.fsc) : "");
-      setMt(row.mt != null ? String(row.mt) : "");
-      setRate(row.rate != null ? String(row.rate) : "");
-      setLoadNote(row.load_note != null ? String(row.load_note) : "");
-      setLoadsheetId(row.loadsheet_id != null ? String(row.loadsheet_id) : "");
-    });
+    /* eslint-disable react-hooks/set-state-in-effect -- mirror schedule_loads row into local inputs */
+    if (!row) {
+      setOrigin("");
+      setEndUser("");
+      setFsc("");
+      setMt("");
+      setRate("");
+      setLoadNote("");
+      setLoadsheetId("");
+      return;
+    }
+    setOrigin(row.origin != null ? String(row.origin) : "");
+    setEndUser(row.end_user != null ? String(row.end_user) : "");
+    setFsc(row.fsc != null ? String(row.fsc) : "");
+    setMt(row.mt != null ? String(row.mt) : "");
+    setRate(row.rate != null ? String(row.rate) : "");
+    setLoadNote(row.load_note != null ? String(row.load_note) : "");
+    setLoadsheetId(row.loadsheet_id != null ? String(row.loadsheet_id) : "");
+    /* eslint-enable react-hooks/set-state-in-effect */
     // eslint-disable-next-line react-hooks/exhaustive-deps -- depend on row field primitives, not row object identity
   }, [
     row?.id,
@@ -242,7 +237,7 @@ function LoadSplitCard({
               aria-label={`${slotTitle} FSC`}
             />
             <div
-              title="(MT × rate) + FSC when FSC is filled. Total in CAD — scroll if needed."
+              title="MT × rate, or × FSC when FSC is filled (FSC is a multiplier). Total in CAD — scroll if needed."
               className={`${fieldCellTotal} cursor-default`}
               aria-label={`${slotTitle} total (auto)`}
             >
@@ -369,28 +364,47 @@ export default function UnitWeekLoadsGrid({
     }) => {
       if (!slotId || !dayIso) return;
 
-      const { error } = await persistScheduleLoad(supabase, {
-        scheduleLoadId,
-        weekId: wk,
-        loadDate: dayIso,
-        loadSlotId: slotId,
-        inUseUnitId: unitId,
-        payload,
-      });
-
-      if (error) {
-        if (
-          /load_note|origin|end_user|\bmt\b|rate|load_total|loadsheet_id|load_number|\bfsc\b|column .* does not exist/i.test(
-            error.message ?? "",
-          )
-        ) {
-          alert(
-            "Apply the latest Supabase migrations for schedule_loads detail columns, then try again.",
-          );
-        } else {
-          console.error(error.message);
-          alert(scheduleLoadErrorMessage(error.message));
+      if (scheduleLoadId) {
+        const { error } = await supabase
+          .from("schedule_loads")
+          .update(payload)
+          .eq("id", scheduleLoadId);
+        if (error) {
+          if (
+            /load_note|origin|end_user|\bmt\b|rate|load_total|loadsheet_id|load_number|\bfsc\b|column .* does not exist/i.test(
+              error.message ?? "",
+            )
+          ) {
+            alert(
+              "Apply the latest Supabase migrations for schedule_loads detail columns, then try again.",
+            );
+          } else {
+            console.error(error.message);
+            alert(error.message);
+          }
+          return;
         }
+        await onUpdated?.();
+        return;
+      }
+
+      if (!wk || !unitId) {
+        console.warn(
+          "Missing week or unit id; cannot create schedule_load row.",
+        );
+        return;
+      }
+
+      const { error } = await supabase.from("schedule_loads").insert({
+        week_id: wk,
+        load_date: dayIso,
+        load_slot_id: slotId,
+        in_use_unit_id: unitId,
+        ...payload,
+      });
+      if (error) {
+        console.error(error.message);
+        alert(error.message);
         return;
       }
       await onUpdated?.();
@@ -458,7 +472,7 @@ export default function UnitWeekLoadsGrid({
                     type="button"
                     title="Assign a load sheet to this day (copy into schedule)"
                     aria-label="Assign load sheet to this day"
-                    className="absolute right-1 top-1/2 shrink-0 -translate-y-1/2 rounded border border-white/30 bg-white/10 px-1 py-px text-[10px] font-bold uppercase tracking-wide text-white hover:bg-white/20"
+                    className="absolute right-1 top-1/2 shrink-0 -translate-y-1/2 rounded border border-white/30 bg-white/10 px-1 py-px text-[8px] font-bold uppercase tracking-wide text-white hover:bg-white/20"
                     onClick={() =>
                       setAssignTarget({
                         dayIso: d.iso,
@@ -466,7 +480,7 @@ export default function UnitWeekLoadsGrid({
                       })
                     }
                   >
-                    <FaPlus />
+                    +
                   </button>
                 </>
               ) : (
@@ -544,6 +558,7 @@ export default function UnitWeekLoadsGrid({
         scheduleLoadId={editLoadsheetTarget?.scheduleLoadId ?? null}
         loadSheets={loadSheets}
         onSaved={onLoadSheetsUpdated ?? (async () => {})}
+        onScheduleUpdated={onUpdated}
         onScheduleUnlinked={onUpdated}
       />
     </div>

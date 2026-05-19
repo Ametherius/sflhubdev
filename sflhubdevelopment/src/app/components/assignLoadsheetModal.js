@@ -5,6 +5,10 @@ import { FaTimes } from "react-icons/fa";
 import ButtonDark from "./buttonDark";
 import { createClient } from "@/lib/supabase/client";
 import {
+  buildScheduleLoadNote,
+  buildScheduleLoadPayload,
+} from "@/lib/loadsheetCopy";
+import {
   persistScheduleLoad,
   scheduleLoadErrorMessage,
 } from "@/lib/scheduleLoadsPersist";
@@ -25,16 +29,6 @@ function nullIfEmpty(s) {
 /** DB may return numeric load_number; always stringify before .trim(). */
 function strTrim(v) {
   return String(v ?? "").trim();
-}
-
-/** Load # on first line; broker on second line when present (green notes column). */
-function buildScheduleLoadNote(loadNumber, broker) {
-  const num = strTrim(loadNumber);
-  const br = strTrim(broker);
-  if (!num && !br) return null;
-  if (!br) return num.length ? num : null;
-  if (!num) return `Broker: ${br}`;
-  return `${num}\nBroker: ${br}`;
 }
 
 function slotOptionLabel(slot) {
@@ -136,21 +130,16 @@ export default function AssignLoadsheetModal({
       return isoDateKey(l.load_date) === dk && String(sid) === String(slotId);
     });
 
-    const num = strTrim(selectedSheet.load_number);
-    const loadNote = buildScheduleLoadNote(
-      selectedSheet.load_number,
-      selectedSheet.broker,
-    );
-    const payload = {
-      loadsheet_id: selectedSheet.id,
-      load_number: num.length ? num : null,
-      load_note: loadNote,
-      origin: nullIfEmpty(selectedSheet.origin),
-      end_user: nullIfEmpty(selectedSheet.end_user),
-      mt: nullIfEmpty(selectedSheet.mt),
-      rate: nullIfEmpty(selectedSheet.rate),
-      fsc: nullIfEmpty(selectedSheet.fsc),
-    };
+    const payload = buildScheduleLoadPayload({
+      loadsheetId: selectedSheet.id,
+      loadNumber: selectedSheet.load_number,
+      origin: selectedSheet.origin,
+      endUser: selectedSheet.end_user,
+      mt: selectedSheet.mt,
+      rate: selectedSheet.rate,
+      fsc: selectedSheet.fsc,
+      broker: selectedSheet.broker,
+    });
 
     const { error } = await persistScheduleLoad(supabase, {
       scheduleLoadId: row?.id ?? null,

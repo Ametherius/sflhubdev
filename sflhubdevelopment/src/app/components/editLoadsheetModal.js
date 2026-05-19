@@ -4,7 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import { FaTimes } from "react-icons/fa";
 import ButtonDark from "./buttonDark";
 import { computeLoadTotalDisplay, formatLoadTotalCad } from "@/lib/loadTotal";
-import { nextCopyLoadNumber } from "@/lib/loadsheetCopy";
+import {
+  buildScheduleLoadPayload,
+  nextCopyLoadNumber,
+} from "@/lib/loadsheetCopy";
 import { createClient } from "@/lib/supabase/client";
 
 function nullIfEmpty(s) {
@@ -24,6 +27,8 @@ export default function EditLoadsheetModal({
   /** When set (opened from a grid slot), offer "remove from this slot" for schedule_loads */
   scheduleLoadId = null,
   onSaved,
+  /** Called after syncing this slot's schedule_loads row (refresh week loads) */
+  onScheduleUpdated,
   /** Called after unlinking schedule row from loadsheet (refresh week loads) */
   onScheduleUnlinked,
 }) {
@@ -83,7 +88,9 @@ export default function EditLoadsheetModal({
       setInvoiced(false);
       return;
     }
-    setLoadNumber(selected.load_number != null ? String(selected.load_number) : "");
+    setLoadNumber(
+      selected.load_number != null ? String(selected.load_number) : "",
+    );
     setOrigin(selected.origin != null ? String(selected.origin) : "");
     setEndUser(selected.end_user != null ? String(selected.end_user) : "");
     setMt(selected.mt != null ? String(selected.mt) : "");
@@ -196,6 +203,39 @@ export default function EditLoadsheetModal({
       }
       return;
     }
+
+    if (scheduleLoadId) {
+      const schedulePayload = buildScheduleLoadPayload({
+        loadsheetId: selectedId,
+        loadNumber: num,
+        origin,
+        endUser,
+        mt,
+        rate,
+        fsc,
+        broker,
+      });
+      const { error: scheduleError } = await supabase
+        .from("schedule_loads")
+        .update(schedulePayload)
+        .eq("id", scheduleLoadId);
+      if (scheduleError) {
+        if (
+          /load_note|origin|end_user|\bmt\b|rate|load_total|loadsheet_id|load_number|\bfsc\b|column .* does not exist/i.test(
+            scheduleError.message ?? "",
+          )
+        ) {
+          alert(
+            "Load sheet saved, but the schedule slot could not update. Apply the latest schedule_loads migrations, then try again.",
+          );
+        } else {
+          alert(scheduleError.message);
+        }
+        return;
+      }
+      await onScheduleUpdated?.();
+    }
+
     await onSaved?.();
     onClose();
   }
@@ -266,8 +306,10 @@ export default function EditLoadsheetModal({
           Edit load sheet
         </h2>
         <p className="mb-4 text-sm text-green-900/80">
-          Changes the saved template in your library. Assigned schedule rows keep their
-          current values until you assign again from the day <strong>+</strong> button.
+          Updates the saved template in your library.
+          {scheduleLoadId
+            ? " This slot on the schedule updates immediately with the same fields."
+            : " Open from a schedule slot’s Sheet button to push changes into that cell."}
         </p>
 
         {scheduleLoadId ? (
@@ -286,7 +328,8 @@ export default function EditLoadsheetModal({
 
         {loadSheets.length === 0 ? (
           <p className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
-            No load sheets yet. Use <strong>New load sheet</strong> in the bottom bar first.
+            No load sheets yet. Use <strong>New load sheet</strong> in the
+            bottom bar first.
           </p>
         ) : (
           <label className="mb-3 block text-sm font-medium">
@@ -391,7 +434,8 @@ export default function EditLoadsheetModal({
             />
           </label>
           <label className="block text-sm font-medium">
-            Broker <span className="font-normal text-green-900/60">(optional)</span>
+            Broker{" "}
+            <span className="font-normal text-green-900/60">(optional)</span>
             <input
               className={inputClass}
               value={broker}
@@ -409,7 +453,7 @@ export default function EditLoadsheetModal({
               disabled={!selectedId}
               onChange={(e) => void handleInvoicedChange(e.target.checked)}
             />
-            Mark as invoiced
+            Mark as completed
             <span className="font-normal text-green-900/60">
               (light green origin / end user on the schedule)
             </span>
