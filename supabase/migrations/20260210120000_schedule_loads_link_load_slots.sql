@@ -92,108 +92,182 @@ alter table public.load_slots
   alter column sort_order set not null;
 
 -- ── 0b) Seed three default slots when load_slots is empty
---     MIN(drivers.id) / MIN(units.id): one cheap aggregate per table (PK), not a scan of
---     all rows. Placeholders only — edit in Studio or relax NOT NULL if slots are templates.
+--     Builds INSERT per row so NOT NULL columns without defaults (e.g. origin) get safe placeholders.
 do $$
 declare
   need_driver boolean;
   need_unit boolean;
-  has_name boolean;
-  drv_id public.drivers.id%type;
-  unt_id public.units.id%type;
+  drv_id text;
+  unt_id text;
+  n int;
+  col_names text[];
+  col_exprs text[];
+  sql text;
+  extra record;
 begin
-  if not exists (select 1 from public.load_slots) then
-    begin
-      select exists (
-        select 1
-        from information_schema.columns c
-        where c.table_schema = 'public'
-          and c.table_name = 'load_slots'
-          and c.column_name = 'driver_id'
-          and c.is_nullable = 'NO'
-      ) into need_driver;
-
-      select exists (
-        select 1
-        from information_schema.columns c
-        where c.table_schema = 'public'
-          and c.table_name = 'load_slots'
-          and c.column_name = 'unit_id'
-          and c.is_nullable = 'NO'
-      ) into need_unit;
-
-      select exists (
-        select 1
-        from information_schema.columns
-        where table_schema = 'public'
-          and table_name = 'load_slots'
-          and column_name = 'name'
-      ) into has_name;
-
-      if need_driver then
-        select min(d.id) into drv_id from public.drivers d;
-        if drv_id is null then
-          raise exception
-            'load_slots.driver_id is NOT NULL but public.drivers has no rows. Add a driver first.';
-        end if;
-      end if;
-
-      if need_unit then
-        select min(u.id) into unt_id from public.units u;
-        if unt_id is null then
-          raise exception
-            'load_slots.unit_id is NOT NULL but public.units has no rows. Add a unit first.';
-        end if;
-      end if;
-
-      if has_name and need_driver and need_unit then
-        insert into public.load_slots (id, sort_order, name, driver_id, unit_id) values
-          (gen_random_uuid(), 1, 'Load 1', drv_id, unt_id),
-          (gen_random_uuid(), 2, 'Load 2', drv_id, unt_id),
-          (gen_random_uuid(), 3, 'Load 3', drv_id, unt_id);
-      elsif has_name and need_driver then
-        insert into public.load_slots (id, sort_order, name, driver_id) values
-          (gen_random_uuid(), 1, 'Load 1', drv_id),
-          (gen_random_uuid(), 2, 'Load 2', drv_id),
-          (gen_random_uuid(), 3, 'Load 3', drv_id);
-      elsif has_name and need_unit and not need_driver then
-        insert into public.load_slots (id, sort_order, name, unit_id) values
-          (gen_random_uuid(), 1, 'Load 1', unt_id),
-          (gen_random_uuid(), 2, 'Load 2', unt_id),
-          (gen_random_uuid(), 3, 'Load 3', unt_id);
-      elsif need_driver and need_unit then
-        insert into public.load_slots (id, sort_order, driver_id, unit_id) values
-          (gen_random_uuid(), 1, drv_id, unt_id),
-          (gen_random_uuid(), 2, drv_id, unt_id),
-          (gen_random_uuid(), 3, drv_id, unt_id);
-      elsif need_driver then
-        insert into public.load_slots (id, sort_order, driver_id) values
-          (gen_random_uuid(), 1, drv_id),
-          (gen_random_uuid(), 2, drv_id),
-          (gen_random_uuid(), 3, drv_id);
-      elsif need_unit and not need_driver then
-        insert into public.load_slots (id, sort_order, unit_id) values
-          (gen_random_uuid(), 1, unt_id),
-          (gen_random_uuid(), 2, unt_id),
-          (gen_random_uuid(), 3, unt_id);
-      elsif has_name then
-        insert into public.load_slots (id, sort_order, name) values
-          (gen_random_uuid(), 1, 'Load 1'),
-          (gen_random_uuid(), 2, 'Load 2'),
-          (gen_random_uuid(), 3, 'Load 3');
-      else
-        insert into public.load_slots (id, sort_order) values
-          (gen_random_uuid(), 1),
-          (gen_random_uuid(), 2),
-          (gen_random_uuid(), 3);
-      end if;
-    exception
-      when others then
-        raise exception
-          'load_slots is empty and auto-seed failed (%). Add rows manually.',
-          sqlerrm;
-    end;
+  if exists (select 1 from public.load_slots limit 1) then
+    return;
   end if;
+
+  select exists (
+    select 1
+    from information_schema.columns c
+    where c.table_schema = 'public'
+      and c.table_name = 'load_slots'
+      and c.column_name = 'driver_id'
+      and c.is_nullable = 'NO'
+  ) into need_driver;
+
+  select exists (
+    select 1
+    from information_schema.columns c
+    where c.table_schema = 'public'
+      and c.table_name = 'load_slots'
+      and c.column_name = 'unit_id'
+      and c.is_nullable = 'NO'
+  ) into need_unit;
+
+  if need_driver then
+    select d.id::text into drv_id from public.drivers d order by d.id limit 1;
+    if drv_id is null then
+      raise exception
+        'load_slots.driver_id is NOT NULL but public.drivers has no rows. Add a driver first.';
+    end if;
+  end if;
+
+  if need_unit then
+    select u.id::text into unt_id from public.units u order by u.id limit 1;
+    if unt_id is null then
+      raise exception
+        'load_slots.unit_id is NOT NULL but public.units has no rows. Add a unit first.';
+    end if;
+  end if;
+
+  for n in 1..3 loop
+    col_names := array[]::text[];
+    col_exprs := array[]::text[];
+
+    col_names := array_append(col_names, 'id');
+    col_exprs := array_append(col_exprs, quote_literal(gen_random_uuid()::text) || '::uuid');
+
+    col_names := array_append(col_names, 'sort_order');
+    col_exprs := array_append(col_exprs, n::text);
+
+    if exists (
+      select 1
+      from information_schema.columns c
+      where c.table_schema = 'public'
+        and c.table_name = 'load_slots'
+        and c.column_name = 'slot_index'
+    ) then
+      col_names := array_append(col_names, 'slot_index');
+      -- Many schemas use 0-based slot_index (0,1,2); sort_order stays 1-based.
+      col_exprs := array_append(col_exprs, (n - 1)::text);
+    end if;
+
+    if exists (
+      select 1
+      from information_schema.columns c
+      where c.table_schema = 'public'
+        and c.table_name = 'load_slots'
+        and c.column_name = 'name'
+    ) then
+      col_names := array_append(col_names, 'name');
+      col_exprs := array_append(col_exprs, quote_literal('Load ' || n::text));
+    end if;
+
+    if need_driver then
+      col_names := array_append(col_names, 'driver_id');
+      col_exprs := array_append(col_exprs, quote_literal(drv_id));
+    end if;
+
+    if need_unit then
+      col_names := array_append(col_names, 'unit_id');
+      col_exprs := array_append(col_exprs, quote_literal(unt_id));
+    end if;
+
+    for extra in
+      select
+        c.column_name,
+        c.data_type
+      from information_schema.columns c
+      where c.table_schema = 'public'
+        and c.table_name = 'load_slots'
+        and c.is_nullable = 'NO'
+        and c.column_default is null
+        and coalesce(c.is_generated, '') <> 'ALWAYS'
+        and c.column_name not in (
+          'id',
+          'sort_order',
+          'slot_index',
+          'name',
+          'driver_id',
+          'unit_id'
+        )
+    loop
+      col_names := array_append(col_names, extra.column_name);
+      case
+        when extra.data_type in ('text', 'character varying', 'character') then
+          if extra.column_name in ('mt', 'rate', 'fsc', 'load_total', 'load_number') then
+            col_exprs := array_append(col_exprs, quote_literal('0'));
+          else
+            col_exprs := array_append(col_exprs, quote_literal(''));
+          end if;
+        when extra.data_type in ('smallint', 'integer', 'bigint') then
+          if extra.column_name in ('mt', 'rate') then
+            col_exprs := array_append(col_exprs, '1');
+          else
+            col_exprs := array_append(col_exprs, '0');
+          end if;
+        when extra.data_type = 'boolean' then
+          col_exprs := array_append(col_exprs, 'false');
+        when extra.data_type = 'numeric' then
+          if extra.column_name in ('mt', 'rate', 'fsc', 'load_total') then
+            col_exprs := array_append(col_exprs, '1');
+          else
+            col_exprs := array_append(col_exprs, '0');
+          end if;
+        when extra.data_type = 'double precision' then
+          col_exprs := array_append(col_exprs, '0::double precision');
+        when extra.data_type = 'real' then
+          col_exprs := array_append(col_exprs, '0::real');
+        when extra.data_type = 'date' then
+          col_exprs := array_append(col_exprs, '''1970-01-01''::date');
+        when extra.data_type = 'timestamp with time zone' then
+          col_exprs := array_append(col_exprs, '''1970-01-01 00:00:00+00''::timestamptz');
+        when extra.data_type = 'timestamp without time zone' then
+          col_exprs := array_append(col_exprs, '''1970-01-01 00:00:00''::timestamp');
+        when extra.data_type = 'uuid' then
+          raise exception
+            'load_slots autoseed: column % is uuid NOT NULL without default — insert three rows manually (sort_order 1–3), then re-run.',
+            extra.column_name;
+        else
+          raise exception
+            'load_slots autoseed: cannot auto-fill NOT NULL column % (type %) — insert three rows manually.',
+            extra.column_name,
+            extra.data_type;
+      end case;
+    end loop;
+
+    sql := format(
+      'insert into public.load_slots (%s) values (%s)',
+      (
+        select string_agg(quote_ident(x), ', ')
+        from unnest(col_names) as u(x)
+      ),
+      (
+        select string_agg(x, ', ')
+        from unnest(col_exprs) as u(x)
+      )
+    );
+
+    execute sql;
+  end loop;
+exception
+  when others then
+    raise exception
+      'load_slots is empty and auto-seed failed (%). Add three rows (sort_order 1–3), then re-run.',
+      sqlerrm;
 end $$;
 
 -- ── 1) Column without FK first (avoids FK errors during backfill) ──────────

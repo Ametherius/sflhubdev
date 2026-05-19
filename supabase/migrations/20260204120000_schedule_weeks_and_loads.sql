@@ -52,6 +52,9 @@ grant execute on function public.create_schedule_week (date) to authenticated;
 alter table public.schedule_weeks enable row level security;
 alter table public.schedule_loads enable row level security;
 
+drop policy if exists "schedule_weeks_authenticated_all" on public.schedule_weeks;
+drop policy if exists "schedule_loads_authenticated_all" on public.schedule_loads;
+
 create policy "schedule_weeks_authenticated_all"
   on public.schedule_weeks
   for all
