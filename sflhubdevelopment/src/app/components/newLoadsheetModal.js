@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { FaTimes } from "react-icons/fa";
 import ButtonDark from "./buttonDark";
+import { computeLoadTotalDisplay, formatLoadTotalCad } from "@/lib/loadTotal";
 import { createClient } from "@/lib/supabase/client";
 
 function nullIfEmpty(s) {
@@ -12,23 +13,35 @@ function nullIfEmpty(s) {
 
 export default function NewLoadsheetModal({ open, onClose, onCreated }) {
   const supabase = useMemo(() => createClient(), []);
+  const [broker, setBroker] = useState("");
   const [loadNumber, setLoadNumber] = useState("");
   const [origin, setOrigin] = useState("");
   const [endUser, setEndUser] = useState("");
   const [mt, setMt] = useState("");
   const [rate, setRate] = useState("");
   const [fsc, setFsc] = useState("");
-  const [broker, setBroker] = useState("");
+  const [flatRate, setFlatRate] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  const loadTotalPreview = useMemo(
+    () => computeLoadTotalDisplay(mt, rate, fsc, flatRate),
+    [mt, rate, fsc, flatRate],
+  );
+
+  const loadTotalPreviewCad = useMemo(
+    () => formatLoadTotalCad(loadTotalPreview),
+    [loadTotalPreview],
+  );
+
   function reset() {
+    setBroker("");
     setLoadNumber("");
     setOrigin("");
     setEndUser("");
     setMt("");
     setRate("");
     setFsc("");
-    setBroker("");
+    setFlatRate(false);
   }
 
   async function handleSubmit(e) {
@@ -42,18 +55,23 @@ export default function NewLoadsheetModal({ open, onClose, onCreated }) {
     setSaving(true);
     const { error } = await supabase.from("loadsheets").insert({
       load_number: num,
+      broker: nullIfEmpty(broker),
       origin: nullIfEmpty(origin),
       end_user: nullIfEmpty(endUser),
       mt: nullIfEmpty(mt),
       rate: nullIfEmpty(rate),
       fsc: nullIfEmpty(fsc),
-      broker: nullIfEmpty(broker),
+      flat_rate: flatRate,
     });
     setSaving(false);
     if (error) {
       if (/does not exist|schema cache|PGRST205/i.test(error.message ?? "")) {
         alert(
           "The loadsheets table is not available yet. Apply the latest Supabase migration, then try again.",
+        );
+      } else if (/flat_rate|column .* does not exist/i.test(error.message ?? "")) {
+        alert(
+          "Flat rate needs the latest Supabase migration (loadsheets.flat_rate). Apply migrations, then try again.",
         );
       } else {
         alert(error.message);
@@ -95,11 +113,20 @@ export default function NewLoadsheetModal({ open, onClose, onCreated }) {
           New load sheet
         </h2>
         <p className="mb-4 text-sm text-green-900/80">
-          Save a reusable load. On the schedule, use “Assign load” on a day to
+          Save a reusable load. On the schedule, use the day <strong>+</strong> button to
           copy these values into that unit&apos;s load row.
         </p>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+          <label className="block text-sm font-medium">
+            Broker <span className="font-normal text-green-900/60">(optional)</span>
+            <input
+              className={inputClass}
+              value={broker}
+              onChange={(e) => setBroker(e.target.value)}
+              placeholder="Broker"
+            />
+          </label>
           <label className="block text-sm font-medium">
             Load number <span className="text-red-700">*</span>
             <input
@@ -136,6 +163,7 @@ export default function NewLoadsheetModal({ open, onClose, onCreated }) {
                 value={mt}
                 onChange={(e) => setMt(e.target.value)}
                 placeholder="MT"
+                disabled={flatRate}
               />
             </label>
             <label className="block text-sm font-medium">
@@ -157,13 +185,26 @@ export default function NewLoadsheetModal({ open, onClose, onCreated }) {
               placeholder="Fuel surcharge"
             />
           </label>
-          <label className="block text-sm font-medium">
-            Broker <span className="font-normal text-green-900/60">(optional)</span>
+          <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
             <input
-              className={inputClass}
-              value={broker}
-              onChange={(e) => setBroker(e.target.value)}
-              placeholder="Broker"
+              type="checkbox"
+              className="size-4 rounded border-green-950/30 text-green-950 focus:ring-green-950/30"
+              checked={flatRate}
+              onChange={(e) => setFlatRate(e.target.checked)}
+            />
+            Flat rate
+            <span className="font-normal text-green-900/60">(total = rate × FSC only)</span>
+          </label>
+          <label className="block text-sm font-medium">
+            Total{" "}
+            <span className="font-normal text-green-900/60">
+              {flatRate ? "(rate × FSC)" : "(MT × rate + FSC)"}
+            </span>
+            <input
+              className={`${inputClass} cursor-not-allowed bg-neutral-100 text-neutral-700`}
+              readOnly
+              value={loadTotalPreviewCad}
+              placeholder="—"
             />
           </label>
 

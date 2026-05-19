@@ -29,9 +29,10 @@ export function buildScheduleLoadPayload({
   rate,
   fsc,
   broker,
+  flatRate = false,
 }) {
   const num = strTrim(loadNumber);
-  const loadTotalDisplay = computeLoadTotalDisplay(mt, rate, fsc);
+  const loadTotalDisplay = computeLoadTotalDisplay(mt, rate, fsc, flatRate);
   return {
     loadsheet_id: loadsheetId,
     load_number: num.length ? num : null,

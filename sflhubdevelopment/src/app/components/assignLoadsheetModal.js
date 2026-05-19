@@ -59,6 +59,7 @@ export default function AssignLoadsheetModal({
   /** When set, modal opens with this load_slot_id selected (e.g. third slot). */
   initialSlotId = null,
   onAssigned,
+  onLoadPatched,
 }) {
   const supabase = useMemo(() => createClient(), []);
   const [loadsheetId, setLoadsheetId] = useState("");
@@ -139,9 +140,10 @@ export default function AssignLoadsheetModal({
       rate: selectedSheet.rate,
       fsc: selectedSheet.fsc,
       broker: selectedSheet.broker,
+      flatRate: Boolean(selectedSheet.flat_rate),
     });
 
-    const { error } = await persistScheduleLoad(supabase, {
+    const { data, error } = await persistScheduleLoad(supabase, {
       scheduleLoadId: row?.id ?? null,
       weekId,
       loadDate: dk,
@@ -165,6 +167,9 @@ export default function AssignLoadsheetModal({
       return;
     }
 
+    if (data) {
+      onLoadPatched?.(data);
+    }
     await onAssigned?.();
     onClose();
   }

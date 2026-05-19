@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FaTimes } from "react-icons/fa";
 import ButtonDark from "./buttonDark";
 import { computeLoadTotalDisplay, formatLoadTotalCad } from "@/lib/loadTotal";
@@ -9,6 +9,7 @@ import {
   nextCopyLoadNumber,
 } from "@/lib/loadsheetCopy";
 import { createClient } from "@/lib/supabase/client";
+import { persistScheduleLoad } from "@/lib/scheduleLoadsPersist";
 
 function nullIfEmpty(s) {
   const t = String(s ?? "").trim();
@@ -29,6 +30,8 @@ export default function EditLoadsheetModal({
   onSaved,
   /** Called after syncing this slot's schedule_loads row (refresh week loads) */
   onScheduleUpdated,
+  /** Merge saved row into week loads immediately (before refetch) */
+  onSchedulePatched,
   /** Called after unlinking schedule row from loadsheet (refresh week loads) */
   onScheduleUnlinked,
 }) {
@@ -41,14 +44,22 @@ export default function EditLoadsheetModal({
   const [rate, setRate] = useState("");
   const [fsc, setFsc] = useState("");
   const [broker, setBroker] = useState("");
+  const [flatRate, setFlatRate] = useState(false);
   const [invoiced, setInvoiced] = useState(false);
   const [saving, setSaving] = useState(false);
   const [copying, setCopying] = useState(false);
   const [unlinking, setUnlinking] = useState(false);
+  const liveSyncReadyRef = useRef(false);
+  const liveSyncGenRef = useRef(0);
+  const lastHydratedSheetIdRef = useRef(null);
 
   useEffect(() => {
+    if (!open) {
+      liveSyncReadyRef.current = false;
+      return;
+    }
+    liveSyncReadyRef.current = false;
     /* eslint-disable react-hooks/set-state-in-effect -- reset picker when modal opens */
-    if (!open) return;
     const want =
       initialLoadsheetId != null && String(initialLoadsheetId).trim() !== ""
         ? String(initialLoadsheetId)
@@ -65,8 +76,8 @@ export default function EditLoadsheetModal({
   );
 
   const loadTotalPreview = useMemo(
-    () => computeLoadTotalDisplay(mt, rate, fsc),
-    [mt, rate, fsc],
+    () => computeLoadTotalDisplay(mt, rate, fsc, flatRate),
+    [mt, rate, fsc, flatRate],
   );
 
   const loadTotalPreviewCad = useMemo(
@@ -75,9 +86,13 @@ export default function EditLoadsheetModal({
   );
 
   useEffect(() => {
-    /* eslint-disable react-hooks/set-state-in-effect -- hydrate form from selected loadsheet */
-    if (!open) return;
+    /* eslint-disable react-hooks/set-state-in-effect -- hydrate form when sheet selection changes */
+    if (!open) {
+      lastHydratedSheetIdRef.current = null;
+      return;
+    }
     if (!selected) {
+      lastHydratedSheetIdRef.current = null;
       setLoadNumber("");
       setOrigin("");
       setEndUser("");
@@ -85,9 +100,14 @@ export default function EditLoadsheetModal({
       setRate("");
       setFsc("");
       setBroker("");
+      setFlatRate(false);
       setInvoiced(false);
       return;
     }
+    if (lastHydratedSheetIdRef.current === selectedId) return;
+    lastHydratedSheetIdRef.current = selectedId;
+
+    liveSyncReadyRef.current = false;
     setLoadNumber(
       selected.load_number != null ? String(selected.load_number) : "",
     );
@@ -97,9 +117,145 @@ export default function EditLoadsheetModal({
     setRate(selected.rate != null ? String(selected.rate) : "");
     setFsc(selected.fsc != null ? String(selected.fsc) : "");
     setBroker(selected.broker != null ? String(selected.broker) : "");
+    setFlatRate(Boolean(selected.flat_rate));
     setInvoiced(Boolean(selected.invoiced));
+    queueMicrotask(() => {
+      liveSyncReadyRef.current = true;
+    });
     /* eslint-enable react-hooks/set-state-in-effect */
-  }, [open, selected]);
+  }, [open, selected, selectedId]);
+
+  const persistLive = useCallback(
+    async (overrides = {}) => {
+      if (!selectedId || !liveSyncReadyRef.current) return;
+
+      const num = (overrides.loadNumber ?? loadNumber).trim();
+      if (!num) return;
+
+      const values = {
+        loadNumber: num,
+        origin: overrides.origin ?? origin,
+        endUser: overrides.endUser ?? endUser,
+        mt: overrides.mt ?? mt,
+        rate: overrides.rate ?? rate,
+        fsc: overrides.fsc ?? fsc,
+        broker: overrides.broker ?? broker,
+        flatRate:
+          overrides.flatRate !== undefined ? overrides.flatRate : flatRate,
+      };
+
+      const { error } = await supabase
+        .from("loadsheets")
+        .update({
+          load_number: values.loadNumber,
+          origin: nullIfEmpty(values.origin),
+          end_user: nullIfEmpty(values.endUser),
+          mt: nullIfEmpty(values.mt),
+          rate: nullIfEmpty(values.rate),
+          fsc: nullIfEmpty(values.fsc),
+          broker: nullIfEmpty(values.broker),
+          flat_rate: values.flatRate,
+        })
+        .eq("id", selectedId);
+
+      if (error) {
+        if (/flat_rate|column .* does not exist/i.test(error.message ?? "")) {
+          alert(
+            "Flat rate needs the latest Supabase migration (loadsheets.flat_rate). Apply migrations, then try again.",
+          );
+        } else if (
+          !/does not exist|schema cache|PGRST205/i.test(error.message ?? "")
+        ) {
+          console.error(error.message);
+        }
+        return;
+      }
+
+      if (scheduleLoadId) {
+        const schedulePayload = buildScheduleLoadPayload({
+          loadsheetId: selectedId,
+          loadNumber: values.loadNumber,
+          origin: values.origin,
+          endUser: values.endUser,
+          mt: values.mt,
+          rate: values.rate,
+          fsc: values.fsc,
+          broker: values.broker,
+          flatRate: values.flatRate,
+        });
+        const { data: scheduleRow, error: scheduleError } =
+          await persistScheduleLoad(supabase, {
+            scheduleLoadId,
+            payload: schedulePayload,
+          });
+        if (scheduleError) {
+          if (
+            /load_note|origin|end_user|\bmt\b|rate|load_total|loadsheet_id|load_number|\bfsc\b|column .* does not exist/i.test(
+              scheduleError.message ?? "",
+            )
+          ) {
+            alert(
+              "Load sheet saved, but the schedule slot could not update (missing columns). Apply the latest schedule_loads migrations, then try again.",
+            );
+          } else {
+            alert(scheduleError.message);
+          }
+          return;
+        }
+        if (scheduleRow) {
+          onSchedulePatched?.(scheduleRow);
+        }
+        await onScheduleUpdated?.();
+      }
+
+      await onSaved?.();
+    },
+    [
+      selectedId,
+      loadNumber,
+      origin,
+      endUser,
+      mt,
+      rate,
+      fsc,
+      broker,
+      flatRate,
+      scheduleLoadId,
+      supabase,
+      onSaved,
+      onScheduleUpdated,
+      onSchedulePatched,
+    ],
+  );
+
+  useEffect(() => {
+    if (!open || !selectedId || !liveSyncReadyRef.current) return;
+
+    const gen = ++liveSyncGenRef.current;
+    const timer = setTimeout(() => {
+      if (gen !== liveSyncGenRef.current) return;
+      void persistLive();
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [
+    open,
+    selectedId,
+    loadNumber,
+    origin,
+    endUser,
+    mt,
+    rate,
+    fsc,
+    broker,
+    persistLive,
+  ]);
+
+  function handleFlatRateChange(checked) {
+    setFlatRate(checked);
+    if (!selectedId) return;
+    void persistLive({ flatRate: checked });
+  }
 
   async function handleInvoicedChange(checked) {
     if (!selectedId) return;
@@ -145,6 +301,7 @@ export default function EditLoadsheetModal({
         rate: nullIfEmpty(rate),
         fsc: nullIfEmpty(fsc),
         broker: nullIfEmpty(broker),
+        flat_rate: flatRate,
         invoiced: false,
       })
       .select("id")
@@ -162,6 +319,7 @@ export default function EditLoadsheetModal({
     }
     setSelectedId(String(data.id));
     setLoadNumber(newNum);
+    setFlatRate(flatRate);
     setInvoiced(false);
     await onSaved?.();
   }
@@ -179,63 +337,17 @@ export default function EditLoadsheetModal({
       return;
     }
     setSaving(true);
+    liveSyncGenRef.current += 1;
+    await persistLive();
     const { error } = await supabase
       .from("loadsheets")
-      .update({
-        load_number: num,
-        origin: nullIfEmpty(origin),
-        end_user: nullIfEmpty(endUser),
-        mt: nullIfEmpty(mt),
-        rate: nullIfEmpty(rate),
-        fsc: nullIfEmpty(fsc),
-        broker: nullIfEmpty(broker),
-        invoiced,
-      })
+      .update({ invoiced })
       .eq("id", selectedId);
     setSaving(false);
-    if (error) {
-      if (/does not exist|schema cache|PGRST205/i.test(error.message ?? "")) {
-        alert(
-          "The loadsheets table is not available. Apply migrations, then try again.",
-        );
-      } else {
-        alert(error.message);
-      }
+    if (error && !/invoiced|column .* does not exist/i.test(error.message ?? "")) {
+      alert(error.message);
       return;
     }
-
-    if (scheduleLoadId) {
-      const schedulePayload = buildScheduleLoadPayload({
-        loadsheetId: selectedId,
-        loadNumber: num,
-        origin,
-        endUser,
-        mt,
-        rate,
-        fsc,
-        broker,
-      });
-      const { error: scheduleError } = await supabase
-        .from("schedule_loads")
-        .update(schedulePayload)
-        .eq("id", scheduleLoadId);
-      if (scheduleError) {
-        if (
-          /load_note|origin|end_user|\bmt\b|rate|load_total|loadsheet_id|load_number|\bfsc\b|column .* does not exist/i.test(
-            scheduleError.message ?? "",
-          )
-        ) {
-          alert(
-            "Load sheet saved, but the schedule slot could not update. Apply the latest schedule_loads migrations, then try again.",
-          );
-        } else {
-          alert(scheduleError.message);
-        }
-        return;
-      }
-      await onScheduleUpdated?.();
-    }
-
     await onSaved?.();
     onClose();
   }
@@ -393,7 +505,7 @@ export default function EditLoadsheetModal({
                 value={mt}
                 onChange={(e) => setMt(e.target.value)}
                 placeholder="MT"
-                disabled={!selectedId}
+                disabled={!selectedId || flatRate}
               />
             </label>
             <label className="block text-sm font-medium">
@@ -410,7 +522,7 @@ export default function EditLoadsheetModal({
           <label className="block text-sm font-medium">
             FSC{" "}
             <span className="font-normal text-green-900/60">
-              (optional, added to MT × rate when filled)
+              {flatRate ? "(used in rate × FSC total)" : "(optional, added to MT × rate when filled)"}
             </span>
             <input
               className={inputClass}
@@ -420,17 +532,32 @@ export default function EditLoadsheetModal({
               disabled={!selectedId}
             />
           </label>
+          <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
+            <input
+              type="checkbox"
+              className="size-4 rounded border-green-950/30 text-green-950 focus:ring-green-950/30"
+              checked={flatRate}
+              disabled={!selectedId}
+              onChange={(e) => handleFlatRateChange(e.target.checked)}
+            />
+            Flat rate
+            <span className="font-normal text-green-900/60">(total = rate × FSC only)</span>
+          </label>
           <label className="block text-sm font-medium">
             Total{" "}
             <span className="font-normal text-green-900/60">
-              (matches schedule cells: MT × rate + FSC)
+              {flatRate ? "(rate × FSC)" : "(MT × rate + FSC)"}
             </span>
             <input
               className={`${inputClass} cursor-not-allowed bg-neutral-100 text-neutral-700`}
               readOnly
               value={loadTotalPreviewCad}
               placeholder="—"
-              title="Computed from MT, rate, and FSC (same as grid cells). Shown in CAD."
+              title={
+                flatRate
+                  ? "Flat rate: rate × FSC (updates live on the schedule)."
+                  : "MT × rate + FSC when FSC is filled (updates live on the schedule)."
+              }
             />
           </label>
           <label className="block text-sm font-medium">
@@ -478,7 +605,7 @@ export default function EditLoadsheetModal({
               </button>
               <ButtonDark
                 type="submit"
-                text={saving ? "Saving…" : "Save changes"}
+                text={saving ? "Saving…" : "Done"}
                 disabled={!selectedId || loadSheets.length === 0}
               />
             </div>

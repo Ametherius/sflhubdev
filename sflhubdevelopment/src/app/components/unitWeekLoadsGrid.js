@@ -1,11 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { weekDayLabels } from "@/lib/weekDates";
 import {
   computeLoadTotalDisplay,
   formatLoadTotalCadGrid,
 } from "@/lib/loadTotal";
+import {
+  persistScheduleLoad,
+  scheduleLoadErrorMessage,
+} from "@/lib/scheduleLoadsPersist";
 import { createClient } from "@/lib/supabase/client";
 import AssignLoadsheetModal from "./assignLoadsheetModal";
 import EditLoadsheetModal from "./editLoadsheetModal";
@@ -22,6 +26,10 @@ function isoDateKey(raw) {
 function nullIfEmpty(s) {
   const t = String(s ?? "").trim();
   return t.length ? t : null;
+}
+
+function strField(v) {
+  return v != null && String(v).trim() !== "" ? String(v) : "";
 }
 
 function slotLabel(slot) {
@@ -63,9 +71,9 @@ const fieldStackInvoiced =
 const fieldCell =
   "min-h-9 h-9 max-h-9 w-full min-w-0 max-w-full border-0 border-r border-neutral-300 bg-white px-1 py-1 text-center text-sm leading-snug text-neutral-900 outline-none placeholder:text-neutral-400 last:border-r-0 focus:bg-neutral-50";
 
-/** Read-only total: stays inside the cell; scroll only if the amount is unusually long. */
+/** Read-only total: fixed height, no scroll; clip with ellipsis if needed. */
 const fieldCellTotal =
-  "min-h-9 h-9 max-h-9 w-full min-w-0 max-w-full shrink border-0 border-r border-neutral-300 bg-neutral-100 px-0.5 py-0 text-neutral-700 last:border-r-0 overflow-x-auto overflow-y-hidden overscroll-x-contain [scrollbar-width:thin] flex items-center justify-center";
+  "min-h-9 h-9 max-h-9 w-full min-w-[3.75rem] border-0 border-r border-neutral-300 bg-neutral-100 px-1 py-0 text-neutral-700 last:border-r-0 overflow-hidden flex items-center justify-center";
 
 /**
  * Left: Origin, End user, then MT | Rate | FSC | Total in one compact row.
@@ -83,6 +91,7 @@ function LoadSplitCard({
   onPersist,
   onEditLoadsheet,
   loadsheetInvoiced = false,
+  loadsheetFlatRate = false,
 }) {
   const slotTitle = slotLabel(slot);
   const [origin, setOrigin] = useState("");
@@ -92,20 +101,23 @@ function LoadSplitCard({
   const [rate, setRate] = useState("");
   const [loadNote, setLoadNote] = useState("");
   const [loadsheetId, setLoadsheetId] = useState("");
+  const pendingLocalRef = useRef(null);
 
   const loadTotalDisplay = useMemo(
-    () => computeLoadTotalDisplay(mt, rate, fsc),
-    [mt, rate, fsc],
+    () => computeLoadTotalDisplay(mt, rate, fsc, loadsheetFlatRate),
+    [mt, rate, fsc, loadsheetFlatRate],
   );
 
-  const loadTotalCad = useMemo(
-    () => formatLoadTotalCadGrid(loadTotalDisplay),
-    [loadTotalDisplay],
-  );
+  const loadTotalCad = useMemo(() => {
+    const fromComputed = formatLoadTotalCadGrid(loadTotalDisplay);
+    if (fromComputed) return fromComputed;
+    return formatLoadTotalCadGrid(row?.load_total);
+  }, [loadTotalDisplay, row?.load_total]);
 
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect -- mirror schedule_loads row into local inputs */
     if (!row) {
+      pendingLocalRef.current = null;
       setOrigin("");
       setEndUser("");
       setFsc("");
@@ -115,15 +127,39 @@ function LoadSplitCard({
       setLoadsheetId("");
       return;
     }
-    setOrigin(row.origin != null ? String(row.origin) : "");
-    setEndUser(row.end_user != null ? String(row.end_user) : "");
-    setFsc(row.fsc != null ? String(row.fsc) : "");
-    setMt(row.mt != null ? String(row.mt) : "");
-    setRate(row.rate != null ? String(row.rate) : "");
-    setLoadNote(row.load_note != null ? String(row.load_note) : "");
-    setLoadsheetId(row.loadsheet_id != null ? String(row.loadsheet_id) : "");
+
+    const pending = pendingLocalRef.current;
+    const rowOrigin = strField(row.origin);
+    const rowEndUser = strField(row.end_user);
+    const rowFsc = strField(row.fsc);
+    const rowMt = strField(row.mt);
+    const rowRate = strField(row.rate);
+    const rowNote = strField(row.load_note);
+    const rowSheetId = strField(row.loadsheet_id);
+
+    if (pending) {
+      const caughtUp =
+        rowOrigin === strField(pending.origin) &&
+        rowEndUser === strField(pending.endUser) &&
+        rowFsc === strField(pending.fsc) &&
+        rowMt === strField(pending.mt) &&
+        rowRate === strField(pending.rate) &&
+        rowNote === strField(pending.loadNote) &&
+        rowSheetId === strField(pending.loadsheetId);
+      if (caughtUp) {
+        pendingLocalRef.current = null;
+      }
+    }
+
+    const p = pendingLocalRef.current;
+    setOrigin(p?.origin ?? rowOrigin);
+    setEndUser(p?.endUser ?? rowEndUser);
+    setFsc(p?.fsc ?? rowFsc);
+    setMt(p?.mt ?? rowMt);
+    setRate(p?.rate ?? rowRate);
+    setLoadNote(p?.loadNote ?? rowNote);
+    setLoadsheetId(p?.loadsheetId ?? rowSheetId);
     /* eslint-enable react-hooks/set-state-in-effect */
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- depend on row field primitives, not row object identity
   }, [
     row?.id,
     row?.origin,
@@ -133,11 +169,22 @@ function LoadSplitCard({
     row?.rate,
     row?.load_note,
     row?.loadsheet_id,
+    row?.load_total,
   ]);
 
   const save = useCallback(async () => {
     if (!slotId) return;
     const lid = loadsheetId.trim();
+    const snapshot = {
+      origin,
+      endUser,
+      fsc,
+      mt,
+      rate,
+      loadNote,
+      loadsheetId: lid,
+    };
+    pendingLocalRef.current = snapshot;
     const payload = {
       loadsheet_id: lid.length ? lid : null,
       origin: nullIfEmpty(origin),
@@ -148,7 +195,7 @@ function LoadSplitCard({
       load_total: nullIfEmpty(loadTotalDisplay),
       load_note: nullIfEmpty(loadNote),
     };
-    await onPersist({
+    const ok = await onPersist({
       scheduleLoadId,
       dayIso,
       slotId,
@@ -156,6 +203,9 @@ function LoadSplitCard({
       inUseUnitId,
       payload,
     });
+    if (ok !== false) {
+      pendingLocalRef.current = null;
+    }
   }, [
     scheduleLoadId,
     dayIso,
@@ -170,6 +220,7 @@ function LoadSplitCard({
     rate,
     loadTotalDisplay,
     loadNote,
+    loadsheetFlatRate,
     onPersist,
   ]);
 
@@ -186,7 +237,7 @@ function LoadSplitCard({
 
   return (
     <div
-      className={`${rootGrow} relative w-full min-w-[260px] overflow-hidden rounded-lg border border-neutral-400/90 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.08)]`}
+      className={`${rootGrow} relative w-full min-w-[275px] overflow-hidden rounded-lg border border-neutral-400/90 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.08)]`}
     >
       <div className={innerRow}>
         <div className="flex w-50 min-h-0 min-w-0 flex-1 flex-col border-r border-neutral-300 bg-white">
@@ -208,7 +259,7 @@ function LoadSplitCard({
             placeholder="End user"
             aria-label={`${slotTitle} end user`}
           />
-          <div className="grid min-h-9 min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.12fr)] border-t border-neutral-300">
+          <div className="grid min-h-9 min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(3.75rem,1.35fr)] border-t border-neutral-300">
             <input
               type="text"
               className={fieldCell}
@@ -216,6 +267,7 @@ function LoadSplitCard({
               onChange={(e) => setMt(e.target.value)}
               onBlur={() => void save()}
               placeholder="MT"
+              disabled={loadsheetFlatRate}
               aria-label={`${slotTitle} MT`}
             />
             <input
@@ -237,11 +289,15 @@ function LoadSplitCard({
               aria-label={`${slotTitle} FSC`}
             />
             <div
-              title="MT × rate, or × FSC when FSC is filled (FSC is a multiplier). Total in CAD — scroll if needed."
+              title={
+                loadsheetFlatRate
+                  ? "Flat rate: rate × FSC. Total in CAD."
+                  : "MT × rate, or × FSC when FSC is filled. Total in CAD."
+              }
               className={`${fieldCellTotal} cursor-default`}
               aria-label={`${slotTitle} total (auto)`}
             >
-              <span className="inline-block whitespace-nowrap px-0.5 text-center text-[10px] tabular-nums leading-tight text-neutral-800 sm:text-[11px]">
+              <span className="block w-full truncate px-0.5 text-center text-[10px] tabular-nums leading-tight text-neutral-800 sm:text-[11px]">
                 {loadTotalCad || (
                   <span className="text-neutral-400">Total</span>
                 )}
@@ -291,6 +347,7 @@ export default function UnitWeekLoadsGrid({
   loadSlots = [],
   loadSheets = [],
   onUpdated,
+  onLoadPatched,
   onLoadSheetsUpdated,
 }) {
   const supabase = useMemo(() => createClient(), []);
@@ -353,6 +410,15 @@ export default function UnitWeekLoadsGrid({
     return m;
   }, [loadSheets]);
 
+  const flatRateBySheetId = useMemo(() => {
+    const m = new Map();
+    for (const sheet of loadSheets ?? []) {
+      if (sheet?.id == null) continue;
+      m.set(String(sheet.id), Boolean(sheet.flat_rate));
+    }
+    return m;
+  }, [loadSheets]);
+
   const persistRow = useCallback(
     async ({
       scheduleLoadId,
@@ -362,54 +428,57 @@ export default function UnitWeekLoadsGrid({
       inUseUnitId: unitId,
       payload,
     }) => {
-      if (!slotId || !dayIso) return;
+      if (!slotId || !dayIso) return false;
 
-      if (scheduleLoadId) {
-        const { error } = await supabase
-          .from("schedule_loads")
-          .update(payload)
-          .eq("id", scheduleLoadId);
-        if (error) {
-          if (
-            /load_note|origin|end_user|\bmt\b|rate|load_total|loadsheet_id|load_number|\bfsc\b|column .* does not exist/i.test(
-              error.message ?? "",
-            )
-          ) {
-            alert(
-              "Apply the latest Supabase migrations for schedule_loads detail columns, then try again.",
-            );
-          } else {
-            console.error(error.message);
-            alert(error.message);
-          }
-          return;
-        }
-        await onUpdated?.();
-        return;
-      }
-
-      if (!wk || !unitId) {
-        console.warn(
-          "Missing week or unit id; cannot create schedule_load row.",
-        );
-        return;
-      }
-
-      const { error } = await supabase.from("schedule_loads").insert({
-        week_id: wk,
-        load_date: dayIso,
-        load_slot_id: slotId,
-        in_use_unit_id: unitId,
-        ...payload,
+      const { data, error } = await persistScheduleLoad(supabase, {
+        scheduleLoadId: scheduleLoadId ?? null,
+        weekId: wk,
+        loadDate: dayIso,
+        loadSlotId: slotId,
+        inUseUnitId: unitId,
+        payload,
       });
+
       if (error) {
-        console.error(error.message);
-        alert(error.message);
-        return;
+        const colMissing = /column .* does not exist/i.test(error.message ?? "");
+        if (
+          colMissing &&
+          scheduleLoadId &&
+          /fsc|load_total|loadsheet_id/i.test(error.message ?? "")
+        ) {
+          const { error: retryErr } = await supabase
+            .from("schedule_loads")
+            .update(payload)
+            .eq("id", scheduleLoadId);
+          if (!retryErr) {
+            onLoadPatched?.({ id: scheduleLoadId, ...payload });
+            await onUpdated?.();
+            return true;
+          }
+        }
+        if (
+          /load_note|origin|end_user|\bmt\b|rate|load_total|loadsheet_id|load_number|\bfsc\b|column .* does not exist/i.test(
+            error.message ?? "",
+          )
+        ) {
+          alert(
+            "Apply the latest Supabase migrations for schedule_loads detail columns, then try again.",
+          );
+        } else {
+          alert(scheduleLoadErrorMessage(error.message));
+        }
+        return false;
+      }
+
+      if (data) {
+        onLoadPatched?.(data);
+      } else if (scheduleLoadId) {
+        onLoadPatched?.({ id: scheduleLoadId, ...payload });
       }
       await onUpdated?.();
+      return true;
     },
-    [supabase, onUpdated],
+    [supabase, onUpdated, onLoadPatched],
   );
 
   if (!weekStartISO || days.length === 0) {
@@ -428,7 +497,7 @@ export default function UnitWeekLoadsGrid({
     : "relative overflow-x-auto rounded-lg rounded-l-none border border-green-950 bg-white p-3 text-green-950 shadow-sm lg:-ml-px lg:border-l-0";
 
   const gridShell = embeddedInRow
-    ? "grid min-h-0 min-w-[2100px] flex-1 grid-cols-7 gap-x-2 gap-y-1"
+    ? "grid min-h-0 min-w-[2205px] flex-1 grid-cols-7 gap-x-2 gap-y-1"
     : "grid min-w-[980px] grid-cols-7 gap-3";
 
   const dayHeaderShell = embeddedInRow
@@ -436,7 +505,7 @@ export default function UnitWeekLoadsGrid({
     : "rounded-t-lg bg-green-950 py-2.5 text-center text-[13px] font-semibold leading-tight text-white shadow-sm";
 
   const dayColShell = embeddedInRow
-    ? "flex h-full min-h-0 min-w-[260px] flex-col gap-1"
+    ? "flex h-full min-h-0 min-w-[275px] flex-col gap-1"
     : "flex min-w-0 flex-col gap-2";
 
   const slotShortfall = slotPlan.need - slotPlan.defined;
@@ -472,7 +541,7 @@ export default function UnitWeekLoadsGrid({
                     type="button"
                     title="Assign a load sheet to this day (copy into schedule)"
                     aria-label="Assign load sheet to this day"
-                    className="absolute right-1 top-1/2 shrink-0 -translate-y-1/2 rounded border border-white/30 bg-white/10 px-1 py-px text-[8px] font-bold uppercase tracking-wide text-white hover:bg-white/20"
+                    className="absolute right-1 top-1/2 shrink-0 -translate-y-1/2 rounded border border-white/30 bg-white/10 px-1 py-px text-[12px] font-bold uppercase tracking-wide text-white hover:bg-white/20"
                     onClick={() =>
                       setAssignTarget({
                         dayIso: d.iso,
@@ -505,12 +574,15 @@ export default function UnitWeekLoadsGrid({
                   row?.loadsheet_id != null ? String(row.loadsheet_id) : "";
                 const loadsheetInvoiced =
                   sheetId.length > 0 && invoicedBySheetId.get(sheetId) === true;
+                const loadsheetFlatRate =
+                  sheetId.length > 0 && flatRateBySheetId.get(sheetId) === true;
                 return (
                   <LoadSplitCard
                     key={`${d.iso}-${slot.id ?? `pad-${slot.sort_order}`}`}
                     fillColumn={embeddedInRow}
                     row={row}
                     loadsheetInvoiced={loadsheetInvoiced}
+                    loadsheetFlatRate={loadsheetFlatRate}
                     scheduleLoadId={row?.id ?? null}
                     dayIso={d.iso}
                     slotId={slot.id}
@@ -550,6 +622,7 @@ export default function UnitWeekLoadsGrid({
         loadsheets={loadSheets}
         initialSlotId={assignTarget?.initialSlotId ?? null}
         onAssigned={onUpdated}
+        onLoadPatched={onLoadPatched}
       />
       <EditLoadsheetModal
         open={editLoadsheetTarget != null}
@@ -559,6 +632,7 @@ export default function UnitWeekLoadsGrid({
         loadSheets={loadSheets}
         onSaved={onLoadSheetsUpdated ?? (async () => {})}
         onScheduleUpdated={onUpdated}
+        onSchedulePatched={onLoadPatched}
         onScheduleUnlinked={onUpdated}
       />
     </div>

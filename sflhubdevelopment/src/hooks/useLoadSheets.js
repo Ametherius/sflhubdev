@@ -5,8 +5,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePostgresRealtime } from "./usePostgresRealtime";
 
 const SELECT =
-  "id, load_number, origin, end_user, mt, rate, fsc, broker, invoiced";
+  "id, load_number, origin, end_user, mt, rate, fsc, broker, invoiced, flat_rate";
 const SELECT_LEGACY =
+  "id, load_number, origin, end_user, mt, rate, fsc, broker, invoiced";
+const SELECT_LEGACY_NO_INVOICED =
   "id, load_number, origin, end_user, mt, rate, fsc, broker";
 
 export function useLoadSheets() {
@@ -30,15 +32,31 @@ export function useLoadSheets() {
       .select(SELECT)
       .order("load_number", { ascending: true });
 
-    if (error && /invoiced|column .* does not exist/i.test(error.message ?? "")) {
-      const legacy = await supabase
+    if (
+      error &&
+      /flat_rate|invoiced|column .* does not exist/i.test(error.message ?? "")
+    ) {
+      let legacy = await supabase
         .from("loadsheets")
         .select(SELECT_LEGACY)
         .order("load_number", { ascending: true });
+      if (
+        legacy.error &&
+        /invoiced|column .* does not exist/i.test(legacy.error.message ?? "")
+      ) {
+        legacy = await supabase
+          .from("loadsheets")
+          .select(SELECT_LEGACY_NO_INVOICED)
+          .order("load_number", { ascending: true });
+      }
       data = legacy.data;
       error = legacy.error;
       if (!error && data) {
-        data = data.map((row) => ({ ...row, invoiced: false }));
+        data = data.map((row) => ({
+          ...row,
+          invoiced: row.invoiced ?? false,
+          flat_rate: row.flat_rate ?? false,
+        }));
       }
     }
 

@@ -58,7 +58,8 @@ export default function Schedule() {
   const [newDriverModalOpen, setNewDriverModalOpen] = useState(false);
   const [newUnitModalOpen, setNewUnitModalOpen] = useState(false);
   const supabase = useMemo(() => createClient(), []);
-  const [loads, refreshLoads] = useWeekLoads(resolvedWeekId);
+  const [loads, refreshLoads, , mergeScheduleLoad] =
+    useWeekLoads(resolvedWeekId);
   const [loadSlots] = useLoadSlots();
   const [loadSheets, refreshLoadSheets] = useLoadSheets();
   const [searchByName, setSearchByName] = useState("");
@@ -381,7 +382,23 @@ export default function Schedule() {
       </div>
       <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-4 pb-28">
-          <input
+          <div className="flex flex-row flex-1 fixed top-30 right-10 min-h-0 max-h-12">
+            <input
+              type="search"
+              value={searchAssigned}
+              placeholder="Search By Division"
+              onChange={(e) => setSearchAssigned(e.target.value)}
+              className="mb-4 w-full max-w-md rounded-xl py-6 bg-white p-2 text-green-950 placeholder:text-green-950"
+            />
+            <input
+              type="search"
+              value={searchByName}
+              placeholder="Search By Name"
+              onChange={(e) => setSearchByName(e.target.value)}
+              className="bg-white rounded-xl max-w-md placeholder:text-green-950 p-2 ml-2 text-green-950"
+            />
+          </div>
+          {/* <input
             type="search"
             value={searchAssigned}
             placeholder="Search By Division"
@@ -394,7 +411,7 @@ export default function Schedule() {
             placeholder="Search By Name"
             onChange={(e) => setSearchByName(e.target.value)}
             className="bg-white rounded-xl max-w-md placeholder:text-green-950 p-2 ml-2 text-green-950"
-          />
+          /> */}
           {assignedRowsForDisplay.map((row) => (
             <ScheduleRow
               key={row.id}
@@ -408,6 +425,7 @@ export default function Schedule() {
               loadSheets={loadSheets}
               onDelete={() => handleDelete(row.id)}
               onLoadsUpdated={refreshLoads}
+              onLoadPatched={mergeScheduleLoad}
               onLoadSheetsUpdated={refreshLoadSheets}
             />
           ))}

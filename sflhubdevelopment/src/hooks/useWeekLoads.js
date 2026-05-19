@@ -7,7 +7,9 @@ import { usePostgresRealtime } from "./usePostgresRealtime";
 const LOAD_SELECT_MODERN =
   "id, week_id, load_date, load_slot_id, in_use_unit_id, load_note, origin, end_user, mt, rate, load_total, loadsheet_id, load_number, fsc";
 const LOAD_SELECT_MODERN_NO_LOADSHEET =
-  "id, week_id, load_date, load_slot_id, in_use_unit_id, load_note, origin, end_user, mt, rate, load_total";
+  "id, week_id, load_date, load_slot_id, in_use_unit_id, load_note, origin, end_user, mt, rate, fsc, load_total";
+const LOAD_SELECT_MODERN_NO_FSC =
+  "id, week_id, load_date, load_slot_id, in_use_unit_id, load_note, origin, end_user, mt, rate, load_total, loadsheet_id, load_number";
 const LOAD_SELECT_MODERN_NO_DETAIL =
   "id, week_id, load_date, load_slot_id, in_use_unit_id, load_note";
 const LOAD_SELECT_MODERN_NO_NOTE =
@@ -73,7 +75,6 @@ export function useWeekLoads(weekId) {
   const supabase = useMemo(() => createClient(), []);
 
   const refreshLoads = useCallback(async () => {
-    setReady(false);
     if (!weekId) {
       setLoads([]);
       setReady(true);
@@ -98,12 +99,25 @@ export function useWeekLoads(weekId) {
 
     if (
       modern.error &&
-      /loadsheet_id|load_number|\bfsc\b/i.test(modern.error.message ?? "") &&
+      /loadsheet_id|load_number/i.test(modern.error.message ?? "") &&
       /does not exist/i.test(modern.error.message ?? "")
     ) {
       modern = await supabase
         .from("schedule_loads")
         .select(LOAD_SELECT_MODERN_NO_LOADSHEET)
+        .eq("week_id", weekId)
+        .order("load_date", { ascending: true })
+        .order("load_slot_id", { ascending: true });
+    }
+
+    if (
+      modern.error &&
+      /\bfsc\b/i.test(modern.error.message ?? "") &&
+      /does not exist/i.test(modern.error.message ?? "")
+    ) {
+      modern = await supabase
+        .from("schedule_loads")
+        .select(LOAD_SELECT_MODERN_NO_FSC)
         .eq("week_id", weekId)
         .order("load_date", { ascending: true })
         .order("load_slot_id", { ascending: true });
@@ -264,10 +278,24 @@ export function useWeekLoads(weekId) {
     refreshLoads,
   );
 
+  const mergeScheduleLoad = useCallback((row) => {
+    if (!row?.id) return;
+    setLoads((prev) => {
+      const id = String(row.id);
+      const idx = prev.findIndex((l) => String(l.id) === id);
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = { ...next[idx], ...row };
+        return next;
+      }
+      return [...prev, row];
+    });
+  }, []);
+
   const meta = useMemo(
     () => ({ ready, legacySlotIndex }),
     [ready, legacySlotIndex],
   );
 
-  return [loads, refreshLoads, meta];
+  return [loads, refreshLoads, meta, mergeScheduleLoad];
 }

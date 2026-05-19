@@ -32,6 +32,10 @@ function isoDateKey(raw) {
   return s.length >= 10 ? s.slice(0, 10) : s;
 }
 
+/** Columns returned after save so the UI can update without waiting on a full refetch. */
+export const SCHEDULE_LOAD_RETURN_SELECT =
+  "id, week_id, load_date, load_slot_id, in_use_unit_id, load_note, origin, end_user, mt, rate, fsc, load_total, loadsheet_id, load_number";
+
 /**
  * Update an existing schedule_loads row, or ensure scaffold rows then update/insert.
  * Avoids client inserts with a missing week_id (schedule_loads_week_id_fkey).
@@ -45,11 +49,13 @@ export async function persistScheduleLoad(supabase, {
   payload,
 }) {
   if (scheduleLoadId) {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("schedule_loads")
       .update(payload)
-      .eq("id", scheduleLoadId);
-    return { error };
+      .eq("id", scheduleLoadId)
+      .select(SCHEDULE_LOAD_RETURN_SELECT)
+      .single();
+    return { data, error };
   }
 
   const wk = weekId != null ? String(weekId).trim() : "";
@@ -103,19 +109,25 @@ export async function persistScheduleLoad(supabase, {
   if (findErr) return { error: findErr };
 
   if (existing?.id) {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("schedule_loads")
       .update(payload)
-      .eq("id", existing.id);
-    return { error };
+      .eq("id", existing.id)
+      .select(SCHEDULE_LOAD_RETURN_SELECT)
+      .single();
+    return { data, error };
   }
 
-  const { error } = await supabase.from("schedule_loads").insert({
-    week_id: wk,
-    load_date: dayIso,
-    load_slot_id: slotId,
-    in_use_unit_id: unitId,
-    ...payload,
-  });
-  return { error };
+  const { data, error } = await supabase
+    .from("schedule_loads")
+    .insert({
+      week_id: wk,
+      load_date: dayIso,
+      load_slot_id: slotId,
+      in_use_unit_id: unitId,
+      ...payload,
+    })
+    .select(SCHEDULE_LOAD_RETURN_SELECT)
+    .single();
+  return { data, error };
 }

@@ -34,6 +34,7 @@ export default function ScheduleRow({
   loadSheets = [],
   onDelete,
   onLoadsUpdated,
+  onLoadPatched,
   onLoadSheetsUpdated,
 }) {
   const driver = assignment.driver;
@@ -66,7 +67,7 @@ export default function ScheduleRow({
             ufaPIN={unit.ufaPIN}
             onDelete={onDelete}
           />
-          <div className="flex min-h-0 w-full shrink-0 bg-white lg:flex lg:min-h-0 lg:min-w-[2100px] lg:flex-1 lg:flex-col">
+          <div className="flex min-h-0 w-full shrink-0 bg-white lg:flex lg:min-h-0 lg:min-w-[2205px] lg:flex-1 lg:flex-col">
             <UnitWeekLoadsGrid
               embeddedInRow
               weekStartISO={weekStartISO}
@@ -76,6 +77,7 @@ export default function ScheduleRow({
               loadSlots={loadSlots}
               loadSheets={loadSheets}
               onUpdated={onLoadsUpdated}
+              onLoadPatched={onLoadPatched}
               onLoadSheetsUpdated={onLoadSheetsUpdated}
             />
           </div>

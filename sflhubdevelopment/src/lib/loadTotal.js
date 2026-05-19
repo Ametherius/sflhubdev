@@ -8,14 +8,25 @@ export function parseMetricNum(s) {
   return Number.isFinite(n) ? n : null;
 }
 
-/** Total = MT × rate; if FSC is non-empty, total = (MT × rate) + FSC. */
-export function computeLoadTotalDisplay(mt, rate, fsc) {
-  const m = parseMetricNum(mt);
+/**
+ * Standard: MT × rate; if FSC is non-empty, (MT × rate) + FSC.
+ * Flat rate: rate × FSC only (ignores MT).
+ */
+export function computeLoadTotalDisplay(mt, rate, fsc, flatRate = false) {
   const r = parseMetricNum(rate);
-  if (m == null || r == null) return "";
-  const base = m * r;
   const fRaw = String(fsc ?? "").trim();
   const f = parseMetricNum(fsc);
+
+  if (flatRate) {
+    if (r == null) return "";
+    if (fRaw === "" || f == null) return "";
+    const total = r * f;
+    return String(Math.round(total * 100) / 100);
+  }
+
+  const m = parseMetricNum(mt);
+  if (m == null || r == null) return "";
+  const base = m * r;
   let total = base;
   if (fRaw !== "" && f != null) {
     total = base + f;
