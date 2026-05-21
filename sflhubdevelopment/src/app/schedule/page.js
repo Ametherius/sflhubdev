@@ -27,6 +27,7 @@ import { useLoadSlots } from "@/hooks/useLoadSlots";
 import { useLoadSheets } from "@/hooks/useLoadSheets";
 import ScheduleRow from "../components/scheduleRow";
 import { isScheduleWeekFkError } from "@/lib/scheduleLoadsPersist";
+import AssignedMenu from "../components/assignedMenu";
 
 export default function Schedule() {
   const [drivers, refreshDrivers] = useDrivers();
@@ -45,6 +46,7 @@ export default function Schedule() {
   }, [weeks, selectedWeekId]);
   const [newWeekModalOpen, setNewWeekModalOpen] = useState(false);
   const [newLoadsheetModalOpen, setNewLoadsheetModalOpen] = useState(false);
+  const [assignedMenu, setAssignedMenu] = useState(false);
   const [unitsShowing, setUnitsShowing] = useState(false);
   const [driversShowing, setDriversShowing] = useState(false);
   const [searchDrivers, setSearchDrivers] = useState("");
@@ -158,12 +160,20 @@ export default function Schedule() {
 
   function toggleUnitMenu() {
     if (driversShowing) setDriversShowing(false);
+    if (assignedMenu) setAssignedMenu(false);
     setUnitsShowing(!unitsShowing);
   }
 
   function toggleDriverMenu() {
     if (unitsShowing) setUnitsShowing(false);
+    if (assignedMenu) setAssignedMenu(false);
     setDriversShowing(!driversShowing);
+  }
+
+  function toggleAssignedMenu() {
+    if (unitsShowing) setUnitsShowing(false);
+    if (driversShowing) setDriversShowing(false);
+    setAssignedMenu(!assignedMenu);
   }
 
   async function createAssigned() {
@@ -322,6 +332,18 @@ export default function Schedule() {
         })}
       </div>
       <div
+        className={`w-130 bg-white overflow-y-scroll max-h-screen fixed top-0 right-0 z-50 flex flex-wrap ${assignedMenu ? "" : "hidden"} justify-center`}
+      >
+        <button
+          type="button"
+          className="text-green-950 absolute top-0 right-0 m-3 text-2xl cursor-pointer"
+          onClick={() => setAssignedMenu(false)}
+        >
+          <FaTimes />
+        </button>
+        <AssignedMenu assigned={assigned} />
+      </div>
+      <div
         className={`w-130 bg-white overflow-y-scroll max-h-screen fixed top-0 right-0 mx-0 p-3 z-50 border-2 flex flex-wrap ${driversShowing ? "" : "hidden"} justify-center`}
       >
         <button
@@ -358,7 +380,7 @@ export default function Schedule() {
           />
         ))}
       </div>
-      <div className="fixed z-10 bottom-0 left-1/2 transform -translate-x-1/2 flex">
+      <div className="fixed z-10 bottom-0 left-1/2 transform -translate-x-1/2 flex w-full justify-center">
         <BtnWhite text="Units" Icon={FaTruck} onClick={toggleUnitMenu} />
         <BtnWhite text="Drivers" Icon={FaUser} onClick={toggleDriverMenu} />
         <BtnWhite
@@ -378,6 +400,11 @@ export default function Schedule() {
           Icon={FaPlus}
           text="New load sheet"
           onClick={() => setNewLoadsheetModalOpen(true)}
+        />
+        <BtnWhite
+          Icon={FaTruck}
+          text="Assigned Units"
+          onClick={toggleAssignedMenu}
         />
       </div>
       <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
