@@ -28,6 +28,7 @@ import { useLoadSheets } from "@/hooks/useLoadSheets";
 import ScheduleRow from "../components/scheduleRow";
 import { isScheduleWeekFkError } from "@/lib/scheduleLoadsPersist";
 import AssignedMenu from "../components/assignedMenu";
+import LoadsheetMenu from "../components/loadsheetMenu";
 
 export default function Schedule() {
   const [drivers, refreshDrivers] = useDrivers();
@@ -65,6 +66,7 @@ export default function Schedule() {
   const [loadSlots] = useLoadSlots();
   const [loadSheets, refreshLoadSheets] = useLoadSheets();
   const [searchByName, setSearchByName] = useState("");
+  const [loadsheetMenu, setLoadsheetMenu] = useState(true);
 
   const assignedRowsForDisplay = useMemo(() => {
     let rows = assigned.filter((row) => row.driver && row.unit);
@@ -492,6 +494,11 @@ export default function Schedule() {
         onClose={() => setNewUnitModalOpen(false)}
         onCreated={refreshUnits}
       />
+      {/* <div
+        className={`w-96 bg-white overflow-y-scroll max-h-screen z-50 fixed top-0 right-0 mx-0 p-3 border-2 flex flex-wrap ${loadsheetMenu ? "" : "hidden"} justify-center`}
+      >
+        <LoadsheetMenu loadsheets={loadSheets} />
+      </div> */}
     </div>
   );
 }

@@ -5,7 +5,10 @@ export default function AssignedMenu({ assigned }) {
         Assigned Units
       </h2>{" "}
       {assigned.map((a) => (
-        <div className="bg-gray-900 p-1 m-2 grid grid-cols-3">
+        <div
+          key={a.assignedID}
+          className="bg-gray-900 p-1 m-2 grid grid-cols-3"
+        >
           <p className="p-2 text-center border">{a.driver.name}</p>
           <p className="p-2 text-center border">{a.unit.unit}</p>
           <p className="p-2 text-center border">{a.driver.phone}</p>

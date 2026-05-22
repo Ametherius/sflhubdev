@@ -50,8 +50,8 @@ export default function ScheduleRow({
           {banner}
         </p>
       ) : null}
-      <div className="overflow-x-auto overscroll-x-contain pb-1">
-        <div className="flex w-max min-w-full flex-col overflow-hidden rounded-2xl border-2 border-green-950 bg-white shadow-[0_12px_40px_-12px_rgba(0,0,0,0.35)] ring-1 ring-green-950/15 lg:flex-row lg:items-stretch">
+      <div className="pb-1">
+        <div className="flex w-full min-w-0 overflow-hidden p-2 flex-col rounded-2xl border-2 border-green-950 bg-white shadow-[0_12px_40px_-12px_rgba(0,0,0,0.35)] ring-1 ring-green-950/15 lg:flex-row lg:items-stretch">
           <AssignedCard
             embedded
             name={driver.name}
@@ -67,7 +67,7 @@ export default function ScheduleRow({
             ufaPIN={unit.ufaPIN}
             onDelete={onDelete}
           />
-          <div className="flex min-h-0 w-full shrink-0 bg-white lg:flex lg:min-h-0 lg:min-w-[2205px] lg:flex-1 lg:flex-col">
+          <div className="overflow-x-auto overscroll-x-contain flex min-h-0 w-full min-w-0 bg-white lg:flex lg:min-h-0  lg:flex-1 lg:flex-col">
             <UnitWeekLoadsGrid
               embeddedInRow
               weekStartISO={weekStartISO}
