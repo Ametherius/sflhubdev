@@ -161,6 +161,23 @@ export default function Schedule() {
     return String(u.unit).toLowerCase().includes(searchUnits.toLowerCase());
   });
 
+  const sortedDrivers = [...drivers].sort((a, b) => {
+    const driverA = (a.name ?? "").trim();
+    const driverB = (b.name ?? "").trim();
+    return driverA.localeCompare(driverB, undefined, { sensitivity: "base" });
+  });
+
+  const sortedUnits = [...units].sort((a, b) => {
+    const unitA = a.unit;
+    const unitB = b.unit;
+    const numA = Number(unitA);
+    const numB = Number(unitB);
+
+    if (Number.isFinite(numA) && Number.isFinite(numB)) {
+      return numA - numB;
+    }
+  });
+
   async function handleCreateWeek(weekStartISO) {
     const { error, weekId } = await createWeek(weekStartISO);
     if (weekId) setSelectedWeekId(weekId);
@@ -290,14 +307,14 @@ export default function Schedule() {
             <FormSelect
               label="Select Driver"
               placeholder="Select a driver…"
-              options={drivers}
+              options={sortedDrivers}
               value={driverValue}
               onChange={(e) => setDriverValue(e.target.value)}
             />
             <FormSelect
               label="Select Unit"
               placeholder="Select a unit…"
-              options={units}
+              options={sortedUnits}
               value={unitValue}
               onChange={(e) => setUnitValue(e.target.value)}
             />
@@ -495,9 +512,12 @@ export default function Schedule() {
         onClose={() => setNewUnitModalOpen(false)}
         onCreated={refreshUnits}
       />
-      {/* <div
+      <div
         className={`w-96 bg-white overflow-y-scroll max-h-full z-50 fixed top-0 right-0 mx-0 p-3 border-2 flex flex-wrap ${loadsheetMenu ? "" : "hidden"} justify-center`}
       >
+        <h2 className="text-green-950 font-bold text-2xl text-center">
+          Loadsheets
+        </h2>
         <div className="fixed top-0 right-0 m-3 mr-4 text-2xl text-green-950 cursor-pointer ">
           <button
             className="text-green-950 text-3xl"
@@ -507,7 +527,7 @@ export default function Schedule() {
           </button>
         </div>
         <LoadsheetMenu loadsheets={loadSheets} />
-      </div> */}
+      </div>
     </div>
   );
 }
