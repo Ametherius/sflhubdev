@@ -4,7 +4,14 @@ import { useEffect, useMemo, useState } from "react";
 import Header from "../components/header";
 import { useUnits } from "@/hooks/useUnits";
 import BtnWhite from "../components/btnWhite";
-import { FaCalendar, FaPlus, FaTimes, FaTruck, FaUser } from "react-icons/fa";
+import {
+  FaCalendar,
+  FaList,
+  FaPlus,
+  FaTimes,
+  FaTruck,
+  FaUser,
+} from "react-icons/fa";
 import { useDrivers } from "@/hooks/useDrivers";
 import DriverCard from "../components/driverCard";
 import UnitCard from "../components/unitCard";
@@ -66,7 +73,7 @@ export default function Schedule() {
   const [loadSlots] = useLoadSlots();
   const [loadSheets, refreshLoadSheets] = useLoadSheets();
   const [searchByName, setSearchByName] = useState("");
-  const [loadsheetMenu, setLoadsheetMenu] = useState(true);
+  const [loadsheetMenu, setLoadsheetMenu] = useState(false);
 
   const assignedRowsForDisplay = useMemo(() => {
     let rows = assigned.filter((row) => row.driver && row.unit);
@@ -164,6 +171,13 @@ export default function Schedule() {
     if (driversShowing) setDriversShowing(false);
     if (assignedMenu) setAssignedMenu(false);
     setUnitsShowing(!unitsShowing);
+  }
+
+  function toggleLoadsheets() {
+    if (unitsShowing) setUnitsShowing(false);
+    if (driversShowing) setDriversShowing(false);
+    if (assignedMenu) setAssignedMenu(false);
+    setLoadsheetMenu(!loadsheetMenu);
   }
 
   function toggleDriverMenu() {
@@ -383,6 +397,7 @@ export default function Schedule() {
         ))}
       </div>
       <div className="fixed z-10 bottom-0 left-1/2 transform -translate-x-1/2 flex w-full justify-center">
+        <BtnWhite text="Loadsheets" Icon={FaList} onClick={toggleLoadsheets} />
         <BtnWhite text="Units" Icon={FaTruck} onClick={toggleUnitMenu} />
         <BtnWhite text="Drivers" Icon={FaUser} onClick={toggleDriverMenu} />
         <BtnWhite
@@ -427,20 +442,6 @@ export default function Schedule() {
               className="bg-white rounded-xl max-w-md placeholder:text-green-950 p-2 ml-2 text-green-950"
             />
           </div>
-          {/* <input
-            type="search"
-            value={searchAssigned}
-            placeholder="Search By Division"
-            onChange={(e) => setSearchAssigned(e.target.value)}
-            className="mb-4 w-full max-w-md rounded-xl bg-white p-2 text-green-950 placeholder:text-green-950"
-          />
-          <input
-            type="search"
-            value={searchByName}
-            placeholder="Search By Name"
-            onChange={(e) => setSearchByName(e.target.value)}
-            className="bg-white rounded-xl max-w-md placeholder:text-green-950 p-2 ml-2 text-green-950"
-          /> */}
           {assignedRowsForDisplay.map((row) => (
             <ScheduleRow
               key={row.id}
@@ -495,8 +496,16 @@ export default function Schedule() {
         onCreated={refreshUnits}
       />
       {/* <div
-        className={`w-96 bg-white overflow-y-scroll max-h-screen z-50 fixed top-0 right-0 mx-0 p-3 border-2 flex flex-wrap ${loadsheetMenu ? "" : "hidden"} justify-center`}
+        className={`w-96 bg-white overflow-y-scroll max-h-full z-50 fixed top-0 right-0 mx-0 p-3 border-2 flex flex-wrap ${loadsheetMenu ? "" : "hidden"} justify-center`}
       >
+        <div className="fixed top-0 right-0 m-3 mr-4 text-2xl text-green-950 cursor-pointer ">
+          <button
+            className="text-green-950 text-3xl"
+            onClick={() => setLoadsheetMenu(false)}
+          >
+            <FaTimes />
+          </button>
+        </div>
         <LoadsheetMenu loadsheets={loadSheets} />
       </div> */}
     </div>

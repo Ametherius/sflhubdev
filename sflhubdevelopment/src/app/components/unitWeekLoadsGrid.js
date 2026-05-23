@@ -16,6 +16,23 @@ import EditLoadsheetModal from "./editLoadsheetModal";
 
 const LOADS_PER_DAY = 3; // fixed; matches DB ensure_schedule_loads_for_week (limit 3) + canonical load_slots
 
+/** Embedded schedule: fixed day columns; scroll wrapper is ScheduleRow. */
+const EMBEDDED_DAY_COL_BASE_PX = 296;
+const EMBEDDED_DAY_COL_EXTRA_REM = 3;
+const EMBEDDED_DAY_COL_PX =
+  EMBEDDED_DAY_COL_BASE_PX + EMBEDDED_DAY_COL_EXTRA_REM * 16;
+const EMBEDDED_GRID_GAP_PX = 8;
+const EMBEDDED_GRID_WIDTH_PX =
+  7 * EMBEDDED_DAY_COL_PX + 6 * EMBEDDED_GRID_GAP_PX;
+const EMBEDDED_GRID_STYLE = {
+  gridTemplateColumns: `repeat(7, calc(${EMBEDDED_DAY_COL_BASE_PX}px + ${EMBEDDED_DAY_COL_EXTRA_REM}rem))`,
+  width: EMBEDDED_GRID_WIDTH_PX,
+  minWidth: EMBEDDED_GRID_WIDTH_PX,
+};
+const EMBEDDED_ROOT_CLASS =
+  "relative flex h-full min-h-0 shrink-0 flex-col";
+const EMBEDDED_GRID_CLASS = "grid min-h-0 shrink-0 gap-x-2 gap-y-1";
+
 /** Normalize PostgREST date / string to YYYY-MM-DD for map keys. */
 function isoDateKey(raw) {
   if (raw == null) return "";
@@ -63,7 +80,7 @@ function slotsFromLoads(loads) {
 }
 
 const fieldStack =
-  "w-full border-0 border-b border-neutral-300 bg-white px-2.5 py-2 text-left text-sm text-neutral-900 outline-none placeholder:text-neutral-400 focus:bg-neutral-50";
+  "w-full min-w-0 border-0 border-b border-neutral-300 bg-white px-2.5 py-2 text-left text-sm text-neutral-900 outline-none placeholder:text-neutral-400 focus:bg-neutral-50";
 
 const fieldStackInvoiced =
   "w-full border-0 border-b border-neutral-300 bg-green-300 px-2.5 py-2 text-left text-sm text-neutral-900 outline-none placeholder:text-neutral-500 focus:bg-green-300";
@@ -71,9 +88,9 @@ const fieldStackInvoiced =
 const fieldCell =
   "min-h-9 h-9 max-h-9 w-full min-w-0 max-w-full border-0 border-r border-neutral-300 bg-white px-1 py-1 text-center text-sm leading-snug text-neutral-900 outline-none placeholder:text-neutral-400 last:border-r-0 focus:bg-neutral-50";
 
-/** Read-only total: fixed height, no scroll; clip with ellipsis if needed. */
+/** Read-only total: fixed height; matches pre-scroll layout proportions. */
 const fieldCellTotal =
-  "min-h-9 h-9 max-h-9 w-full min-w-[3.75rem] border-0 border-r border-neutral-300 bg-neutral-100 px-1 py-0 text-neutral-700 last:border-r-0 overflow-hidden flex items-center justify-center";
+  "min-h-9 h-9 max-h-9 w-full min-w-0 max-w-full border-0 border-r border-neutral-300 bg-neutral-100 px-0.5 py-0 text-neutral-700 last:border-r-0 overflow-x-auto overflow-y-hidden overscroll-x-contain [scrollbar-width:thin] flex items-center justify-center";
 
 /**
  * Left: Origin, End user, then MT | Rate | FSC | Total in one compact row.
@@ -237,10 +254,10 @@ function LoadSplitCard({
 
   return (
     <div
-      className={`${rootGrow} relative w-full min-w-[275px] overflow-hidden rounded-lg border border-neutral-400/90 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.08)]`}
+      className={`${rootGrow} relative w-full min-w-0 overflow-hidden rounded-lg border border-neutral-400/90 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.08)]`}
     >
       <div className={innerRow}>
-        <div className="flex w-50 min-h-0 min-w-0 flex-1 flex-col border-r border-neutral-300 bg-white">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col border-r border-neutral-300 bg-white">
           <input
             type="text"
             className={locationFieldClass}
@@ -259,7 +276,7 @@ function LoadSplitCard({
             placeholder="End user"
             aria-label={`${slotTitle} end user`}
           />
-          <div className="grid min-h-9 min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(3.75rem,1.35fr)] border-t border-neutral-300">
+          <div className="grid min-h-9 min-w-0 grid-cols-[minmax(2.25rem,1fr)_minmax(2.25rem,1fr)_minmax(2.25rem,1fr)_minmax(3.25rem,1.1fr)] border-t border-neutral-300">
             <input
               type="text"
               className={fieldCell}
@@ -305,7 +322,7 @@ function LoadSplitCard({
             </div>
           </div>
         </div>
-        <div className="flex w-48 max-w-48 min-h-0 min-w-0 shrink-0 flex-col bg-green-950 p-2 sm:w-52">
+        <div className="flex w-[9.25rem] max-w-[9.25rem] min-h-0 shrink-0 flex-col bg-green-950 p-2">
           <textarea
             className="min-h-[60px] flex-1 resize-y rounded-sm border border-white/90 bg-[#40916c]/35 p-2 text-sm leading-snug text-white outline-none placeholder:text-white/60 focus:bg-[#40916c]/55"
             value={loadNote}
@@ -493,11 +510,11 @@ export default function UnitWeekLoadsGrid({
   }
 
   const rootShell = embeddedInRow
-    ? "relative flex h-full min-h-0 flex-1 flex-col overflow-x-visible overflow-y-visible p-2"
+    ? EMBEDDED_ROOT_CLASS
     : "relative overflow-x-auto rounded-lg rounded-l-none border border-green-950 bg-white p-3 text-green-950 shadow-sm lg:-ml-px lg:border-l-0";
 
   const gridShell = embeddedInRow
-    ? "grid min-h-0 min-w-[2205px] flex-1 grid-cols-7 gap-x-2 gap-y-1"
+    ? EMBEDDED_GRID_CLASS
     : "grid min-w-[980px] grid-cols-7 gap-3";
 
   const dayHeaderShell = embeddedInRow
@@ -505,14 +522,19 @@ export default function UnitWeekLoadsGrid({
     : "rounded-t-lg bg-green-950 py-2.5 text-center text-[13px] font-semibold leading-tight text-white shadow-sm";
 
   const dayColShell = embeddedInRow
-    ? "flex h-full min-h-0 min-w-[275px] flex-col gap-1"
+    ? "flex h-full min-h-0 min-w-0 flex-col gap-1"
     : "flex min-w-0 flex-col gap-2";
 
   const slotShortfall = slotPlan.need - slotPlan.defined;
   const showSlotShortfallBanner = slotShortfall > 0 && slotPlan.fromTable;
 
+  const embeddedRootStyle = embeddedInRow
+    ? { width: EMBEDDED_GRID_WIDTH_PX, minWidth: EMBEDDED_GRID_WIDTH_PX }
+    : undefined;
+  const embeddedGridStyle = embeddedInRow ? EMBEDDED_GRID_STYLE : undefined;
+
   return (
-    <div className={rootShell}>
+    <div className={rootShell} style={embeddedRootStyle}>
       {showSlotShortfallBanner ? (
         <div
           className={`mb-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-snug text-amber-950 ${
@@ -528,7 +550,7 @@ export default function UnitWeekLoadsGrid({
           <span className="font-mono">load_slots</span> ids.
         </div>
       ) : null}
-      <div className={gridShell}>
+      <div className={gridShell} style={embeddedGridStyle}>
         {days.map((d) => (
           <div key={d.iso} className={dayColShell}>
             <div className={dayHeaderShell}>
