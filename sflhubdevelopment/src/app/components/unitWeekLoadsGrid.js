@@ -29,8 +29,7 @@ const EMBEDDED_GRID_STYLE = {
   width: EMBEDDED_GRID_WIDTH_PX,
   minWidth: EMBEDDED_GRID_WIDTH_PX,
 };
-const EMBEDDED_ROOT_CLASS =
-  "relative flex h-full min-h-0 shrink-0 flex-col";
+const EMBEDDED_ROOT_CLASS = "relative flex h-full min-h-0 shrink-0 flex-col";
 const EMBEDDED_GRID_CLASS = "grid min-h-0 shrink-0 gap-x-2 gap-y-1";
 
 /** Normalize PostgREST date / string to YYYY-MM-DD for map keys. */
@@ -276,7 +275,7 @@ function LoadSplitCard({
             placeholder="End user"
             aria-label={`${slotTitle} end user`}
           />
-          <div className="grid min-h-9 min-w-0 grid-cols-[minmax(2.25rem,1fr)_minmax(2.25rem,1fr)_minmax(2.25rem,1fr)_minmax(3.25rem,1.1fr)] border-t border-neutral-300">
+          <div className="grid min-h-9 min-w-0 grid-cols-[minmax(2.5rem,1fr)_minmax(2.75rem,1fr)_minmax(2.75rem,1fr)_minmax(3.75rem,1.1fr)] border-t border-neutral-300">
             <input
               type="text"
               className={fieldCell}
@@ -322,7 +321,7 @@ function LoadSplitCard({
             </div>
           </div>
         </div>
-        <div className="flex w-[9.25rem] max-w-[9.25rem] min-h-0 shrink-0 flex-col bg-green-950 p-2">
+        <div className="flex w-[10rem] max-w-[12rem] min-h-0 shrink-0 flex-col bg-green-950 p-2">
           <textarea
             className="min-h-[60px] flex-1 resize-y rounded-sm border border-white/90 bg-[#40916c]/35 p-2 text-sm leading-snug text-white outline-none placeholder:text-white/60 focus:bg-[#40916c]/55"
             value={loadNote}
@@ -457,7 +456,9 @@ export default function UnitWeekLoadsGrid({
       });
 
       if (error) {
-        const colMissing = /column .* does not exist/i.test(error.message ?? "");
+        const colMissing = /column .* does not exist/i.test(
+          error.message ?? "",
+        );
         if (
           colMissing &&
           scheduleLoadId &&

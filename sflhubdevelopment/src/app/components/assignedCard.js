@@ -13,6 +13,8 @@ export default function AssignedCard({
   ufa,
   ufaPIN,
   onDelete,
+  /** CAD week revenue total for this unit (embedded schedule rows). */
+  weekTotalDisplay = "",
   /** When true, sits flush inside ScheduleRow (no outer margin / full-height column). */
   embedded = false,
 }) {
@@ -33,6 +35,14 @@ export default function AssignedCard({
       <div className="flex justify-center py-2 text-green-950">
         <p>{division}</p>
       </div>
+      {embedded ? (
+        <div className="flex justify-center border-b border-green-950/20 pb-2 text-green-950">
+          <p className="text-sm font-semibold">
+            Week total:{" "}
+            <span className="tabular-nums">{weekTotalDisplay || "$0.00"}</span>
+          </p>
+        </div>
+      ) : null}
       <div className="grid grid-cols-2">
         <div className="flex justify-start p-2 text-green-950">
           <p>

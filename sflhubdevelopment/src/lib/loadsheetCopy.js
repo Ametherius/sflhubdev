@@ -77,3 +77,34 @@ export function nextCopyLoadNumber(sourceLoadNumber, allSheets) {
 
   return `${root}-${maxSuffix + 1}`;
 }
+
+/** Insert a duplicate loadsheet row with the next -N load number suffix. */
+export async function insertLoadsheetCopy(supabase, sourceSheet, allSheets) {
+  const num = strTrim(sourceSheet?.load_number);
+  if (!num) {
+    return { data: null, error: { message: "Load number is required to copy." } };
+  }
+  const newNum = nextCopyLoadNumber(num, allSheets);
+  if (!newNum) {
+    return {
+      data: null,
+      error: { message: "Could not determine a copy load number." },
+    };
+  }
+
+  return supabase
+    .from("loadsheets")
+    .insert({
+      load_number: newNum,
+      origin: nullIfEmpty(sourceSheet.origin),
+      end_user: nullIfEmpty(sourceSheet.end_user),
+      mt: nullIfEmpty(sourceSheet.mt),
+      rate: nullIfEmpty(sourceSheet.rate),
+      fsc: nullIfEmpty(sourceSheet.fsc),
+      broker: nullIfEmpty(sourceSheet.broker),
+      flat_rate: Boolean(sourceSheet.flat_rate),
+      invoiced: false,
+    })
+    .select("id")
+    .single();
+}

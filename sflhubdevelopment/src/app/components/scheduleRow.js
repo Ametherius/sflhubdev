@@ -1,8 +1,11 @@
 "use client";
 
+import { useMemo } from "react";
 import AssignedCard from "./assignedCard";
 import UnitWeekLoadsGrid from "./unitWeekLoadsGrid";
 import { addDays, parseISODateLocal } from "@/lib/weekDates";
+import { formatLoadTotalCad } from "@/lib/loadTotal";
+import { sumWeekUnitRevenue } from "@/lib/weekUnitRevenue";
 
 function formatWeekBanner(weekStartISO) {
   if (!weekStartISO) return null;
@@ -43,6 +46,11 @@ export default function ScheduleRow({
 
   const banner = formatWeekBanner(weekStartISO);
 
+  const weekTotalDisplay = useMemo(() => {
+    const sum = sumWeekUnitRevenue(loads, loadSheets);
+    return formatLoadTotalCad(String(sum)) || "$0.00";
+  }, [loads, loadSheets]);
+
   return (
     <article className="mb-10 w-full min-w-0 max-w-full">
       {banner ? (
@@ -65,6 +73,7 @@ export default function ScheduleRow({
             petroPIN={unit.petroPIN}
             ufa={unit.ufa}
             ufaPIN={unit.ufaPIN}
+            weekTotalDisplay={weekTotalDisplay}
             onDelete={onDelete}
           />
           <div className="min-h-0 min-w-0 flex-1 overflow-x-auto overscroll-x-contain bg-white p-2 lg:rounded-tr-2xl">

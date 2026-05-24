@@ -28,6 +28,8 @@ import { useUser } from "@/hooks/useUser";
 import { createClient } from "@/lib/supabase/client";
 import NewWeekModal from "../components/newWeekModal";
 import NewLoadsheetModal from "../components/newLoadsheetModal";
+import EditLoadsheetModal from "../components/editLoadsheetModal";
+import { insertLoadsheetCopy } from "@/lib/loadsheetCopy";
 import { compareAssignedRows } from "@/lib/divisionSort";
 import { useWeekLoads } from "@/hooks/useWeekLoads";
 import { useLoadSlots } from "@/hooks/useLoadSlots";
@@ -36,6 +38,7 @@ import ScheduleRow from "../components/scheduleRow";
 import { isScheduleWeekFkError } from "@/lib/scheduleLoadsPersist";
 import AssignedMenu from "../components/assignedMenu";
 import LoadsheetMenu from "../components/loadsheetMenu";
+import CattleLoadsheet from "../components/cattleLoadsheet";
 
 export default function Schedule() {
   const [drivers, refreshDrivers] = useDrivers();
@@ -74,6 +77,51 @@ export default function Schedule() {
   const [loadSheets, refreshLoadSheets] = useLoadSheets();
   const [searchByName, setSearchByName] = useState("");
   const [loadsheetMenu, setLoadsheetMenu] = useState(false);
+  const [editLoadsheetId, setEditLoadsheetId] = useState(null);
+  const [copyingLoadsheetId, setCopyingLoadsheetId] = useState(null);
+
+  async function handleDeleteLoadsheet(sheet) {
+    if (!sheet?.id) return;
+    const label = String(sheet.load_number ?? "").trim() || "this loadsheet";
+    if (
+      !window.confirm(`Delete loadsheet "${label}"? This cannot be undone.`)
+    ) {
+      return;
+    }
+    const { error } = await supabase
+      .from("loadsheets")
+      .delete()
+      .eq("id", sheet.id);
+    if (error) {
+      alert(error.message);
+      return;
+    }
+    if (editLoadsheetId === sheet.id) setEditLoadsheetId(null);
+    await refreshLoadSheets();
+  }
+
+  function handleEditLoadsheet(sheet) {
+    if (!sheet?.id) return;
+    setEditLoadsheetId(sheet.id);
+  }
+
+  async function handleCopyLoadsheet(sheet) {
+    if (!sheet?.id || copyingLoadsheetId) return;
+    setCopyingLoadsheetId(sheet.id);
+    const { error } = await insertLoadsheetCopy(supabase, sheet, loadSheets);
+    setCopyingLoadsheetId(null);
+    if (error) {
+      if (/does not exist|schema cache|PGRST205/i.test(error.message ?? "")) {
+        alert(
+          "The loadsheets table is not available. Apply migrations, then try again.",
+        );
+      } else {
+        alert(error.message);
+      }
+      return;
+    }
+    await refreshLoadSheets();
+  }
 
   const assignedRowsForDisplay = useMemo(() => {
     let rows = assigned.filter((row) => row.driver && row.unit);
@@ -484,6 +532,13 @@ export default function Schedule() {
         onClose={() => setNewLoadsheetModalOpen(false)}
         onCreated={refreshLoadSheets}
       />
+      <EditLoadsheetModal
+        open={editLoadsheetId != null}
+        initialLoadsheetId={editLoadsheetId}
+        loadSheets={loadSheets}
+        onClose={() => setEditLoadsheetId(null)}
+        onSaved={refreshLoadSheets}
+      />
       <EditDriverModal
         open={editDriver != null}
         driver={editDriver}
@@ -526,8 +581,16 @@ export default function Schedule() {
             <FaTimes />
           </button>
         </div>
-        <LoadsheetMenu loadsheets={loadSheets} />
+        <LoadsheetMenu
+          loadsheets={loadSheets}
+          onEdit={handleEditLoadsheet}
+          onDelete={handleDeleteLoadsheet}
+          onCopy={handleCopyLoadsheet}
+        />
       </div>
+      {/* <div className="bg-white border-2 border-green-950 shadow-2xl fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 rounded-xl p-4 z-50">
+        <CattleLoadsheet />
+      </div> */}
     </div>
   );
 }
