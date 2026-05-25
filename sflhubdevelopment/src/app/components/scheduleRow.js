@@ -5,7 +5,11 @@ import AssignedCard from "./assignedCard";
 import UnitWeekLoadsGrid from "./unitWeekLoadsGrid";
 import { addDays, parseISODateLocal } from "@/lib/weekDates";
 import { formatLoadTotalCad } from "@/lib/loadTotal";
-import { sumWeekUnitRevenue } from "@/lib/weekUnitRevenue";
+import { formatWeekRevenuePerKm } from "@/lib/revenuePerKm";
+import {
+  sumWeekUnitKms,
+  sumWeekUnitRevenue,
+} from "@/lib/weekUnitRevenue";
 
 function formatWeekBanner(weekStartISO) {
   if (!weekStartISO) return null;
@@ -46,9 +50,13 @@ export default function ScheduleRow({
 
   const banner = formatWeekBanner(weekStartISO);
 
-  const weekTotalDisplay = useMemo(() => {
-    const sum = sumWeekUnitRevenue(loads, loadSheets);
-    return formatLoadTotalCad(String(sum)) || "$0.00";
+  const { weekTotalDisplay, weekRevenuePerKmDisplay } = useMemo(() => {
+    const revenue = sumWeekUnitRevenue(loads, loadSheets);
+    const kms = sumWeekUnitKms(loads, loadSheets);
+    return {
+      weekTotalDisplay: formatLoadTotalCad(String(revenue)) || "$0.00",
+      weekRevenuePerKmDisplay: formatWeekRevenuePerKm(revenue, kms),
+    };
   }, [loads, loadSheets]);
 
   return (
@@ -74,6 +82,7 @@ export default function ScheduleRow({
             ufa={unit.ufa}
             ufaPIN={unit.ufaPIN}
             weekTotalDisplay={weekTotalDisplay}
+            weekRevenuePerKmDisplay={weekRevenuePerKmDisplay}
             onDelete={onDelete}
           />
           <div className="min-h-0 min-w-0 flex-1 overflow-x-auto overscroll-x-contain bg-white p-2 lg:rounded-tr-2xl">

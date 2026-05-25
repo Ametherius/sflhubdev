@@ -3,7 +3,26 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FaTimes } from "react-icons/fa";
 import ButtonDark from "./buttonDark";
-import { computeLoadTotalDisplay, formatLoadTotalCad } from "@/lib/loadTotal";
+import {
+  DEFAULT_LOAD_CATEGORY,
+  LOAD_CATEGORIES,
+  computeUsGrainUsdTotal,
+  fetchLiveUsdCadRate,
+  fieldRulesForCategory,
+  loadCategoryFromStorage,
+  loadCategoryStorageValue,
+  normalizeLoadCategory,
+  totalFormulaHint,
+} from "@/lib/loadCategory";
+import {
+  computeLoadTotalDisplay,
+  formatLoadTotalCad,
+  formatUsdTotal,
+} from "@/lib/loadTotal";
+import {
+  computeRevenuePerKm,
+  formatRevenuePerKmCad,
+} from "@/lib/revenuePerKm";
 import {
   buildScheduleLoadPayload,
   nextCopyLoadNumber,
@@ -44,7 +63,10 @@ export default function EditLoadsheetModal({
   const [rate, setRate] = useState("");
   const [fsc, setFsc] = useState("");
   const [broker, setBroker] = useState("");
-  const [flatRate, setFlatRate] = useState(false);
+  const [kms, setKms] = useState("");
+  const [loadCategory, setLoadCategory] = useState(DEFAULT_LOAD_CATEGORY);
+  const [usdCadRate, setUsdCadRate] = useState("");
+  const [fetchingFx, setFetchingFx] = useState(false);
   const [invoiced, setInvoiced] = useState(false);
   const [saving, setSaving] = useState(false);
   const [copying, setCopying] = useState(false);
@@ -75,15 +97,46 @@ export default function EditLoadsheetModal({
     [loadSheets, selectedId],
   );
 
+  const fieldRules = useMemo(
+    () => fieldRulesForCategory(loadCategory, false),
+    [loadCategory],
+  );
+
+  const totalHint = useMemo(
+    () => totalFormulaHint(loadCategory, false),
+    [loadCategory],
+  );
+
   const loadTotalPreview = useMemo(
-    () => computeLoadTotalDisplay(mt, rate, fsc, flatRate),
-    [mt, rate, fsc, flatRate],
+    () =>
+      computeLoadTotalDisplay(mt, rate, fsc, {
+        loadCategory,
+        usdCadRate,
+        flatRate: false,
+      }),
+    [mt, rate, fsc, loadCategory, usdCadRate],
   );
 
   const loadTotalPreviewCad = useMemo(
     () => formatLoadTotalCad(loadTotalPreview),
     [loadTotalPreview],
   );
+
+  const usdTotalPreview = useMemo(() => {
+    if (loadCategory !== "us_grain") return "";
+    return formatUsdTotal(computeUsGrainUsdTotal(mt, rate));
+  }, [loadCategory, mt, rate]);
+
+  const revenuePerKmPreview = useMemo(() => {
+    const rev = loadTotalPreview
+      ? Number(String(loadTotalPreview).replace(/,/g, ""))
+      : null;
+    const perKm =
+      rev != null && Number.isFinite(rev)
+        ? computeRevenuePerKm(rev, kms)
+        : null;
+    return formatRevenuePerKmCad(perKm);
+  }, [loadTotalPreview, kms]);
 
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect -- hydrate form when sheet selection changes */
@@ -100,7 +153,9 @@ export default function EditLoadsheetModal({
       setRate("");
       setFsc("");
       setBroker("");
-      setFlatRate(false);
+      setKms("");
+      setLoadCategory(DEFAULT_LOAD_CATEGORY);
+      setUsdCadRate("");
       setInvoiced(false);
       return;
     }
@@ -117,7 +172,14 @@ export default function EditLoadsheetModal({
     setRate(selected.rate != null ? String(selected.rate) : "");
     setFsc(selected.fsc != null ? String(selected.fsc) : "");
     setBroker(selected.broker != null ? String(selected.broker) : "");
-    setFlatRate(Boolean(selected.flat_rate));
+    setKms(selected.kms != null ? String(selected.kms) : "");
+    setLoadCategory(loadCategoryFromStorage(selected.load_category));
+    if (Boolean(selected.flat_rate) && !selected.load_category) {
+      setLoadCategory("legacy_flat");
+    }
+    setUsdCadRate(
+      selected.usd_cad_rate != null ? String(selected.usd_cad_rate) : "",
+    );
     setInvoiced(Boolean(selected.invoiced));
     queueMicrotask(() => {
       liveSyncReadyRef.current = true;
@@ -125,12 +187,12 @@ export default function EditLoadsheetModal({
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [open, selected, selectedId]);
 
-  const persistLive = useCallback(
+  const saveLoadsheet = useCallback(
     async (overrides = {}) => {
-      if (!selectedId || !liveSyncReadyRef.current) return;
+      if (!selectedId) return { error: null };
 
       const num = (overrides.loadNumber ?? loadNumber).trim();
-      if (!num) return;
+      if (!num) return { error: null };
 
       const values = {
         loadNumber: num,
@@ -140,9 +202,15 @@ export default function EditLoadsheetModal({
         rate: overrides.rate ?? rate,
         fsc: overrides.fsc ?? fsc,
         broker: overrides.broker ?? broker,
-        flatRate:
-          overrides.flatRate !== undefined ? overrides.flatRate : flatRate,
+        kms: overrides.kms ?? kms,
+        loadCategory: overrides.loadCategory ?? loadCategory,
+        usdCadRate: overrides.usdCadRate ?? usdCadRate,
+        invoiced:
+          overrides.invoiced !== undefined ? overrides.invoiced : invoiced,
       };
+
+      const cat = normalizeLoadCategory(values.loadCategory, false);
+      const categoryStored = loadCategoryStorageValue(cat);
 
       const { error } = await supabase
         .from("loadsheets")
@@ -154,22 +222,19 @@ export default function EditLoadsheetModal({
           rate: nullIfEmpty(values.rate),
           fsc: nullIfEmpty(values.fsc),
           broker: nullIfEmpty(values.broker),
-          flat_rate: values.flatRate,
+          kms: nullIfEmpty(values.kms),
+          load_category: categoryStored,
+          usd_cad_rate: nullIfEmpty(values.usdCadRate),
+          flat_rate: cat === "legacy_flat",
+          invoiced: values.invoiced,
         })
         .eq("id", selectedId);
 
       if (error) {
-        if (/flat_rate|column .* does not exist/i.test(error.message ?? "")) {
-          alert(
-            "Flat rate needs the latest Supabase migration (loadsheets.flat_rate). Apply migrations, then try again.",
-          );
-        } else if (
-          !/does not exist|schema cache|PGRST205/i.test(error.message ?? "")
-        ) {
-          console.error(error.message);
-        }
-        return;
+        return { error };
       }
+
+      await onSaved?.();
 
       if (scheduleLoadId) {
         const schedulePayload = buildScheduleLoadPayload({
@@ -181,7 +246,9 @@ export default function EditLoadsheetModal({
           rate: values.rate,
           fsc: values.fsc,
           broker: values.broker,
-          flatRate: values.flatRate,
+          flatRate: cat === "legacy_flat",
+          loadCategory: cat,
+          usdCadRate: values.usdCadRate,
         });
         const { data: scheduleRow, error: scheduleError } =
           await persistScheduleLoad(supabase, {
@@ -189,18 +256,7 @@ export default function EditLoadsheetModal({
             payload: schedulePayload,
           });
         if (scheduleError) {
-          if (
-            /load_note|origin|end_user|\bmt\b|rate|load_total|loadsheet_id|load_number|\bfsc\b|column .* does not exist/i.test(
-              scheduleError.message ?? "",
-            )
-          ) {
-            alert(
-              "Load sheet saved, but the schedule slot could not update (missing columns). Apply the latest schedule_loads migrations, then try again.",
-            );
-          } else {
-            alert(scheduleError.message);
-          }
-          return;
+          return { error: scheduleError };
         }
         if (scheduleRow) {
           onSchedulePatched?.(scheduleRow);
@@ -208,7 +264,7 @@ export default function EditLoadsheetModal({
         await onScheduleUpdated?.();
       }
 
-      await onSaved?.();
+      return { error: null };
     },
     [
       selectedId,
@@ -219,13 +275,50 @@ export default function EditLoadsheetModal({
       rate,
       fsc,
       broker,
-      flatRate,
+      kms,
+      loadCategory,
+      usdCadRate,
+      invoiced,
       scheduleLoadId,
       supabase,
       onSaved,
       onScheduleUpdated,
       onSchedulePatched,
     ],
+  );
+
+  function reportSaveError(error) {
+    const msg = error?.message ?? String(error);
+    if (/load_category|usd_cad_rate|kms|column .* does not exist/i.test(msg)) {
+      alert(
+        "Load category / KMs / FX need the latest Supabase migrations (loadsheets.load_category, kms, usd_cad_rate). Apply migrations, then try again.",
+      );
+      return;
+    }
+    if (
+      /load_note|origin|end_user|\bmt\b|rate|load_total|loadsheet_id|load_number|\bfsc\b|column .* does not exist/i.test(
+        msg,
+      )
+    ) {
+      alert(
+        "Load sheet saved, but the schedule slot could not update (missing columns). Apply the latest schedule_loads migrations, then try again.",
+      );
+      return;
+    }
+    if (!/does not exist|schema cache|PGRST205/i.test(msg)) {
+      alert(msg);
+    }
+  }
+
+  const persistLive = useCallback(
+    async (overrides = {}) => {
+      if (!selectedId || !liveSyncReadyRef.current) return;
+      const { error } = await saveLoadsheet(overrides);
+      if (error) {
+        reportSaveError(error);
+      }
+    },
+    [selectedId, saveLoadsheet],
   );
 
   useEffect(() => {
@@ -248,34 +341,49 @@ export default function EditLoadsheetModal({
     rate,
     fsc,
     broker,
+    kms,
+    loadCategory,
+    usdCadRate,
     persistLive,
   ]);
 
-  function handleFlatRateChange(checked) {
-    setFlatRate(checked);
+  function handleLoadCategoryChange(next) {
+    setLoadCategory(next);
     if (!selectedId) return;
-    void persistLive({ flatRate: checked });
+    void (async () => {
+      const { error } = await saveLoadsheet({ loadCategory: next });
+      if (error) reportSaveError(error);
+    })();
+  }
+
+  async function handleFetchLiveUsdCad() {
+    if (!selectedId || fetchingFx) return;
+    setFetchingFx(true);
+    try {
+      const rate = await fetchLiveUsdCadRate();
+      setUsdCadRate(rate);
+      await persistLive({ usdCadRate: rate });
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Could not fetch USD/CAD rate.");
+    } finally {
+      setFetchingFx(false);
+    }
   }
 
   async function handleInvoicedChange(checked) {
     if (!selectedId) return;
     setInvoiced(checked);
-    const { error } = await supabase
-      .from("loadsheets")
-      .update({ invoiced: checked })
-      .eq("id", selectedId);
+    const { error } = await saveLoadsheet({ invoiced: checked });
     if (error) {
       if (/invoiced|column .* does not exist/i.test(error.message ?? "")) {
         alert(
           "Invoiced status needs the latest Supabase migration (loadsheets.invoiced). Apply migrations, then try again.",
         );
       } else {
-        alert(error.message);
+        reportSaveError(error);
       }
       setInvoiced(!checked);
-      return;
     }
-    await onSaved?.();
   }
 
   async function handleCopy() {
@@ -301,7 +409,12 @@ export default function EditLoadsheetModal({
         rate: nullIfEmpty(rate),
         fsc: nullIfEmpty(fsc),
         broker: nullIfEmpty(broker),
-        flat_rate: flatRate,
+        kms: nullIfEmpty(kms),
+        load_category: loadCategoryStorageValue(
+          normalizeLoadCategory(loadCategory, false),
+        ),
+        usd_cad_rate: nullIfEmpty(usdCadRate),
+        flat_rate: false,
         invoiced: false,
       })
       .select("id")
@@ -319,7 +432,6 @@ export default function EditLoadsheetModal({
     }
     setSelectedId(String(data.id));
     setLoadNumber(newNum);
-    setFlatRate(flatRate);
     setInvoiced(false);
     await onSaved?.();
   }
@@ -338,17 +450,12 @@ export default function EditLoadsheetModal({
     }
     setSaving(true);
     liveSyncGenRef.current += 1;
-    await persistLive();
-    const { error } = await supabase
-      .from("loadsheets")
-      .update({ invoiced })
-      .eq("id", selectedId);
+    const { error } = await saveLoadsheet();
     setSaving(false);
-    if (error && !/invoiced|column .* does not exist/i.test(error.message ?? "")) {
-      alert(error.message);
+    if (error) {
+      reportSaveError(error);
       return;
     }
-    await onSaved?.();
     onClose();
   }
 
@@ -497,67 +604,132 @@ export default function EditLoadsheetModal({
               disabled={!selectedId}
             />
           </label>
-          <div className="grid grid-cols-2 gap-3">
-            <label className="block text-sm font-medium">
-              MT
-              <input
-                className={inputClass}
-                value={mt}
-                onChange={(e) => setMt(e.target.value)}
-                placeholder="MT"
-                disabled={!selectedId || flatRate}
-              />
-            </label>
+          <label className="block text-sm font-medium">
+            Load type
+            <select
+              className={selectClass}
+              value={loadCategory}
+              disabled={!selectedId}
+              onChange={(e) => handleLoadCategoryChange(e.target.value)}
+            >
+              {loadCategory === "legacy_flat" ? (
+                <option value="legacy_flat">Legacy flat (rate × FSC)</option>
+              ) : null}
+              {LOAD_CATEGORIES.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div
+            className={`grid gap-3 ${fieldRules.showMt ? "grid-cols-2" : "grid-cols-1"}`}
+          >
+            {fieldRules.showMt ? (
+              <label className="block text-sm font-medium">
+                MT
+                <input
+                  className={inputClass}
+                  value={mt}
+                  onChange={(e) => setMt(e.target.value)}
+                  placeholder="MT"
+                  disabled={!selectedId}
+                />
+              </label>
+            ) : null}
             <label className="block text-sm font-medium">
               Rate
               <input
                 className={inputClass}
                 value={rate}
                 onChange={(e) => setRate(e.target.value)}
-                placeholder="Rate"
+                placeholder={
+                  fieldRules.rateIsFlatTotal ? "Total amount (CAD)" : "Rate"
+                }
                 disabled={!selectedId}
               />
             </label>
           </div>
+          {fieldRules.showFsc ? (
+            <label className="block text-sm font-medium">
+              FSC{" "}
+              <span className="font-normal text-green-900/60">
+                {loadCategory === "chicken"
+                  ? "(556 × FSC + rate)"
+                  : "(legacy flat: rate × FSC)"}
+              </span>
+              <input
+                className={inputClass}
+                value={fsc}
+                onChange={(e) => setFsc(e.target.value)}
+                placeholder="e.g. 150"
+                disabled={!selectedId}
+              />
+            </label>
+          ) : null}
+          {fieldRules.showUsdCad ? (
+            <div className="space-y-2">
+              <label className="block text-sm font-medium">
+                USD → CAD rate{" "}
+                <span className="font-normal text-green-900/60">
+                  (MT × rate = USD, then × this rate for CAD total)
+                </span>
+                <input
+                  className={inputClass}
+                  value={usdCadRate}
+                  onChange={(e) => setUsdCadRate(e.target.value)}
+                  placeholder="e.g. 1.38"
+                  disabled={!selectedId}
+                />
+              </label>
+              <button
+                type="button"
+                className="rounded-lg border border-green-950/30 bg-white px-3 py-1.5 text-xs font-semibold text-green-950 hover:bg-green-950/5 disabled:opacity-50"
+                disabled={!selectedId || fetchingFx}
+                onClick={() => void handleFetchLiveUsdCad()}
+              >
+                {fetchingFx ? "Fetching…" : "Use live USD/CAD rate"}
+              </button>
+              {usdTotalPreview ? (
+                <p className="text-xs text-green-900/80">
+                  USD subtotal:{" "}
+                  <span className="font-semibold tabular-nums">
+                    {usdTotalPreview}
+                  </span>
+                </p>
+              ) : null}
+            </div>
+          ) : null}
           <label className="block text-sm font-medium">
-            FSC{" "}
-            <span className="font-normal text-green-900/60">
-              {flatRate ? "(used in rate × FSC total)" : "(optional, added to MT × rate when filled)"}
-            </span>
-            <input
-              className={inputClass}
-              value={fsc}
-              onChange={(e) => setFsc(e.target.value)}
-              placeholder="e.g. 150"
-              disabled={!selectedId}
-            />
-          </label>
-          <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
-            <input
-              type="checkbox"
-              className="size-4 rounded border-green-950/30 text-green-950 focus:ring-green-950/30"
-              checked={flatRate}
-              disabled={!selectedId}
-              onChange={(e) => handleFlatRateChange(e.target.checked)}
-            />
-            Flat rate
-            <span className="font-normal text-green-900/60">(total = rate × FSC only)</span>
-          </label>
-          <label className="block text-sm font-medium">
-            Total{" "}
-            <span className="font-normal text-green-900/60">
-              {flatRate ? "(rate × FSC)" : "(MT × rate + FSC)"}
-            </span>
+            Total (CAD){" "}
+            <span className="font-normal text-green-900/60">({totalHint})</span>
             <input
               className={`${inputClass} cursor-not-allowed bg-neutral-100 text-neutral-700`}
               readOnly
               value={loadTotalPreviewCad}
               placeholder="—"
-              title={
-                flatRate
-                  ? "Flat rate: rate × FSC (updates live on the schedule)."
-                  : "MT × rate + FSC when FSC is filled (updates live on the schedule)."
-              }
+              title={`${totalHint} — saved to the schedule as CAD.`}
+            />
+          </label>
+          <label className="block text-sm font-medium">
+            KMs{" "}
+            <span className="font-normal text-green-900/60">(for revenue/km)</span>
+            <input
+              className={inputClass}
+              value={kms}
+              onChange={(e) => setKms(e.target.value)}
+              placeholder="e.g. 450"
+              disabled={!selectedId}
+            />
+          </label>
+          <label className="block text-sm font-medium">
+            Revenue/km{" "}
+            <span className="font-normal text-green-900/60">(total ÷ KMs)</span>
+            <input
+              className={`${inputClass} cursor-not-allowed bg-neutral-100 text-neutral-700`}
+              readOnly
+              value={revenuePerKmPreview}
+              placeholder="—"
             />
           </label>
           <label className="block text-sm font-medium">

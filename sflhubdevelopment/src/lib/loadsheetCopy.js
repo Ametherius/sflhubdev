@@ -1,3 +1,8 @@
+import {
+  calcOptionsFromSheet,
+  loadCategoryFromStorage,
+  loadCategoryStorageValue,
+} from "@/lib/loadCategory";
 import { computeLoadTotalDisplay } from "@/lib/loadTotal";
 
 function nullIfEmpty(s) {
@@ -30,9 +35,15 @@ export function buildScheduleLoadPayload({
   fsc,
   broker,
   flatRate = false,
+  loadCategory = null,
+  usdCadRate = null,
 }) {
   const num = strTrim(loadNumber);
-  const loadTotalDisplay = computeLoadTotalDisplay(mt, rate, fsc, flatRate);
+  const loadTotalDisplay = computeLoadTotalDisplay(mt, rate, fsc, {
+    flatRate,
+    loadCategory,
+    usdCadRate,
+  });
   return {
     loadsheet_id: loadsheetId,
     load_number: num.length ? num : null,
@@ -103,6 +114,13 @@ export async function insertLoadsheetCopy(supabase, sourceSheet, allSheets) {
       fsc: nullIfEmpty(sourceSheet.fsc),
       broker: nullIfEmpty(sourceSheet.broker),
       flat_rate: Boolean(sourceSheet.flat_rate),
+      load_category: nullIfEmpty(
+        loadCategoryStorageValue(
+          loadCategoryFromStorage(sourceSheet.load_category),
+        ),
+      ),
+      usd_cad_rate: nullIfEmpty(sourceSheet.usd_cad_rate),
+      kms: nullIfEmpty(sourceSheet.kms),
       invoiced: false,
     })
     .select("id")

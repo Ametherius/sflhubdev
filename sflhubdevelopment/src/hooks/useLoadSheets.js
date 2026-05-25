@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePostgresRealtime } from "./usePostgresRealtime";
 
 const SELECT =
-  "id, load_number, origin, end_user, mt, rate, fsc, broker, invoiced, flat_rate";
+  "id, load_number, origin, end_user, mt, rate, fsc, broker, invoiced, flat_rate, kms, load_category, usd_cad_rate";
 const SELECT_LEGACY =
   "id, load_number, origin, end_user, mt, rate, fsc, broker, invoiced";
 const SELECT_LEGACY_NO_INVOICED =
@@ -34,7 +34,9 @@ export function useLoadSheets() {
 
     if (
       error &&
-      /flat_rate|invoiced|column .* does not exist/i.test(error.message ?? "")
+      /load_category|usd_cad_rate|kms|flat_rate|invoiced|column .* does not exist/i.test(
+        error.message ?? "",
+      )
     ) {
       let legacy = await supabase
         .from("loadsheets")
@@ -56,6 +58,9 @@ export function useLoadSheets() {
           ...row,
           invoiced: row.invoiced ?? false,
           flat_rate: row.flat_rate ?? false,
+          kms: row.kms ?? null,
+          load_category: row.load_category ?? null,
+          usd_cad_rate: row.usd_cad_rate ?? null,
         }));
       }
     }

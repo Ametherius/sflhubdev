@@ -1,4 +1,5 @@
-import { computeLoadTotalDisplay } from "@/lib/loadTotal";
+import { calcOptionsFromSheet } from "@/lib/loadCategory";
+import { computeLoadTotalDisplay, parseMetricNum } from "@/lib/loadTotal";
 
 function parseLoadTotalNumber(loadTotalRaw) {
   if (loadTotalRaw == null || String(loadTotalRaw).trim() === "") return null;
@@ -28,8 +29,7 @@ export function resolveLoadRevenue(load, sheetsMap) {
   const mt = load?.mt ?? sheet?.mt;
   const rate = load?.rate ?? sheet?.rate;
   const fsc = load?.fsc ?? sheet?.fsc;
-  const flatRate = Boolean(sheet?.flat_rate);
-  const computed = computeLoadTotalDisplay(mt, rate, fsc, flatRate);
+  const computed = computeLoadTotalDisplay(mt, rate, fsc, calcOptionsFromSheet(sheet));
   return parseLoadTotalNumber(computed);
 }
 
@@ -40,6 +40,25 @@ export function sumWeekUnitRevenue(unitLoads, loadSheets) {
   for (const load of unitLoads ?? []) {
     const n = resolveLoadRevenue(load, map);
     if (n != null) sum += n;
+  }
+  return sum;
+}
+
+/** KMs for one schedule row (from linked loadsheet). */
+export function resolveLoadKms(load, sheetsMap) {
+  const sheetId = load?.loadsheet_id;
+  if (sheetId == null || String(sheetId).length === 0) return null;
+  const sheet = sheetsMap.get(String(sheetId));
+  return parseMetricNum(sheet?.kms);
+}
+
+/** Sum KMs for all week loads that reference a loadsheet with KMs set. */
+export function sumWeekUnitKms(unitLoads, loadSheets) {
+  const map = sheetsById(loadSheets);
+  let sum = 0;
+  for (const load of unitLoads ?? []) {
+    const k = resolveLoadKms(load, map);
+    if (k != null) sum += k;
   }
   return sum;
 }

@@ -15,6 +15,8 @@ export default function AssignedCard({
   onDelete,
   /** CAD week revenue total for this unit (embedded schedule rows). */
   weekTotalDisplay = "",
+  /** CAD revenue per km for the week (embedded schedule rows). */
+  weekRevenuePerKmDisplay = "",
   /** When true, sits flush inside ScheduleRow (no outer margin / full-height column). */
   embedded = false,
 }) {
@@ -36,10 +38,16 @@ export default function AssignedCard({
         <p>{division}</p>
       </div>
       {embedded ? (
-        <div className="flex justify-center border-b border-green-950/20 pb-2 text-green-950">
+        <div className="flex flex-col items-center gap-0.5 border-b border-green-950/20 pb-2 text-center text-green-950">
           <p className="text-sm font-semibold">
             Week total:{" "}
             <span className="tabular-nums">{weekTotalDisplay || "$0.00"}</span>
+          </p>
+          <p className="text-xs font-medium text-green-950/85">
+            Revenue/km:{" "}
+            <span className="tabular-nums">
+              {weekRevenuePerKmDisplay || "—"}
+            </span>
           </p>
         </div>
       ) : null}

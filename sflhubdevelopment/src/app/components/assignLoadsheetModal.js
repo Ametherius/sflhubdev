@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { FaTimes } from "react-icons/fa";
 import ButtonDark from "./buttonDark";
 import { createClient } from "@/lib/supabase/client";
+import { calcOptionsFromSheet } from "@/lib/loadCategory";
 import {
   buildScheduleLoadNote,
   buildScheduleLoadPayload,
@@ -131,6 +132,7 @@ export default function AssignLoadsheetModal({
       return isoDateKey(l.load_date) === dk && String(sid) === String(slotId);
     });
 
+    const calc = calcOptionsFromSheet(selectedSheet);
     const payload = buildScheduleLoadPayload({
       loadsheetId: selectedSheet.id,
       loadNumber: selectedSheet.load_number,
@@ -140,7 +142,9 @@ export default function AssignLoadsheetModal({
       rate: selectedSheet.rate,
       fsc: selectedSheet.fsc,
       broker: selectedSheet.broker,
-      flatRate: Boolean(selectedSheet.flat_rate),
+      flatRate: calc.flatRate,
+      loadCategory: calc.loadCategory,
+      usdCadRate: calc.usdCadRate,
     });
 
     const { data, error } = await persistScheduleLoad(supabase, {

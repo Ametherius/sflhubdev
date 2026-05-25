@@ -1,3 +1,8 @@
+import {
+  computeLoadTotalDisplay as computeByCategory,
+  normalizeLoadCategory,
+} from "@/lib/loadCategory";
+
 /** Parse MT / rate / FSC style numeric strings (commas allowed). */
 export function parseMetricNum(s) {
   const t = String(s ?? "")
@@ -9,31 +14,26 @@ export function parseMetricNum(s) {
 }
 
 /**
- * Standard: MT × rate; if FSC is non-empty, (MT × rate) + FSC.
- * Flat rate: rate × FSC only (ignores MT).
+ * CAD total for schedule / sheets.
+ * Fourth argument: legacy `flatRate` boolean, or options
+ * `{ loadCategory, usdCadRate, flatRate }`.
  */
-export function computeLoadTotalDisplay(mt, rate, fsc, flatRate = false) {
-  const r = parseMetricNum(rate);
-  const fRaw = String(fsc ?? "").trim();
-  const f = parseMetricNum(fsc);
-
-  if (flatRate) {
-    if (r == null) return "";
-    if (fRaw === "" || f == null) return "";
-    const total = r * f;
-    return String(Math.round(total * 100) / 100);
+export function computeLoadTotalDisplay(mt, rate, fsc, fourth = {}) {
+  if (typeof fourth === "boolean") {
+    return computeByCategory({ mt, rate, fsc, flatRate: fourth });
   }
-
-  const m = parseMetricNum(mt);
-  if (m == null || r == null) return "";
-  const base = m * r;
-  let total = base;
-  if (fRaw !== "" && f != null) {
-    total = base + f;
-  }
-  const rounded = Math.round(total * 100) / 100;
-  return String(rounded);
+  const opts = fourth && typeof fourth === "object" ? fourth : {};
+  return computeByCategory({
+    mt,
+    rate,
+    fsc,
+    loadCategory: opts.loadCategory,
+    usdCadRate: opts.usdCadRate,
+    flatRate: opts.flatRate,
+  });
 }
+
+export { normalizeLoadCategory };
 
 const CAD_TOTAL_FORMAT = new Intl.NumberFormat("en-CA", {
   style: "currency",
@@ -69,4 +69,17 @@ export function formatLoadTotalCadGrid(loadTotalRaw) {
   const n = parseLoadTotalNumber(loadTotalRaw);
   if (n == null) return "";
   return CAD_GRID_FORMAT.format(n);
+}
+
+const USD_TOTAL_FORMAT = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
+export function formatUsdTotal(usdTotalRaw) {
+  const n = parseLoadTotalNumber(usdTotalRaw);
+  if (n == null) return "";
+  return USD_TOTAL_FORMAT.format(n);
 }
