@@ -44,12 +44,27 @@ export function sumWeekUnitRevenue(unitLoads, loadSheets) {
   return sum;
 }
 
-/** KMs for one schedule row (from linked loadsheet). */
+/** KMs for one schedule row (per-slot value, else linked loadsheet for legacy rows). */
 export function resolveLoadKms(load, sheetsMap) {
+  if (load != null && Object.prototype.hasOwnProperty.call(load, "kms")) {
+    const rowKms = parseMetricNum(load.kms);
+    if (rowKms != null) return rowKms;
+  }
   const sheetId = load?.loadsheet_id;
   if (sheetId == null || String(sheetId).length === 0) return null;
   const sheet = sheetsMap.get(String(sheetId));
   return parseMetricNum(sheet?.kms);
+}
+
+/** Invoiced for one schedule row (per-slot; legacy rows fall back to loadsheet). */
+export function resolveLoadInvoiced(load, sheetsMap) {
+  if (load != null && Object.prototype.hasOwnProperty.call(load, "invoiced")) {
+    return Boolean(load.invoiced);
+  }
+  const sheetId = load?.loadsheet_id;
+  if (sheetId == null || String(sheetId).length === 0) return false;
+  const sheet = sheetsMap.get(String(sheetId));
+  return Boolean(sheet?.invoiced);
 }
 
 /** Sum KMs for all week loads that reference a loadsheet with KMs set. */

@@ -5,6 +5,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePostgresRealtime } from "./usePostgresRealtime";
 
 const LOAD_SELECT_MODERN =
+  "id, week_id, load_date, load_slot_id, in_use_unit_id, load_note, origin, end_user, mt, rate, load_total, loadsheet_id, load_number, fsc, kms, invoiced";
+const LOAD_SELECT_MODERN_NO_SLOT_META =
   "id, week_id, load_date, load_slot_id, in_use_unit_id, load_note, origin, end_user, mt, rate, load_total, loadsheet_id, load_number, fsc";
 const LOAD_SELECT_MODERN_NO_LOADSHEET =
   "id, week_id, load_date, load_slot_id, in_use_unit_id, load_note, origin, end_user, mt, rate, fsc, load_total";
@@ -105,6 +107,19 @@ export function useWeekLoads(weekId) {
       modern = await supabase
         .from("schedule_loads")
         .select(LOAD_SELECT_MODERN_NO_LOADSHEET)
+        .eq("week_id", weekId)
+        .order("load_date", { ascending: true })
+        .order("load_slot_id", { ascending: true });
+    }
+
+    if (
+      modern.error &&
+      /\b(kms|invoiced)\b/i.test(modern.error.message ?? "") &&
+      /does not exist/i.test(modern.error.message ?? "")
+    ) {
+      modern = await supabase
+        .from("schedule_loads")
+        .select(LOAD_SELECT_MODERN_NO_SLOT_META)
         .eq("week_id", weekId)
         .order("load_date", { ascending: true })
         .order("load_slot_id", { ascending: true });

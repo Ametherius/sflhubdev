@@ -46,6 +46,9 @@ export default function EditLoadsheetModal({
   initialLoadsheetId = null,
   /** When set (opened from a grid slot), offer "remove from this slot" for schedule_loads */
   scheduleLoadId = null,
+  /** Per-slot KMs / invoiced from schedule_loads (not the shared loadsheet). */
+  scheduleKms = undefined,
+  scheduleInvoiced = undefined,
   onSaved,
   /** Called after syncing this slot's schedule_loads row (refresh week loads) */
   onScheduleUpdated,
@@ -74,6 +77,39 @@ export default function EditLoadsheetModal({
   const liveSyncReadyRef = useRef(false);
   const liveSyncGenRef = useRef(0);
   const lastHydratedSheetIdRef = useRef(null);
+  const liveSyncSuppressUntilRef = useRef(0);
+  const slotMetaFetchGenRef = useRef(0);
+
+  useEffect(() => {
+    if (open) {
+      lastHydratedSheetIdRef.current = null;
+      liveSyncSuppressUntilRef.current = Date.now() + 700;
+    }
+  }, [open]);
+
+  /** Load per-slot KMs / completed from schedule_loads (not the shared loadsheet). */
+  useEffect(() => {
+    if (!open || !scheduleLoadId) return;
+    const gen = ++slotMetaFetchGenRef.current;
+    void (async () => {
+      const { data, error } = await supabase
+        .from("schedule_loads")
+        .select("kms, invoiced")
+        .eq("id", scheduleLoadId)
+        .maybeSingle();
+      if (gen !== slotMetaFetchGenRef.current) return;
+      if (error) {
+        if (!/invoiced|kms|column .* does not exist/i.test(error.message ?? "")) {
+          console.error(error.message);
+        }
+        return;
+      }
+      if (!data) return;
+      setKms(data.kms != null ? String(data.kms) : "");
+      setInvoiced(Boolean(data.invoiced));
+      liveSyncSuppressUntilRef.current = Date.now() + 600;
+    })();
+  }, [open, scheduleLoadId, supabase]);
 
   useEffect(() => {
     if (!open) {
@@ -172,7 +208,6 @@ export default function EditLoadsheetModal({
     setRate(selected.rate != null ? String(selected.rate) : "");
     setFsc(selected.fsc != null ? String(selected.fsc) : "");
     setBroker(selected.broker != null ? String(selected.broker) : "");
-    setKms(selected.kms != null ? String(selected.kms) : "");
     setLoadCategory(loadCategoryFromStorage(selected.load_category));
     if (Boolean(selected.flat_rate) && !selected.load_category) {
       setLoadCategory("legacy_flat");
@@ -180,12 +215,26 @@ export default function EditLoadsheetModal({
     setUsdCadRate(
       selected.usd_cad_rate != null ? String(selected.usd_cad_rate) : "",
     );
-    setInvoiced(Boolean(selected.invoiced));
+    if (scheduleLoadId) {
+      if (scheduleKms !== undefined) {
+        setKms(scheduleKms != null ? String(scheduleKms) : "");
+      } else {
+        setKms(selected.kms != null ? String(selected.kms) : "");
+      }
+      if (scheduleInvoiced !== undefined) {
+        setInvoiced(Boolean(scheduleInvoiced));
+      } else {
+        setInvoiced(Boolean(selected.invoiced));
+      }
+    } else {
+      setKms(selected.kms != null ? String(selected.kms) : "");
+      setInvoiced(Boolean(selected.invoiced));
+    }
     queueMicrotask(() => {
       liveSyncReadyRef.current = true;
     });
     /* eslint-enable react-hooks/set-state-in-effect */
-  }, [open, selected, selectedId]);
+  }, [open, selected, selectedId, scheduleLoadId, scheduleKms, scheduleInvoiced]);
 
   const saveLoadsheet = useCallback(
     async (overrides = {}) => {
@@ -212,22 +261,26 @@ export default function EditLoadsheetModal({
       const cat = normalizeLoadCategory(values.loadCategory, false);
       const categoryStored = loadCategoryStorageValue(cat);
 
+      const sheetUpdate = {
+        load_number: values.loadNumber,
+        origin: nullIfEmpty(values.origin),
+        end_user: nullIfEmpty(values.endUser),
+        mt: nullIfEmpty(values.mt),
+        rate: nullIfEmpty(values.rate),
+        fsc: nullIfEmpty(values.fsc),
+        broker: nullIfEmpty(values.broker),
+        load_category: categoryStored,
+        usd_cad_rate: nullIfEmpty(values.usdCadRate),
+        flat_rate: cat === "legacy_flat",
+      };
+      if (!scheduleLoadId) {
+        sheetUpdate.kms = nullIfEmpty(values.kms);
+        sheetUpdate.invoiced = values.invoiced;
+      }
+
       const { error } = await supabase
         .from("loadsheets")
-        .update({
-          load_number: values.loadNumber,
-          origin: nullIfEmpty(values.origin),
-          end_user: nullIfEmpty(values.endUser),
-          mt: nullIfEmpty(values.mt),
-          rate: nullIfEmpty(values.rate),
-          fsc: nullIfEmpty(values.fsc),
-          broker: nullIfEmpty(values.broker),
-          kms: nullIfEmpty(values.kms),
-          load_category: categoryStored,
-          usd_cad_rate: nullIfEmpty(values.usdCadRate),
-          flat_rate: cat === "legacy_flat",
-          invoiced: values.invoiced,
-        })
+        .update(sheetUpdate)
         .eq("id", selectedId);
 
       if (error) {
@@ -237,6 +290,8 @@ export default function EditLoadsheetModal({
       await onSaved?.();
 
       if (scheduleLoadId) {
+        const includeInvoicedOnSchedule =
+          overrides.includeInvoicedOnSchedule === true;
         const schedulePayload = buildScheduleLoadPayload({
           loadsheetId: selectedId,
           loadNumber: values.loadNumber,
@@ -249,6 +304,10 @@ export default function EditLoadsheetModal({
           flatRate: cat === "legacy_flat",
           loadCategory: cat,
           usdCadRate: values.usdCadRate,
+          kms: values.kms,
+          ...(includeInvoicedOnSchedule
+            ? { invoiced: values.invoiced }
+            : {}),
         });
         const { data: scheduleRow, error: scheduleError } =
           await persistScheduleLoad(supabase, {
@@ -313,6 +372,7 @@ export default function EditLoadsheetModal({
   const persistLive = useCallback(
     async (overrides = {}) => {
       if (!selectedId || !liveSyncReadyRef.current) return;
+      if (Date.now() < liveSyncSuppressUntilRef.current) return;
       const { error } = await saveLoadsheet(overrides);
       if (error) {
         reportSaveError(error);
@@ -327,6 +387,7 @@ export default function EditLoadsheetModal({
     const gen = ++liveSyncGenRef.current;
     const timer = setTimeout(() => {
       if (gen !== liveSyncGenRef.current) return;
+      if (Date.now() < liveSyncSuppressUntilRef.current) return;
       void persistLive();
     }, 350);
 
@@ -373,7 +434,33 @@ export default function EditLoadsheetModal({
   async function handleInvoicedChange(checked) {
     if (!selectedId) return;
     setInvoiced(checked);
-    const { error } = await saveLoadsheet({ invoiced: checked });
+    if (scheduleLoadId) {
+      const { data, error } = await persistScheduleLoad(supabase, {
+        scheduleLoadId,
+        payload: { invoiced: checked },
+      });
+      if (error) {
+        if (/invoiced|column .* does not exist/i.test(error.message ?? "")) {
+          alert(
+            "Per-slot invoiced needs migration 20260524120000_schedule_loads_kms_invoiced. Apply migrations, then try again.",
+          );
+        } else {
+          reportSaveError(error);
+        }
+        setInvoiced(!checked);
+        return;
+      }
+      if (data) {
+        onSchedulePatched?.(data);
+      } else {
+        onSchedulePatched?.({ id: scheduleLoadId, invoiced: checked });
+      }
+      return;
+    }
+    const { error } = await saveLoadsheet({
+      invoiced: checked,
+      includeInvoicedOnSchedule: false,
+    });
     if (error) {
       if (/invoiced|column .* does not exist/i.test(error.message ?? "")) {
         alert(
@@ -450,7 +537,9 @@ export default function EditLoadsheetModal({
     }
     setSaving(true);
     liveSyncGenRef.current += 1;
-    const { error } = await saveLoadsheet();
+    const { error } = await saveLoadsheet(
+      scheduleLoadId ? { includeInvoicedOnSchedule: true } : {},
+    );
     setSaving(false);
     if (error) {
       reportSaveError(error);
@@ -481,6 +570,8 @@ export default function EditLoadsheetModal({
         rate: null,
         fsc: null,
         load_total: null,
+        kms: null,
+        invoiced: false,
       })
       .eq("id", scheduleLoadId);
     setUnlinking(false);

@@ -15,6 +15,7 @@ import {
   persistScheduleLoad,
   scheduleLoadErrorMessage,
 } from "@/lib/scheduleLoadsPersist";
+import { resolveLoadInvoiced } from "@/lib/weekUnitRevenue";
 import { createClient } from "@/lib/supabase/client";
 import AssignLoadsheetModal from "./assignLoadsheetModal";
 import EditLoadsheetModal from "./editLoadsheetModal";
@@ -442,11 +443,11 @@ export default function UnitWeekLoadsGrid({
     return m;
   }, [loads]);
 
-  const invoicedBySheetId = useMemo(() => {
+  const sheetsById = useMemo(() => {
     const m = new Map();
     for (const sheet of loadSheets ?? []) {
       if (sheet?.id == null) continue;
-      m.set(String(sheet.id), Boolean(sheet.invoiced));
+      m.set(String(sheet.id), sheet);
     }
     return m;
   }, [loadSheets]);
@@ -624,8 +625,7 @@ export default function UnitWeekLoadsGrid({
                     : undefined;
                 const sheetId =
                   row?.loadsheet_id != null ? String(row.loadsheet_id) : "";
-                const loadsheetInvoiced =
-                  sheetId.length > 0 && invoicedBySheetId.get(sheetId) === true;
+                const loadsheetInvoiced = resolveLoadInvoiced(row, sheetsById);
                 const loadsheetCalc =
                   sheetId.length > 0 ? calcBySheetId.get(sheetId) ?? null : null;
                 return (
@@ -681,6 +681,8 @@ export default function UnitWeekLoadsGrid({
         onClose={() => setEditLoadsheetTarget(null)}
         initialLoadsheetId={editLoadsheetTarget?.initialLoadsheetId ?? null}
         scheduleLoadId={editLoadsheetTarget?.scheduleLoadId ?? null}
+        scheduleKms={editLoadsheetTarget?.scheduleKms}
+        scheduleInvoiced={editLoadsheetTarget?.scheduleInvoiced}
         loadSheets={loadSheets}
         onSaved={onLoadSheetsUpdated ?? (async () => {})}
         onScheduleUpdated={onUpdated}

@@ -34,7 +34,7 @@ function isoDateKey(raw) {
 
 /** Columns returned after save so the UI can update without waiting on a full refetch. */
 export const SCHEDULE_LOAD_RETURN_SELECT =
-  "id, week_id, load_date, load_slot_id, in_use_unit_id, load_note, origin, end_user, mt, rate, fsc, load_total, loadsheet_id, load_number";
+  "id, week_id, load_date, load_slot_id, in_use_unit_id, load_note, origin, end_user, mt, rate, fsc, load_total, loadsheet_id, load_number, kms, invoiced";
 
 /**
  * Update an existing schedule_loads row, or ensure scaffold rows then update/insert.

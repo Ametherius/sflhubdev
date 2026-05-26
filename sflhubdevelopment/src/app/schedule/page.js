@@ -39,6 +39,7 @@ import { isScheduleWeekFkError } from "@/lib/scheduleLoadsPersist";
 import AssignedMenu from "../components/assignedMenu";
 import LoadsheetMenu from "../components/loadsheetMenu";
 import CattleLoadsheet from "../components/cattleLoadsheet";
+import { resolveDefaultScheduleWeekId } from "@/lib/weekDates";
 
 export default function Schedule() {
   const [drivers, refreshDrivers] = useDrivers();
@@ -48,13 +49,10 @@ export default function Schedule() {
   const [weeks, refreshWeeks, createWeek] = useScheduleWeeks();
   const [selectedWeekId, setSelectedWeekId] = useState(null);
   const [newWeekModalKey, setNewWeekModalKey] = useState(0);
-  const resolvedWeekId = useMemo(() => {
-    if (weeks.length === 0) return null;
-    if (selectedWeekId && weeks.some((w) => w.id === selectedWeekId)) {
-      return selectedWeekId;
-    }
-    return weeks[0].id;
-  }, [weeks, selectedWeekId]);
+  const resolvedWeekId = useMemo(
+    () => resolveDefaultScheduleWeekId(weeks, selectedWeekId),
+    [weeks, selectedWeekId],
+  );
   const [newWeekModalOpen, setNewWeekModalOpen] = useState(false);
   const [newLoadsheetModalOpen, setNewLoadsheetModalOpen] = useState(false);
   const [assignedMenu, setAssignedMenu] = useState(false);

@@ -37,6 +37,8 @@ export function buildScheduleLoadPayload({
   flatRate = false,
   loadCategory = null,
   usdCadRate = null,
+  kms = undefined,
+  invoiced = undefined,
 }) {
   const num = strTrim(loadNumber);
   const loadTotalDisplay = computeLoadTotalDisplay(mt, rate, fsc, {
@@ -44,7 +46,7 @@ export function buildScheduleLoadPayload({
     loadCategory,
     usdCadRate,
   });
-  return {
+  const payload = {
     loadsheet_id: loadsheetId,
     load_number: num.length ? num : null,
     load_note: buildScheduleLoadNote(loadNumber, broker),
@@ -55,6 +57,13 @@ export function buildScheduleLoadPayload({
     fsc: nullIfEmpty(fsc),
     load_total: nullIfEmpty(loadTotalDisplay),
   };
+  if (kms !== undefined) {
+    payload.kms = nullIfEmpty(kms);
+  }
+  if (invoiced !== undefined) {
+    payload.invoiced = Boolean(invoiced);
+  }
+  return payload;
 }
 
 /** Strip trailing -N copy suffix (e.g. 1042-3 → 1042). */

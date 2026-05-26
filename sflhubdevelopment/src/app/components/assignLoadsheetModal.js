@@ -145,6 +145,8 @@ export default function AssignLoadsheetModal({
       flatRate: calc.flatRate,
       loadCategory: calc.loadCategory,
       usdCadRate: calc.usdCadRate,
+      kms: selectedSheet.kms,
+      invoiced: false,
     });
 
     const { data, error } = await persistScheduleLoad(supabase, {
