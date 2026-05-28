@@ -27,6 +27,7 @@ export function computeLoadTotalDisplay(mt, rate, fsc, fourth = {}) {
     mt,
     rate,
     fsc,
+    kms: opts.kms,
     loadCategory: opts.loadCategory,
     usdCadRate: opts.usdCadRate,
     flatRate: opts.flatRate,

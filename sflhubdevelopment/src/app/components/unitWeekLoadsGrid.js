@@ -127,6 +127,7 @@ function LoadSplitCard({
 
   const sheetCategory = loadsheetCalc?.loadCategory ?? null;
   const sheetUsdCad = loadsheetCalc?.usdCadRate ?? null;
+  const sheetKms = loadsheetCalc?.kms ?? null;
   const sheetFlatRate = Boolean(loadsheetCalc?.flatRate);
   const linkedSheet = loadsheetId.trim().length > 0 && loadsheetCalc != null;
 
@@ -137,9 +138,10 @@ function LoadSplitCard({
       computeLoadTotalDisplay(mt, rate, fsc, {
         loadCategory: sheetCategory,
         usdCadRate: sheetUsdCad,
+        kms: sheetKms,
         flatRate: sheetFlatRate,
       }),
-    [mt, rate, fsc, sheetCategory, sheetUsdCad, sheetFlatRate],
+    [mt, rate, fsc, sheetCategory, sheetUsdCad, sheetKms, sheetFlatRate],
   );
 
   const totalHint = useMemo(
@@ -459,7 +461,7 @@ export default function UnitWeekLoadsGrid({
       const id = String(sheet.id);
       m.set(id, {
         ...calcOptionsFromSheet(sheet),
-        _rev: `${sheet.load_category ?? ""}|${sheet.usd_cad_rate ?? ""}|${sheet.flat_rate ?? ""}|${sheet.rate ?? ""}|${sheet.mt ?? ""}|${sheet.fsc ?? ""}`,
+        _rev: `${sheet.load_category ?? ""}|${sheet.usd_cad_rate ?? ""}|${sheet.flat_rate ?? ""}|${sheet.rate ?? ""}|${sheet.mt ?? ""}|${sheet.fsc ?? ""}|${sheet.kms ?? ""}`,
       });
     }
     return m;

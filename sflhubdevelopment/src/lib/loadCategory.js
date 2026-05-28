@@ -7,6 +7,8 @@ export const CHICKEN_FSC_MULTIPLIER = 556;
 export const LOAD_CATEGORIES = [
   { id: "canadian_grain", label: "Canadian Grain", storage: "Canadian Grain" },
   { id: "us_grain", label: "US Grain", storage: "US Grain" },
+  { id: "cargill", label: "Cargill", storage: "Cargill" },
+  { id: "irm", label: "IRM", storage: "IRM" },
   { id: "chicken", label: "Chicken", storage: "Chicken" },
   { id: "cattle", label: "Cattle", storage: "Cattle" },
   { id: "tanker", label: "Tanker", storage: "Tanker" },
@@ -75,6 +77,7 @@ export function computeLoadTotalDisplay({
   mt = "",
   rate = "",
   fsc = "",
+  kms = "",
   loadCategory = null,
   usdCadRate = null,
   flatRate = false,
@@ -92,6 +95,21 @@ export function computeLoadTotalDisplay({
       const f = parseMetricNum(fsc);
       if (f == null || r == null) return "";
       return roundMoney(CHICKEN_FSC_MULTIPLIER * f + r);
+    }
+    case "cargill": {
+      const m = parseMetricNum(mt);
+      const f = parseMetricNum(fsc);
+      const k = parseMetricNum(kms);
+      if (m == null || r == null || f == null || k == null) return "";
+      return roundMoney(k * f + r * m);
+    }
+    case "irm": {
+      const m = parseMetricNum(mt);
+      const f = parseMetricNum(fsc);
+      if (m == null || r == null || f == null) return "";
+      const base = r * m;
+      const fscAmount = base * (f / 100);
+      return roundMoney(base + fscAmount);
     }
     case "us_grain": {
       const m = parseMetricNum(mt);
@@ -134,6 +152,10 @@ export function totalFormulaHint(loadCategory, flatRate = false) {
       return "rate (CAD) — flat";
     case "us_grain":
       return "MT × rate (USD) × USD/CAD → CAD on schedule";
+    case "cargill":
+      return "KMs × FSC + rate × MT";
+    case "irm":
+      return "rate × MT + (rate × MT × FSC%)";
     case "legacy_flat":
       return "rate × FSC (legacy)";
     default:
@@ -144,12 +166,24 @@ export function totalFormulaHint(loadCategory, flatRate = false) {
 export function fieldRulesForCategory(loadCategory, flatRate = false) {
   const cat = normalizeLoadCategory(loadCategory, flatRate);
   return {
-    showMt: cat === "canadian_grain" || cat === "us_grain",
-    showFsc: cat === "chicken" || cat === "legacy_flat",
+    showMt:
+      cat === "canadian_grain" ||
+      cat === "us_grain" ||
+      cat === "cargill" ||
+      cat === "irm",
+    showFsc:
+      cat === "chicken" ||
+      cat === "legacy_flat" ||
+      cat === "cargill" ||
+      cat === "irm",
     rateIsFlatTotal: cat === "cattle" || cat === "tanker",
     showUsdCad: cat === "us_grain",
-    mtRequired: cat === "canadian_grain" || cat === "us_grain",
-    fscRequired: cat === "chicken",
+    mtRequired:
+      cat === "canadian_grain" ||
+      cat === "us_grain" ||
+      cat === "cargill" ||
+      cat === "irm",
+    fscRequired: cat === "chicken" || cat === "cargill" || cat === "irm",
     rateRequired: true,
   };
 }
@@ -166,6 +200,7 @@ export function calcOptionsFromSheet(sheet) {
     loadCategory: loadCategoryFromStorage(sheet.load_category),
     flatRate: Boolean(sheet.flat_rate),
     usdCadRate: sheet.usd_cad_rate,
+    kms: sheet.kms,
   };
 }
 

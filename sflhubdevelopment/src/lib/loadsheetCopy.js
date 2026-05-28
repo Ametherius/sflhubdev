@@ -45,6 +45,7 @@ export function buildScheduleLoadPayload({
     flatRate,
     loadCategory,
     usdCadRate,
+    kms,
   });
   const payload = {
     loadsheet_id: loadsheetId,

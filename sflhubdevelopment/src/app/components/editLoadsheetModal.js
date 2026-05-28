@@ -148,9 +148,10 @@ export default function EditLoadsheetModal({
       computeLoadTotalDisplay(mt, rate, fsc, {
         loadCategory,
         usdCadRate,
+        kms,
         flatRate: false,
       }),
-    [mt, rate, fsc, loadCategory, usdCadRate],
+    [mt, rate, fsc, loadCategory, usdCadRate, kms],
   );
 
   const loadTotalPreviewCad = useMemo(
@@ -747,7 +748,11 @@ export default function EditLoadsheetModal({
               <span className="font-normal text-green-900/60">
                 {loadCategory === "chicken"
                   ? "(556 × FSC + rate)"
-                  : "(legacy flat: rate × FSC)"}
+                  : loadCategory === "cargill"
+                    ? "(KMs × FSC + rate × MT)"
+                    : loadCategory === "irm"
+                      ? "(FSC is % — added onto rate × MT)"
+                      : "(legacy flat: rate × FSC)"}
               </span>
               <input
                 className={inputClass}

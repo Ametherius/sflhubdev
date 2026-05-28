@@ -69,9 +69,10 @@ export default function NewLoadsheetModal({ open, onClose, onCreated }) {
       computeLoadTotalDisplay(mt, rate, fsc, {
         loadCategory,
         usdCadRate,
+        kms,
         flatRate: false,
       }),
-    [mt, rate, fsc, loadCategory, usdCadRate],
+    [mt, rate, fsc, loadCategory, usdCadRate, kms],
   );
 
   const loadTotalPreviewCad = useMemo(
@@ -260,7 +261,11 @@ export default function NewLoadsheetModal({ open, onClose, onCreated }) {
             <label className="block text-sm font-medium">
               FSC{" "}
               <span className="font-normal text-green-900/60">
-                (556 × FSC + rate)
+                {loadCategory === "cargill"
+                  ? "(KMs × FSC + rate × MT)"
+                  : loadCategory === "irm"
+                    ? "(FSC is % — added onto rate × MT)"
+                    : "(556 × FSC + rate)"}
               </span>
               <input
                 className={inputClass}
