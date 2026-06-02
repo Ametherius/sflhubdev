@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { weekDayLabels } from "@/lib/weekDates";
 import {
-  calcOptionsFromSheet,
+  calcOptionsFromScheduleLoad,
   fieldRulesForCategory,
+  loadCategoryStorageValue,
   totalFormulaHint,
 } from "@/lib/loadCategory";
 import {
@@ -17,6 +18,7 @@ import {
 } from "@/lib/scheduleLoadsPersist";
 import { resolveLoadInvoiced } from "@/lib/weekUnitRevenue";
 import { createClient } from "@/lib/supabase/client";
+import { confirmSaveChanges } from "@/lib/confirmEdit";
 import AssignLoadsheetModal from "./assignLoadsheetModal";
 import EditLoadsheetModal from "./editLoadsheetModal";
 
@@ -52,6 +54,35 @@ function nullIfEmpty(s) {
 
 function strField(v) {
   return v != null && String(v).trim() !== "" ? String(v) : "";
+}
+
+function scheduleLoadValuesFromRow(row) {
+  if (!row) return null;
+  return {
+    origin: strField(row.origin),
+    endUser: strField(row.end_user),
+    fsc: strField(row.fsc),
+    mt: strField(row.mt),
+    rate: strField(row.rate),
+    loadNote: strField(row.load_note),
+    loadsheetId: strField(row.loadsheet_id),
+  };
+}
+
+function scheduleLoadHasEdits(row, values) {
+  const saved = scheduleLoadValuesFromRow(row);
+  if (!saved) {
+    return Object.values(values).some((v) => String(v ?? "").trim() !== "");
+  }
+  return (
+    values.origin !== saved.origin ||
+    values.endUser !== saved.endUser ||
+    values.fsc !== saved.fsc ||
+    values.mt !== saved.mt ||
+    values.rate !== saved.rate ||
+    values.loadNote !== saved.loadNote ||
+    values.loadsheetId !== saved.loadsheetId
+  );
 }
 
 function slotLabel(slot) {
@@ -112,8 +143,7 @@ function LoadSplitCard({
   fillColumn,
   onPersist,
   onEditLoadsheet,
-  loadsheetInvoiced = false,
-  loadsheetCalc = null,
+  slotInvoiced = false,
 }) {
   const slotTitle = slotLabel(slot);
   const [origin, setOrigin] = useState("");
@@ -125,39 +155,33 @@ function LoadSplitCard({
   const [loadsheetId, setLoadsheetId] = useState("");
   const pendingLocalRef = useRef(null);
 
-  const sheetCategory = loadsheetCalc?.loadCategory ?? null;
-  const sheetUsdCad = loadsheetCalc?.usdCadRate ?? null;
-  const sheetKms = loadsheetCalc?.kms ?? null;
-  const sheetFlatRate = Boolean(loadsheetCalc?.flatRate);
-  const linkedSheet = loadsheetId.trim().length > 0 && loadsheetCalc != null;
-
-  const fieldRules = fieldRulesForCategory(sheetCategory, sheetFlatRate);
+  const rowCalc = useMemo(() => calcOptionsFromScheduleLoad(row), [row]);
+  const rowCategory = rowCalc.loadCategory;
+  const rowUsdCad = rowCalc.usdCadRate;
+  const rowKms = row?.kms ?? null;
+  const fieldRules = fieldRulesForCategory(rowCategory, false);
 
   const loadTotalDisplay = useMemo(
     () =>
       computeLoadTotalDisplay(mt, rate, fsc, {
-        loadCategory: sheetCategory,
-        usdCadRate: sheetUsdCad,
-        kms: sheetKms,
-        flatRate: sheetFlatRate,
+        loadCategory: rowCategory,
+        usdCadRate: rowUsdCad,
+        kms: rowKms,
+        flatRate: false,
       }),
-    [mt, rate, fsc, sheetCategory, sheetUsdCad, sheetKms, sheetFlatRate],
+    [mt, rate, fsc, rowCategory, rowUsdCad, rowKms],
   );
 
   const totalHint = useMemo(
-    () =>
-      totalFormulaHint(sheetCategory, sheetFlatRate) + " → CAD on schedule",
-    [sheetCategory, sheetFlatRate],
+    () => totalFormulaHint(rowCategory, false) + " → CAD on schedule",
+    [rowCategory],
   );
 
   const loadTotalCad = useMemo(() => {
     const fromComputed = formatLoadTotalCadGrid(loadTotalDisplay);
-    if (linkedSheet) {
-      return fromComputed || "";
-    }
     if (fromComputed) return fromComputed;
     return formatLoadTotalCadGrid(row?.load_total);
-  }, [loadTotalDisplay, row?.load_total, linkedSheet]);
+  }, [loadTotalDisplay, row?.load_total]);
 
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect -- mirror schedule_loads row into local inputs */
@@ -220,7 +244,7 @@ function LoadSplitCard({
   const save = useCallback(async () => {
     if (!slotId) return;
     const lid = loadsheetId.trim();
-    const snapshot = {
+    const values = {
       origin,
       endUser,
       fsc,
@@ -229,6 +253,9 @@ function LoadSplitCard({
       loadNote,
       loadsheetId: lid,
     };
+    if (!scheduleLoadHasEdits(row, values)) return;
+    if (!confirmSaveChanges("this schedule load")) return;
+    const snapshot = values;
     pendingLocalRef.current = snapshot;
     const payload = {
       loadsheet_id: lid.length ? lid : null,
@@ -239,6 +266,8 @@ function LoadSplitCard({
       rate: nullIfEmpty(rate),
       load_total: nullIfEmpty(loadTotalDisplay),
       load_note: nullIfEmpty(loadNote),
+      load_category: loadCategoryStorageValue(rowCategory),
+      usd_cad_rate: nullIfEmpty(rowUsdCad),
     };
     const ok = await onPersist({
       scheduleLoadId,
@@ -265,10 +294,10 @@ function LoadSplitCard({
     rate,
     loadTotalDisplay,
     loadNote,
-    sheetCategory,
-    sheetUsdCad,
-    sheetFlatRate,
+    rowCategory,
+    rowUsdCad,
     onPersist,
+    row,
   ]);
 
   const rootGrow = fillColumn
@@ -278,9 +307,7 @@ function LoadSplitCard({
     ? "flex min-h-0 flex-1 flex-row"
     : "flex w-full min-w-0 flex-row";
 
-  const locationFieldClass = loadsheetInvoiced
-    ? fieldStackInvoiced
-    : fieldStack;
+  const locationFieldClass = slotInvoiced ? fieldStackInvoiced : fieldStack;
 
   return (
     <div
@@ -314,7 +341,7 @@ function LoadSplitCard({
               onChange={(e) => setMt(e.target.value)}
               onBlur={() => void save()}
               placeholder="MT"
-              disabled={loadsheetCalc != null && !fieldRules.showMt}
+              disabled={!fieldRules.showMt}
               aria-label={`${slotTitle} MT`}
             />
             <input
@@ -333,7 +360,7 @@ function LoadSplitCard({
               onChange={(e) => setFsc(e.target.value)}
               onBlur={() => void save()}
               placeholder="FSC"
-              disabled={loadsheetCalc != null && !fieldRules.showFsc}
+              disabled={!fieldRules.showFsc}
               aria-label={`${slotTitle} FSC`}
             />
             <div
@@ -364,8 +391,8 @@ function LoadSplitCard({
         <button
           type="button"
           className="absolute bottom-1 right-1 z-[1] rounded border border-white/40 bg-[#1b4332]/95 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white shadow-sm hover:bg-[#1b4332]"
-          title="Edit the saved load sheet (library template)"
-          aria-label="Edit load sheet template"
+          title="Edit this schedule load (slot only)"
+          aria-label="Edit schedule load"
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -388,6 +415,8 @@ export default function UnitWeekLoadsGrid({
   weekId,
   inUseUnitId,
   loads = [],
+  allWeekLoads = null,
+  assignableUnits = [],
   loadSlots = [],
   loadSheets = [],
   onUpdated,
@@ -444,28 +473,6 @@ export default function UnitWeekLoadsGrid({
     }
     return m;
   }, [loads]);
-
-  const sheetsById = useMemo(() => {
-    const m = new Map();
-    for (const sheet of loadSheets ?? []) {
-      if (sheet?.id == null) continue;
-      m.set(String(sheet.id), sheet);
-    }
-    return m;
-  }, [loadSheets]);
-
-  const calcBySheetId = useMemo(() => {
-    const m = new Map();
-    for (const sheet of loadSheets ?? []) {
-      if (sheet?.id == null) continue;
-      const id = String(sheet.id);
-      m.set(id, {
-        ...calcOptionsFromSheet(sheet),
-        _rev: `${sheet.load_category ?? ""}|${sheet.usd_cad_rate ?? ""}|${sheet.flat_rate ?? ""}|${sheet.rate ?? ""}|${sheet.mt ?? ""}|${sheet.fsc ?? ""}|${sheet.kms ?? ""}`,
-      });
-    }
-    return m;
-  }, [loadSheets]);
 
   const persistRow = useCallback(
     async ({
@@ -625,18 +632,14 @@ export default function UnitWeekLoadsGrid({
                   slot.id != null
                     ? loadMap.get(`${d.iso}-${String(slot.id)}`)
                     : undefined;
-                const sheetId =
-                  row?.loadsheet_id != null ? String(row.loadsheet_id) : "";
-                const loadsheetInvoiced = resolveLoadInvoiced(row, sheetsById);
-                const loadsheetCalc =
-                  sheetId.length > 0 ? calcBySheetId.get(sheetId) ?? null : null;
+                const rowKey = row?.id ?? `empty-${d.iso}-${slot.id}`;
+                const slotInvoiced = resolveLoadInvoiced(row);
                 return (
                   <LoadSplitCard
-                    key={`${d.iso}-${slot.id ?? `pad-${slot.sort_order}`}-${sheetId}-${loadsheetCalc?._rev ?? ""}`}
+                    key={`${d.iso}-${slot.id ?? `pad-${slot.sort_order}`}-${rowKey}`}
                     fillColumn={embeddedInRow}
                     row={row}
-                    loadsheetInvoiced={loadsheetInvoiced}
-                    loadsheetCalc={loadsheetCalc}
+                    slotInvoiced={slotInvoiced}
                     scheduleLoadId={row?.id ?? null}
                     dayIso={d.iso}
                     slotId={slot.id}
@@ -645,15 +648,22 @@ export default function UnitWeekLoadsGrid({
                     slot={slot}
                     onPersist={persistRow}
                     onEditLoadsheet={
-                      embeddedInRow && weekId && inUseUnitId && slot.id
+                      embeddedInRow && weekId && slot.id && row?.id
                         ? () =>
                             setEditLoadsheetTarget({
                               initialLoadsheetId:
                                 row?.loadsheet_id != null
                                   ? String(row.loadsheet_id)
                                   : null,
-                              scheduleLoadId:
-                                row?.id != null ? String(row.id) : null,
+                              scheduleLoadId: String(row.id),
+                              scheduleKms:
+                                row != null && "kms" in row ? row.kms : undefined,
+                              scheduleInvoiced:
+                                row != null && "invoiced" in row
+                                  ? row.invoiced
+                                  : undefined,
+                              scheduleLoadCategory: row?.load_category,
+                              scheduleUsdCadRate: row?.usd_cad_rate,
                             })
                         : undefined
                     }
@@ -673,6 +683,9 @@ export default function UnitWeekLoadsGrid({
         inUseUnitId={inUseUnitId}
         loadSlots={assignModalSlots}
         loads={loads}
+        allWeekLoads={allWeekLoads}
+        assignableUnits={assignableUnits}
+        weekDays={days}
         loadsheets={loadSheets}
         initialSlotId={assignTarget?.initialSlotId ?? null}
         onAssigned={onUpdated}
@@ -685,6 +698,8 @@ export default function UnitWeekLoadsGrid({
         scheduleLoadId={editLoadsheetTarget?.scheduleLoadId ?? null}
         scheduleKms={editLoadsheetTarget?.scheduleKms}
         scheduleInvoiced={editLoadsheetTarget?.scheduleInvoiced}
+        scheduleLoadCategory={editLoadsheetTarget?.scheduleLoadCategory}
+        scheduleUsdCadRate={editLoadsheetTarget?.scheduleUsdCadRate}
         loadSheets={loadSheets}
         onSaved={onLoadSheetsUpdated ?? (async () => {})}
         onScheduleUpdated={onUpdated}

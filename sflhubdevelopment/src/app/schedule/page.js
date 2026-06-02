@@ -30,8 +30,9 @@ import NewWeekModal from "../components/newWeekModal";
 import NewLoadsheetModal from "../components/newLoadsheetModal";
 import EditLoadsheetModal from "../components/editLoadsheetModal";
 import { insertLoadsheetCopy } from "@/lib/loadsheetCopy";
-import { compareAssignedRows } from "@/lib/divisionSort";
 import { useWeekLoads } from "@/hooks/useWeekLoads";
+import { useWeekAssignments } from "@/hooks/useWeekAssignments";
+import { loadBelongsToAssignment } from "@/lib/scheduleAssignmentDisplay";
 import { useLoadSlots } from "@/hooks/useLoadSlots";
 import { useLoadSheets } from "@/hooks/useLoadSheets";
 import ScheduleRow from "../components/scheduleRow";
@@ -121,8 +122,10 @@ export default function Schedule() {
     await refreshLoadSheets();
   }
 
-  const assignedRowsForDisplay = useMemo(() => {
-    let rows = assigned.filter((row) => row.driver && row.unit);
+  const [weekDisplayRows] = useWeekAssignments(resolvedWeekId, assigned);
+
+  const scheduleRowsForDisplay = useMemo(() => {
+    let rows = weekDisplayRows ?? [];
     const divisionQ = searchAssigned.trim().toLowerCase();
     if (divisionQ) {
       rows = rows.filter((r) =>
@@ -135,8 +138,20 @@ export default function Schedule() {
         (r.driver?.name ?? "").toLowerCase().includes(nameQ),
       );
     }
-    return rows.sort(compareAssignedRows);
-  }, [assigned, searchAssigned, searchByName]);
+    return rows;
+  }, [weekDisplayRows, searchAssigned, searchByName]);
+
+  const assignableUnits = useMemo(
+    () =>
+      (weekDisplayRows ?? [])
+        .filter((r) => r.inUseUnitId != null && !r.isArchived)
+        .map((r) => ({
+          inUseUnitId: r.inUseUnitId,
+          label: `${r.driver?.name ?? "Driver"} · ${r.unit?.unit ?? "Unit"}`,
+          division: r.driver?.division ?? "",
+        })),
+    [weekDisplayRows],
+  );
 
   const selectedWeek = useMemo(
     () => weeks.find((w) => w.id === resolvedWeekId) ?? null,
@@ -184,8 +199,10 @@ export default function Schedule() {
 
     if (error) {
       console.error(error.message);
+      return;
     }
     await refreshAssigned();
+    await refreshLoads();
   }
 
   async function handleDeleteDriver(id) {
@@ -197,6 +214,7 @@ export default function Schedule() {
     }
     await refreshDrivers();
     await refreshAssigned();
+    await refreshLoads();
   }
 
   const searchedDrivers = drivers.filter((d) => {
@@ -505,18 +523,20 @@ export default function Schedule() {
               className="bg-white rounded-xl max-w-md placeholder:text-green-950 p-2 ml-2 text-green-950"
             />
           </div>
-          {assignedRowsForDisplay.map((row) => (
+          {scheduleRowsForDisplay.map((row) => (
             <ScheduleRow
-              key={row.id}
+              key={row.scheduleAssignmentId ?? row.id}
               assignment={row}
               weekStartISO={selectedWeek?.week_start_date ?? null}
               weekId={resolvedWeekId}
-              loads={loads.filter(
-                (l) => String(l.in_use_unit_id) === String(row.id),
-              )}
+              loads={loads.filter((l) => loadBelongsToAssignment(l, row))}
+              allWeekLoads={loads}
+              assignableUnits={assignableUnits}
               loadSlots={loadSlots}
               loadSheets={loadSheets}
-              onDelete={() => handleDelete(row.id)}
+              onDelete={
+                row.inUseUnitId ? () => handleDelete(row.inUseUnitId) : undefined
+              }
               onLoadsUpdated={refreshLoads}
               onLoadPatched={mergeScheduleLoad}
               onLoadSheetsUpdated={refreshLoadSheets}

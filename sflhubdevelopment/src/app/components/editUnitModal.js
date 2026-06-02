@@ -9,6 +9,7 @@ import {
   isEmptyUpdateResult,
   updateEntityRow,
 } from "@/lib/entityUpdate";
+import { confirmSaveChanges } from "@/lib/confirmEdit";
 
 function hasOwn(obj, key) {
   return obj != null && Object.prototype.hasOwnProperty.call(obj, key);
@@ -76,6 +77,7 @@ export default function EditUnitModal({ open, onClose, unit, onSaved }) {
   async function handleSubmit(e) {
     e.preventDefault();
     if (saving || !unit?.id) return;
+    if (!confirmSaveChanges("this unit")) return;
     setSaving(true);
     try {
       const values = {

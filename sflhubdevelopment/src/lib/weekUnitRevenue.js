@@ -1,4 +1,4 @@
-import { calcOptionsFromSheet } from "@/lib/loadCategory";
+import { calcOptionsFromScheduleLoad } from "@/lib/loadCategory";
 import { computeLoadTotalDisplay, parseMetricNum } from "@/lib/loadTotal";
 
 function parseLoadTotalNumber(loadTotalRaw) {
@@ -7,72 +7,52 @@ function parseLoadTotalNumber(loadTotalRaw) {
   return Number.isFinite(n) ? n : null;
 }
 
-function sheetsById(loadSheets) {
-  const m = new Map();
-  for (const sheet of loadSheets ?? []) {
-    m.set(String(sheet.id), sheet);
-  }
-  return m;
-}
-
-/** Revenue for one schedule_loads row (stored total, else compute from slot + loadsheet). */
-export function resolveLoadRevenue(load, sheetsMap) {
+/** Revenue for one schedule_loads row (stored total, else compute from slot fields only). */
+export function resolveLoadRevenue(load) {
   const stored = parseLoadTotalNumber(load?.load_total);
   if (stored != null) return stored;
 
-  const sheetId = load?.loadsheet_id;
-  const sheet =
-    sheetId != null && String(sheetId).length > 0
-      ? sheetsMap.get(String(sheetId))
-      : null;
-
-  const mt = load?.mt ?? sheet?.mt;
-  const rate = load?.rate ?? sheet?.rate;
-  const fsc = load?.fsc ?? sheet?.fsc;
-  const computed = computeLoadTotalDisplay(mt, rate, fsc, calcOptionsFromSheet(sheet));
+  const opts = calcOptionsFromScheduleLoad(load);
+  const computed = computeLoadTotalDisplay(
+    load?.mt,
+    load?.rate,
+    load?.fsc,
+    {
+      ...opts,
+      kms: load?.kms,
+    },
+  );
   return parseLoadTotalNumber(computed);
 }
 
 /** Sum revenue for all loads assigned to one in-use unit for the week. */
-export function sumWeekUnitRevenue(unitLoads, loadSheets) {
-  const map = sheetsById(loadSheets);
+export function sumWeekUnitRevenue(unitLoads) {
   let sum = 0;
   for (const load of unitLoads ?? []) {
-    const n = resolveLoadRevenue(load, map);
+    const n = resolveLoadRevenue(load);
     if (n != null) sum += n;
   }
   return sum;
 }
 
-/** KMs for one schedule row (per-slot value, else linked loadsheet for legacy rows). */
-export function resolveLoadKms(load, sheetsMap) {
-  if (load != null && Object.prototype.hasOwnProperty.call(load, "kms")) {
-    const rowKms = parseMetricNum(load.kms);
-    if (rowKms != null) return rowKms;
-  }
-  const sheetId = load?.loadsheet_id;
-  if (sheetId == null || String(sheetId).length === 0) return null;
-  const sheet = sheetsMap.get(String(sheetId));
-  return parseMetricNum(sheet?.kms);
+/** KMs for one schedule row (slot-owned). */
+export function resolveLoadKms(load) {
+  return parseMetricNum(load?.kms);
 }
 
-/** Invoiced for one schedule row (per-slot; legacy rows fall back to loadsheet). */
-export function resolveLoadInvoiced(load, sheetsMap) {
+/** Invoiced for one schedule row (slot-owned). */
+export function resolveLoadInvoiced(load) {
   if (load != null && Object.prototype.hasOwnProperty.call(load, "invoiced")) {
     return Boolean(load.invoiced);
   }
-  const sheetId = load?.loadsheet_id;
-  if (sheetId == null || String(sheetId).length === 0) return false;
-  const sheet = sheetsMap.get(String(sheetId));
-  return Boolean(sheet?.invoiced);
+  return false;
 }
 
-/** Sum KMs for all week loads that reference a loadsheet with KMs set. */
-export function sumWeekUnitKms(unitLoads, loadSheets) {
-  const map = sheetsById(loadSheets);
+/** Sum KMs for all week loads on a unit row. */
+export function sumWeekUnitKms(unitLoads) {
   let sum = 0;
   for (const load of unitLoads ?? []) {
-    const k = resolveLoadKms(load, map);
+    const k = resolveLoadKms(load);
     if (k != null) sum += k;
   }
   return sum;

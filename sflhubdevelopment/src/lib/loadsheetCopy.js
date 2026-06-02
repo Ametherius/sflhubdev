@@ -39,6 +39,7 @@ export function buildScheduleLoadPayload({
   usdCadRate = null,
   kms = undefined,
   invoiced = undefined,
+  categoryStored = null,
 }) {
   const num = strTrim(loadNumber);
   const loadTotalDisplay = computeLoadTotalDisplay(mt, rate, fsc, {
@@ -57,6 +58,8 @@ export function buildScheduleLoadPayload({
     rate: nullIfEmpty(rate),
     fsc: nullIfEmpty(fsc),
     load_total: nullIfEmpty(loadTotalDisplay),
+    load_category: categoryStored ?? loadCategoryStorageValue(loadCategory),
+    usd_cad_rate: nullIfEmpty(usdCadRate),
   };
   if (kms !== undefined) {
     payload.kms = nullIfEmpty(kms);

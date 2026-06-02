@@ -37,6 +37,8 @@ export default function ScheduleRow({
   weekStartISO,
   weekId,
   loads,
+  allWeekLoads = null,
+  assignableUnits = [],
   loadSlots,
   loadSheets = [],
   onDelete,
@@ -51,13 +53,13 @@ export default function ScheduleRow({
   const banner = formatWeekBanner(weekStartISO);
 
   const { weekTotalDisplay, weekRevenuePerKmDisplay } = useMemo(() => {
-    const revenue = sumWeekUnitRevenue(loads, loadSheets);
-    const kms = sumWeekUnitKms(loads, loadSheets);
+    const revenue = sumWeekUnitRevenue(loads);
+    const kms = sumWeekUnitKms(loads);
     return {
       weekTotalDisplay: formatLoadTotalCad(String(revenue)) || "$0.00",
       weekRevenuePerKmDisplay: formatWeekRevenuePerKm(revenue, kms),
     };
-  }, [loads, loadSheets]);
+  }, [loads]);
 
   return (
     <article className="mb-10 w-full min-w-0 max-w-full">
@@ -83,15 +85,17 @@ export default function ScheduleRow({
             ufaPIN={unit.ufaPIN}
             weekTotalDisplay={weekTotalDisplay}
             weekRevenuePerKmDisplay={weekRevenuePerKmDisplay}
-            onDelete={onDelete}
+            onDelete={assignment.isArchived ? undefined : onDelete}
           />
           <div className="min-h-0 min-w-0 flex-1 overflow-x-auto overscroll-x-contain bg-white p-2 lg:rounded-tr-2xl">
             <UnitWeekLoadsGrid
               embeddedInRow
               weekStartISO={weekStartISO}
               weekId={weekId}
-              inUseUnitId={assignment.id}
+              inUseUnitId={assignment.inUseUnitId}
               loads={loads}
+              allWeekLoads={allWeekLoads}
+              assignableUnits={assignableUnits}
               loadSlots={loadSlots}
               loadSheets={loadSheets}
               onUpdated={onLoadsUpdated}

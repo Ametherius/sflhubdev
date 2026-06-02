@@ -29,6 +29,10 @@ import {
 } from "@/lib/loadsheetCopy";
 import { createClient } from "@/lib/supabase/client";
 import { persistScheduleLoad } from "@/lib/scheduleLoadsPersist";
+import {
+  confirmInvoicedChange,
+  confirmSaveChanges,
+} from "@/lib/confirmEdit";
 
 function nullIfEmpty(s) {
   const t = String(s ?? "").trim();
@@ -49,6 +53,8 @@ export default function EditLoadsheetModal({
   /** Per-slot KMs / invoiced from schedule_loads (not the shared loadsheet). */
   scheduleKms = undefined,
   scheduleInvoiced = undefined,
+  scheduleLoadCategory = undefined,
+  scheduleUsdCadRate = undefined,
   onSaved,
   /** Called after syncing this slot's schedule_loads row (refresh week loads) */
   onScheduleUpdated,
@@ -209,13 +215,23 @@ export default function EditLoadsheetModal({
     setRate(selected.rate != null ? String(selected.rate) : "");
     setFsc(selected.fsc != null ? String(selected.fsc) : "");
     setBroker(selected.broker != null ? String(selected.broker) : "");
-    setLoadCategory(loadCategoryFromStorage(selected.load_category));
-    if (Boolean(selected.flat_rate) && !selected.load_category) {
-      setLoadCategory("legacy_flat");
+    if (scheduleLoadId && scheduleLoadCategory !== undefined) {
+      setLoadCategory(loadCategoryFromStorage(scheduleLoadCategory));
+    } else {
+      setLoadCategory(loadCategoryFromStorage(selected.load_category));
+      if (Boolean(selected.flat_rate) && !selected.load_category) {
+        setLoadCategory("legacy_flat");
+      }
     }
-    setUsdCadRate(
-      selected.usd_cad_rate != null ? String(selected.usd_cad_rate) : "",
-    );
+    if (scheduleLoadId && scheduleUsdCadRate !== undefined) {
+      setUsdCadRate(
+        scheduleUsdCadRate != null ? String(scheduleUsdCadRate) : "",
+      );
+    } else {
+      setUsdCadRate(
+        selected.usd_cad_rate != null ? String(selected.usd_cad_rate) : "",
+      );
+    }
     if (scheduleLoadId) {
       if (scheduleKms !== undefined) {
         setKms(scheduleKms != null ? String(scheduleKms) : "");
@@ -235,7 +251,16 @@ export default function EditLoadsheetModal({
       liveSyncReadyRef.current = true;
     });
     /* eslint-enable react-hooks/set-state-in-effect */
-  }, [open, selected, selectedId, scheduleLoadId, scheduleKms, scheduleInvoiced]);
+  }, [
+    open,
+    selected,
+    selectedId,
+    scheduleLoadId,
+    scheduleKms,
+    scheduleInvoiced,
+    scheduleLoadCategory,
+    scheduleUsdCadRate,
+  ]);
 
   const saveLoadsheet = useCallback(
     async (overrides = {}) => {
@@ -262,37 +287,7 @@ export default function EditLoadsheetModal({
       const cat = normalizeLoadCategory(values.loadCategory, false);
       const categoryStored = loadCategoryStorageValue(cat);
 
-      const sheetUpdate = {
-        load_number: values.loadNumber,
-        origin: nullIfEmpty(values.origin),
-        end_user: nullIfEmpty(values.endUser),
-        mt: nullIfEmpty(values.mt),
-        rate: nullIfEmpty(values.rate),
-        fsc: nullIfEmpty(values.fsc),
-        broker: nullIfEmpty(values.broker),
-        load_category: categoryStored,
-        usd_cad_rate: nullIfEmpty(values.usdCadRate),
-        flat_rate: cat === "legacy_flat",
-      };
-      if (!scheduleLoadId) {
-        sheetUpdate.kms = nullIfEmpty(values.kms);
-        sheetUpdate.invoiced = values.invoiced;
-      }
-
-      const { error } = await supabase
-        .from("loadsheets")
-        .update(sheetUpdate)
-        .eq("id", selectedId);
-
-      if (error) {
-        return { error };
-      }
-
-      await onSaved?.();
-
       if (scheduleLoadId) {
-        const includeInvoicedOnSchedule =
-          overrides.includeInvoicedOnSchedule === true;
         const schedulePayload = buildScheduleLoadPayload({
           loadsheetId: selectedId,
           loadNumber: values.loadNumber,
@@ -306,7 +301,8 @@ export default function EditLoadsheetModal({
           loadCategory: cat,
           usdCadRate: values.usdCadRate,
           kms: values.kms,
-          ...(includeInvoicedOnSchedule
+          categoryStored,
+          ...(overrides.includeInvoicedOnSchedule === true
             ? { invoiced: values.invoiced }
             : {}),
         });
@@ -322,7 +318,34 @@ export default function EditLoadsheetModal({
           onSchedulePatched?.(scheduleRow);
         }
         await onScheduleUpdated?.();
+        return { error: null };
       }
+
+      const sheetUpdate = {
+        load_number: values.loadNumber,
+        origin: nullIfEmpty(values.origin),
+        end_user: nullIfEmpty(values.endUser),
+        mt: nullIfEmpty(values.mt),
+        rate: nullIfEmpty(values.rate),
+        fsc: nullIfEmpty(values.fsc),
+        broker: nullIfEmpty(values.broker),
+        load_category: categoryStored,
+        usd_cad_rate: nullIfEmpty(values.usdCadRate),
+        flat_rate: cat === "legacy_flat",
+        kms: nullIfEmpty(values.kms),
+        invoiced: values.invoiced,
+      };
+
+      const { error } = await supabase
+        .from("loadsheets")
+        .update(sheetUpdate)
+        .eq("id", selectedId);
+
+      if (error) {
+        return { error };
+      }
+
+      await onSaved?.();
 
       return { error: null };
     },
@@ -434,6 +457,9 @@ export default function EditLoadsheetModal({
 
   async function handleInvoicedChange(checked) {
     if (!selectedId) return;
+    if (!confirmInvoicedChange(checked, { scheduleSlot: Boolean(scheduleLoadId) })) {
+      return;
+    }
     setInvoiced(checked);
     if (scheduleLoadId) {
       const { data, error } = await persistScheduleLoad(supabase, {
@@ -536,6 +562,13 @@ export default function EditLoadsheetModal({
       alert("Load number is required.");
       return;
     }
+    if (
+      !confirmSaveChanges(
+        scheduleLoadId ? "this schedule slot" : "this load sheet",
+      )
+    ) {
+      return;
+    }
     setSaving(true);
     liveSyncGenRef.current += 1;
     const { error } = await saveLoadsheet(
@@ -573,6 +606,8 @@ export default function EditLoadsheetModal({
         load_total: null,
         kms: null,
         invoiced: false,
+        load_category: null,
+        usd_cad_rate: null,
       })
       .eq("id", scheduleLoadId);
     setUnlinking(false);
@@ -617,10 +652,9 @@ export default function EditLoadsheetModal({
           Edit load sheet
         </h2>
         <p className="mb-4 text-sm text-green-900/80">
-          Updates the saved template in your library.
           {scheduleLoadId
-            ? " This slot on the schedule updates immediately with the same fields."
-            : " Open from a schedule slot’s Sheet button to push changes into that cell."}
+            ? "Edits this schedule slot only. The load sheet library template is not changed."
+            : "Updates the saved template in your library."}
         </p>
 
         {scheduleLoadId ? (
