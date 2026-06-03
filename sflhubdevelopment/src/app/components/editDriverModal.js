@@ -9,9 +9,11 @@ import {
   isEmptyUpdateResult,
   updateEntityRow,
 } from "@/lib/entityUpdate";
-import { confirmSaveChanges } from "@/lib/confirmEdit";
+import { useConfirm } from "@/context/confirmContext";
+import { saveChangesConfirmOptions } from "@/lib/confirmEdit";
 
 export default function EditDriverModal({ open, onClose, driver, onSaved }) {
+  const confirm = useConfirm();
   const supabase = useMemo(() => createClient(), []);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -34,7 +36,7 @@ export default function EditDriverModal({ open, onClose, driver, onSaved }) {
   async function handleSubmit(e) {
     e.preventDefault();
     if (saving || !driver?.id) return;
-    if (!confirmSaveChanges("this driver")) return;
+    if (!(await confirm(saveChangesConfirmOptions("this driver")))) return;
     setSaving(true);
     try {
       const patch = {

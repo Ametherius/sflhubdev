@@ -41,8 +41,14 @@ import AssignedMenu from "../components/assignedMenu";
 import LoadsheetMenu from "../components/loadsheetMenu";
 import CattleLoadsheet from "../components/cattleLoadsheet";
 import { resolveDefaultScheduleWeekId } from "@/lib/weekDates";
+import { useConfirm } from "@/context/confirmContext";
+import {
+  deleteDriverConfirmOptions,
+  deleteLoadsheetConfirmOptions,
+} from "@/lib/confirmEdit";
 
 export default function Schedule() {
+  const confirm = useConfirm();
   const [drivers, refreshDrivers] = useDrivers();
   const [units, refreshUnits] = useUnits();
   const [activeUser] = useUser();
@@ -82,11 +88,7 @@ export default function Schedule() {
   async function handleDeleteLoadsheet(sheet) {
     if (!sheet?.id) return;
     const label = String(sheet.load_number ?? "").trim() || "this loadsheet";
-    if (
-      !window.confirm(`Delete loadsheet "${label}"? This cannot be undone.`)
-    ) {
-      return;
-    }
+    if (!(await confirm(deleteLoadsheetConfirmOptions(label)))) return;
     const { error } = await supabase
       .from("loadsheets")
       .delete()
@@ -206,7 +208,7 @@ export default function Schedule() {
   }
 
   async function handleDeleteDriver(id) {
-    if (!confirm("Delete this driver from the database?")) return;
+    if (!(await confirm(deleteDriverConfirmOptions()))) return;
     const { error } = await supabase.from("drivers").delete().eq("id", id);
     if (error) {
       alert(error.message);

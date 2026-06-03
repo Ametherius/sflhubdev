@@ -17,7 +17,8 @@ import {
   persistScheduleLoad,
   scheduleLoadErrorMessage,
 } from "@/lib/scheduleLoadsPersist";
-import { confirmApplyToSchedule } from "@/lib/confirmEdit";
+import { useConfirm } from "@/context/confirmContext";
+import { applyToScheduleConfirmOptions } from "@/lib/confirmEdit";
 
 const LOADS_PER_DAY = 3;
 
@@ -86,6 +87,7 @@ export default function AssignLoadsheetModal({
   onAssigned,
   onLoadPatched,
 }) {
+  const confirm = useConfirm();
   const supabase = useMemo(() => createClient(), []);
   const [loadsheetId, setLoadsheetId] = useState("");
   const [slotId, setSlotId] = useState("");
@@ -247,15 +249,17 @@ export default function AssignLoadsheetModal({
       }
       const cellCount = assignTargetCount;
       if (
-        !confirmApplyToSchedule({
-          cellCount,
-          dayCount: selectedDayIsos.length,
-          dayTitle:
-            selectedDayIsos.length === 1
-              ? weekDays.find((d) => isoDateKey(d.iso) === selectedDayIsos[0])
-                  ?.columnTitle ?? selectedDayIsos[0]
-              : null,
-        })
+        !(await confirm(
+          applyToScheduleConfirmOptions({
+            cellCount,
+            dayCount: selectedDayIsos.length,
+            dayTitle:
+              selectedDayIsos.length === 1
+                ? weekDays.find((d) => isoDateKey(d.iso) === selectedDayIsos[0])
+                    ?.columnTitle ?? selectedDayIsos[0]
+                : null,
+          }),
+        ))
       ) {
         return;
       }
@@ -314,7 +318,11 @@ export default function AssignLoadsheetModal({
       alert("Choose a load sheet and a slot.");
       return;
     }
-    if (!confirmApplyToSchedule({ dayTitle: dayTitle || dayIso })) {
+    if (
+      !(await confirm(
+        applyToScheduleConfirmOptions({ dayTitle: dayTitle || dayIso }),
+      ))
+    ) {
       return;
     }
 

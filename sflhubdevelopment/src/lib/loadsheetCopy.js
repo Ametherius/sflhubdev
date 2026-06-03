@@ -14,6 +14,17 @@ function strTrim(v) {
   return String(v ?? "").trim();
 }
 
+/** Broker line from schedule load_note (`Broker: …` on its own line). */
+export function brokerFromScheduleLoadNote(loadNote) {
+  const n = String(loadNote ?? "").trim();
+  if (!n) return "";
+  for (const line of n.split("\n")) {
+    const m = line.match(/^Broker:\s*(.+)$/i);
+    if (m) return m[1].trim();
+  }
+  return "";
+}
+
 /** Load # on first line; broker on second line when present (green notes column). */
 export function buildScheduleLoadNote(loadNumber, broker) {
   const num = strTrim(loadNumber);

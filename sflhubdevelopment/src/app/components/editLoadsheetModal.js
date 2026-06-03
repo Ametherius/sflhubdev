@@ -24,14 +24,20 @@ import {
   formatRevenuePerKmCad,
 } from "@/lib/revenuePerKm";
 import {
+  brokerFromScheduleLoadNote,
   buildScheduleLoadPayload,
   nextCopyLoadNumber,
 } from "@/lib/loadsheetCopy";
 import { createClient } from "@/lib/supabase/client";
-import { persistScheduleLoad } from "@/lib/scheduleLoadsPersist";
 import {
-  confirmInvoicedChange,
-  confirmSaveChanges,
+  persistScheduleLoad,
+  SCHEDULE_LOAD_RETURN_SELECT,
+} from "@/lib/scheduleLoadsPersist";
+import { useConfirm } from "@/context/confirmContext";
+import {
+  invoicedChangeConfirmOptions,
+  removeFromSlotConfirmOptions,
+  saveChangesConfirmOptions,
 } from "@/lib/confirmEdit";
 
 function nullIfEmpty(s) {
@@ -50,6 +56,8 @@ export default function EditLoadsheetModal({
   initialLoadsheetId = null,
   /** When set (opened from a grid slot), offer "remove from this slot" for schedule_loads */
   scheduleLoadId = null,
+  /** Current schedule_loads row from the grid (slot values, not the library template). */
+  initialScheduleRow = null,
   /** Per-slot KMs / invoiced from schedule_loads (not the shared loadsheet). */
   scheduleKms = undefined,
   scheduleInvoiced = undefined,
@@ -63,6 +71,7 @@ export default function EditLoadsheetModal({
   /** Called after unlinking schedule row from loadsheet (refresh week loads) */
   onScheduleUnlinked,
 }) {
+  const confirm = useConfirm();
   const supabase = useMemo(() => createClient(), []);
   const [selectedId, setSelectedId] = useState("");
   const [loadNumber, setLoadNumber] = useState("");
@@ -82,37 +91,40 @@ export default function EditLoadsheetModal({
   const [unlinking, setUnlinking] = useState(false);
   const liveSyncReadyRef = useRef(false);
   const liveSyncGenRef = useRef(0);
-  const lastHydratedSheetIdRef = useRef(null);
+  const lastHydratedKeyRef = useRef(null);
+  const [scheduleSlotRow, setScheduleSlotRow] = useState(null);
   const liveSyncSuppressUntilRef = useRef(0);
   const slotMetaFetchGenRef = useRef(0);
 
   useEffect(() => {
     if (open) {
-      lastHydratedSheetIdRef.current = null;
+      lastHydratedKeyRef.current = null;
       liveSyncSuppressUntilRef.current = Date.now() + 700;
+      setScheduleSlotRow(initialScheduleRow ?? null);
+    } else {
+      setScheduleSlotRow(null);
     }
-  }, [open]);
+  }, [open, initialScheduleRow]);
 
-  /** Load per-slot KMs / completed from schedule_loads (not the shared loadsheet). */
+  /** Refresh slot row from DB when opened from schedule (values may differ from loadsheet library). */
   useEffect(() => {
     if (!open || !scheduleLoadId) return;
     const gen = ++slotMetaFetchGenRef.current;
     void (async () => {
       const { data, error } = await supabase
         .from("schedule_loads")
-        .select("kms, invoiced")
+        .select(SCHEDULE_LOAD_RETURN_SELECT)
         .eq("id", scheduleLoadId)
         .maybeSingle();
       if (gen !== slotMetaFetchGenRef.current) return;
       if (error) {
-        if (!/invoiced|kms|column .* does not exist/i.test(error.message ?? "")) {
+        if (!/column .* does not exist/i.test(error.message ?? "")) {
           console.error(error.message);
         }
         return;
       }
       if (!data) return;
-      setKms(data.kms != null ? String(data.kms) : "");
-      setInvoiced(Boolean(data.invoiced));
+      setScheduleSlotRow(data);
       liveSyncSuppressUntilRef.current = Date.now() + 600;
     })();
   }, [open, scheduleLoadId, supabase]);
@@ -182,13 +194,13 @@ export default function EditLoadsheetModal({
   }, [loadTotalPreview, kms]);
 
   useEffect(() => {
-    /* eslint-disable react-hooks/set-state-in-effect -- hydrate form when sheet selection changes */
+    /* eslint-disable react-hooks/set-state-in-effect -- hydrate form when sheet/slot changes */
     if (!open) {
-      lastHydratedSheetIdRef.current = null;
+      lastHydratedKeyRef.current = null;
       return;
     }
     if (!selected) {
-      lastHydratedSheetIdRef.current = null;
+      lastHydratedKeyRef.current = null;
       setLoadNumber("");
       setOrigin("");
       setEndUser("");
@@ -202,51 +214,75 @@ export default function EditLoadsheetModal({
       setInvoiced(false);
       return;
     }
-    if (lastHydratedSheetIdRef.current === selectedId) return;
-    lastHydratedSheetIdRef.current = selectedId;
+
+    const hydrateKey = scheduleLoadId
+      ? `slot:${scheduleLoadId}:${selectedId}`
+      : `sheet:${selectedId}`;
+
+    if (scheduleLoadId && !scheduleSlotRow) {
+      return;
+    }
+    if (lastHydratedKeyRef.current === hydrateKey) return;
+    lastHydratedKeyRef.current = hydrateKey;
+
+    const slot = scheduleLoadId ? scheduleSlotRow : null;
 
     liveSyncReadyRef.current = false;
-    setLoadNumber(
-      selected.load_number != null ? String(selected.load_number) : "",
-    );
-    setOrigin(selected.origin != null ? String(selected.origin) : "");
-    setEndUser(selected.end_user != null ? String(selected.end_user) : "");
-    setMt(selected.mt != null ? String(selected.mt) : "");
-    setRate(selected.rate != null ? String(selected.rate) : "");
-    setFsc(selected.fsc != null ? String(selected.fsc) : "");
-    setBroker(selected.broker != null ? String(selected.broker) : "");
-    if (scheduleLoadId && scheduleLoadCategory !== undefined) {
-      setLoadCategory(loadCategoryFromStorage(scheduleLoadCategory));
-    } else {
+
+    if (scheduleLoadId && slot) {
+      setLoadNumber(
+        slot.load_number != null
+          ? String(slot.load_number)
+          : selected.load_number != null
+            ? String(selected.load_number)
+            : "",
+      );
+      setOrigin(slot.origin != null ? String(slot.origin) : "");
+      setEndUser(slot.end_user != null ? String(slot.end_user) : "");
+      setMt(slot.mt != null ? String(slot.mt) : "");
+      setRate(slot.rate != null ? String(slot.rate) : "");
+      setFsc(slot.fsc != null ? String(slot.fsc) : "");
+      setBroker(
+        brokerFromScheduleLoadNote(slot.load_note) ||
+          (selected.broker != null ? String(selected.broker) : ""),
+      );
+      setKms(slot.kms != null ? String(slot.kms) : "");
+      setInvoiced(Boolean(slot.invoiced));
+      setLoadCategory(
+        loadCategoryFromStorage(
+          slot.load_category ?? scheduleLoadCategory ?? selected.load_category,
+        ),
+      );
+      setUsdCadRate(
+        slot.usd_cad_rate != null
+          ? String(slot.usd_cad_rate)
+          : scheduleUsdCadRate != null
+            ? String(scheduleUsdCadRate)
+            : selected.usd_cad_rate != null
+              ? String(selected.usd_cad_rate)
+              : "",
+      );
+    } else if (!scheduleLoadId) {
+      setLoadNumber(
+        selected.load_number != null ? String(selected.load_number) : "",
+      );
+      setOrigin(selected.origin != null ? String(selected.origin) : "");
+      setEndUser(selected.end_user != null ? String(selected.end_user) : "");
+      setMt(selected.mt != null ? String(selected.mt) : "");
+      setRate(selected.rate != null ? String(selected.rate) : "");
+      setFsc(selected.fsc != null ? String(selected.fsc) : "");
+      setBroker(selected.broker != null ? String(selected.broker) : "");
       setLoadCategory(loadCategoryFromStorage(selected.load_category));
       if (Boolean(selected.flat_rate) && !selected.load_category) {
         setLoadCategory("legacy_flat");
       }
-    }
-    if (scheduleLoadId && scheduleUsdCadRate !== undefined) {
-      setUsdCadRate(
-        scheduleUsdCadRate != null ? String(scheduleUsdCadRate) : "",
-      );
-    } else {
       setUsdCadRate(
         selected.usd_cad_rate != null ? String(selected.usd_cad_rate) : "",
       );
-    }
-    if (scheduleLoadId) {
-      if (scheduleKms !== undefined) {
-        setKms(scheduleKms != null ? String(scheduleKms) : "");
-      } else {
-        setKms(selected.kms != null ? String(selected.kms) : "");
-      }
-      if (scheduleInvoiced !== undefined) {
-        setInvoiced(Boolean(scheduleInvoiced));
-      } else {
-        setInvoiced(Boolean(selected.invoiced));
-      }
-    } else {
       setKms(selected.kms != null ? String(selected.kms) : "");
       setInvoiced(Boolean(selected.invoiced));
     }
+
     queueMicrotask(() => {
       liveSyncReadyRef.current = true;
     });
@@ -256,8 +292,7 @@ export default function EditLoadsheetModal({
     selected,
     selectedId,
     scheduleLoadId,
-    scheduleKms,
-    scheduleInvoiced,
+    scheduleSlotRow,
     scheduleLoadCategory,
     scheduleUsdCadRate,
   ]);
@@ -316,8 +351,10 @@ export default function EditLoadsheetModal({
         }
         if (scheduleRow) {
           onSchedulePatched?.(scheduleRow);
+          setScheduleSlotRow(scheduleRow);
+        } else {
+          await onScheduleUpdated?.();
         }
-        await onScheduleUpdated?.();
         return { error: null };
       }
 
@@ -406,7 +443,9 @@ export default function EditLoadsheetModal({
   );
 
   useEffect(() => {
-    if (!open || !selectedId || !liveSyncReadyRef.current) return;
+    if (!open || !selectedId || !liveSyncReadyRef.current || scheduleLoadId) {
+      return;
+    }
 
     const gen = ++liveSyncGenRef.current;
     const timer = setTimeout(() => {
@@ -430,11 +469,12 @@ export default function EditLoadsheetModal({
     loadCategory,
     usdCadRate,
     persistLive,
+    scheduleLoadId,
   ]);
 
   function handleLoadCategoryChange(next) {
     setLoadCategory(next);
-    if (!selectedId) return;
+    if (!selectedId || scheduleLoadId) return;
     void (async () => {
       const { error } = await saveLoadsheet({ loadCategory: next });
       if (error) reportSaveError(error);
@@ -457,7 +497,13 @@ export default function EditLoadsheetModal({
 
   async function handleInvoicedChange(checked) {
     if (!selectedId) return;
-    if (!confirmInvoicedChange(checked, { scheduleSlot: Boolean(scheduleLoadId) })) {
+    if (
+      !(await confirm(
+        invoicedChangeConfirmOptions(checked, {
+          scheduleSlot: Boolean(scheduleLoadId),
+        }),
+      ))
+    ) {
       return;
     }
     setInvoiced(checked);
@@ -563,9 +609,11 @@ export default function EditLoadsheetModal({
       return;
     }
     if (
-      !confirmSaveChanges(
-        scheduleLoadId ? "this schedule slot" : "this load sheet",
-      )
+      !(await confirm(
+        saveChangesConfirmOptions(
+          scheduleLoadId ? "this schedule slot" : "this load sheet",
+        ),
+      ))
     ) {
       return;
     }
@@ -584,13 +632,7 @@ export default function EditLoadsheetModal({
 
   async function handleRemoveFromSlot() {
     if (!scheduleLoadId) return;
-    if (
-      !confirm(
-        "Remove the load from this slot? All copied load details (origin, metrics, notes, load sheet link) will be cleared.",
-      )
-    ) {
-      return;
-    }
+    if (!(await confirm(removeFromSlotConfirmOptions()))) return;
     setUnlinking(true);
     const { error } = await supabase
       .from("schedule_loads")

@@ -1,10 +1,15 @@
-/** Ask the user to confirm before persisting an edit. Returns true if they proceed. */
-export function confirmSaveChanges(what = "your changes") {
-  return window.confirm(`Save changes to ${what}?`);
+/** Options for useConfirm() — save / apply / invoiced / destructive actions. */
+
+export function saveChangesConfirmOptions(what = "your changes") {
+  return {
+    title: "Save changes?",
+    message: `Save changes to ${what}?`,
+    confirmLabel: "Save",
+    cancelLabel: "Cancel",
+  };
 }
 
-/** Confirm before applying loadsheet data to the schedule. */
-export function confirmApplyToSchedule({
+export function applyToScheduleConfirmOptions({
   cellCount = 1,
   dayCount = 1,
   dayTitle = null,
@@ -16,18 +21,64 @@ export function confirmApplyToSchedule({
     } else if (dayTitle) {
       scope = ` on ${dayTitle}`;
     }
-    return window.confirm(
-      `Apply this load sheet to ${cellCount} schedule cells${scope}?`,
-    );
+    return {
+      title: "Apply to schedule?",
+      message: `Apply this load sheet to ${cellCount} schedule cells${scope}?`,
+      confirmLabel: "Apply",
+      cancelLabel: "Cancel",
+    };
   }
   const dayPart = dayTitle ? ` for ${dayTitle}` : "";
-  return window.confirm(`Apply this load sheet to the schedule${dayPart}?`);
+  return {
+    title: "Apply to schedule?",
+    message: `Apply this load sheet to the schedule${dayPart}?`,
+    confirmLabel: "Apply",
+    cancelLabel: "Cancel",
+  };
 }
 
-/** Confirm before toggling invoiced on a load sheet or schedule slot. */
-export function confirmInvoicedChange(invoiced, { scheduleSlot = false } = {}) {
+export function invoicedChangeConfirmOptions(
+  invoiced,
+  { scheduleSlot = false } = {},
+) {
   const target = scheduleSlot ? "this schedule slot" : "this load sheet";
   const verb = invoiced ? "Mark" : "Unmark";
   const state = invoiced ? "invoiced" : "not invoiced";
-  return window.confirm(`${verb} ${target} as ${state}?`);
+  return {
+    title: invoiced ? "Mark invoiced?" : "Unmark invoiced?",
+    message: `${verb} ${target} as ${state}?`,
+    confirmLabel: invoiced ? "Mark invoiced" : "Unmark",
+    cancelLabel: "Cancel",
+  };
+}
+
+export function removeFromSlotConfirmOptions() {
+  return {
+    title: "Remove load from slot?",
+    message:
+      "Remove the load from this slot? All copied load details (origin, metrics, notes, load sheet link) will be cleared.",
+    confirmLabel: "Remove",
+    cancelLabel: "Cancel",
+    variant: "danger",
+  };
+}
+
+export function deleteLoadsheetConfirmOptions(label) {
+  return {
+    title: "Delete load sheet?",
+    message: `Delete loadsheet "${label}"? This cannot be undone.`,
+    confirmLabel: "Delete",
+    cancelLabel: "Cancel",
+    variant: "danger",
+  };
+}
+
+export function deleteDriverConfirmOptions() {
+  return {
+    title: "Delete driver?",
+    message: "Delete this driver from the database?",
+    confirmLabel: "Delete",
+    cancelLabel: "Cancel",
+    variant: "danger",
+  };
 }

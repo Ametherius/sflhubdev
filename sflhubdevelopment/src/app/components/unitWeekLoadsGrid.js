@@ -18,7 +18,8 @@ import {
 } from "@/lib/scheduleLoadsPersist";
 import { resolveLoadInvoiced } from "@/lib/weekUnitRevenue";
 import { createClient } from "@/lib/supabase/client";
-import { confirmSaveChanges } from "@/lib/confirmEdit";
+import { useConfirm } from "@/context/confirmContext";
+import { saveChangesConfirmOptions } from "@/lib/confirmEdit";
 import AssignLoadsheetModal from "./assignLoadsheetModal";
 import EditLoadsheetModal from "./editLoadsheetModal";
 
@@ -145,6 +146,7 @@ function LoadSplitCard({
   onEditLoadsheet,
   slotInvoiced = false,
 }) {
+  const confirm = useConfirm();
   const slotTitle = slotLabel(slot);
   const [origin, setOrigin] = useState("");
   const [endUser, setEndUser] = useState("");
@@ -254,7 +256,19 @@ function LoadSplitCard({
       loadsheetId: lid,
     };
     if (!scheduleLoadHasEdits(row, values)) return;
-    if (!confirmSaveChanges("this schedule load")) return;
+    if (!(await confirm(saveChangesConfirmOptions("this schedule load")))) {
+      const saved = scheduleLoadValuesFromRow(row);
+      if (saved) {
+        setOrigin(saved.origin);
+        setEndUser(saved.endUser);
+        setFsc(saved.fsc);
+        setMt(saved.mt);
+        setRate(saved.rate);
+        setLoadNote(saved.loadNote);
+        setLoadsheetId(saved.loadsheetId);
+      }
+      return;
+    }
     const snapshot = values;
     pendingLocalRef.current = snapshot;
     const payload = {
@@ -298,6 +312,7 @@ function LoadSplitCard({
     rowUsdCad,
     onPersist,
     row,
+    confirm,
   ]);
 
   const rootGrow = fillColumn
@@ -656,6 +671,7 @@ export default function UnitWeekLoadsGrid({
                                   ? String(row.loadsheet_id)
                                   : null,
                               scheduleLoadId: String(row.id),
+                              initialScheduleRow: row,
                               scheduleKms:
                                 row != null && "kms" in row ? row.kms : undefined,
                               scheduleInvoiced:
@@ -696,6 +712,7 @@ export default function UnitWeekLoadsGrid({
         onClose={() => setEditLoadsheetTarget(null)}
         initialLoadsheetId={editLoadsheetTarget?.initialLoadsheetId ?? null}
         scheduleLoadId={editLoadsheetTarget?.scheduleLoadId ?? null}
+        initialScheduleRow={editLoadsheetTarget?.initialScheduleRow ?? null}
         scheduleKms={editLoadsheetTarget?.scheduleKms}
         scheduleInvoiced={editLoadsheetTarget?.scheduleInvoiced}
         scheduleLoadCategory={editLoadsheetTarget?.scheduleLoadCategory}
