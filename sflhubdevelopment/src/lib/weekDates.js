@@ -43,6 +43,12 @@ export function weekDayLabels(weekStartISO) {
   });
 }
 
+/** Last calendar day of the week (weekStart + 6 days), as YYYY-MM-DD. */
+export function weekEndISO(weekStartISO) {
+  if (!weekStartISO) return null;
+  return toISODate(addDays(parseISODateLocal(weekStartISO), 6));
+}
+
 /** True when dateISO falls in the 7-day span starting weekStartISO (inclusive). */
 export function weekContainsDate(weekStartISO, dateISO) {
   if (!weekStartISO || !dateISO) return false;
@@ -50,6 +56,32 @@ export function weekContainsDate(weekStartISO, dateISO) {
   const date = parseISODateLocal(dateISO);
   const end = addDays(start, 6);
   return date >= start && date <= end;
+}
+
+/** True when the week has ended (today is after its last day). */
+export function weekIsComplete(weekStartISO, todayISO = toISODate(new Date())) {
+  const end = weekEndISO(weekStartISO);
+  if (!end || !todayISO) return false;
+  return todayISO > end;
+}
+
+/**
+ * Current and future weeks accept new live-board assignments on the schedule.
+ * Completed (past) weeks only show units already recorded for that week.
+ */
+export function weekAcceptsNewAssignments(
+  weekStartISO,
+  todayISO = toISODate(new Date()),
+) {
+  return !weekIsComplete(weekStartISO, todayISO);
+}
+
+/** Closed weeks: schedule slots may only change MT and completed (invoiced). */
+export function weekAllowsOnlyMtAndCompleted(
+  weekStartISO,
+  todayISO = toISODate(new Date()),
+) {
+  return weekIsComplete(weekStartISO, todayISO);
 }
 
 /** Id of the schedule week whose range contains dateISO (latest start if overlap). */

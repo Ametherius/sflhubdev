@@ -6,6 +6,7 @@ import {
   assignmentFromSnapshot,
 } from "@/lib/scheduleAssignmentDisplay";
 import { compareAssignedRows } from "@/lib/divisionSort";
+import { weekAcceptsNewAssignments } from "@/lib/weekDates";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePostgresRealtime } from "./usePostgresRealtime";
 
@@ -15,7 +16,11 @@ const ASSIGNMENT_SELECT =
 /**
  * Rows to render on the schedule for one week: live board units + archived snapshots.
  */
-export function useWeekAssignments(weekId, liveAssigned = []) {
+export function useWeekAssignments(
+  weekId,
+  liveAssigned = [],
+  weekStartISO = null,
+) {
   const [snapshots, setSnapshots] = useState([]);
   const supabase = useMemo(() => createClient(), []);
 
@@ -34,7 +39,9 @@ export function useWeekAssignments(weekId, liveAssigned = []) {
         setSnapshots([]);
         return;
       }
-      console.error(error.message);
+      if (!/abort/i.test(error.message ?? "")) {
+        console.error(error.message);
+      }
       return;
     }
     setSnapshots(data ?? []);
@@ -62,30 +69,62 @@ export function useWeekAssignments(weekId, liveAssigned = []) {
   }, [snapshots]);
 
   const displayRows = useMemo(() => {
-    const liveIds = new Set();
-    const rows = [];
-
+    const liveById = new Map();
     for (const row of liveAssigned ?? []) {
-      if (!row?.driver || !row?.unit) continue;
-      liveIds.add(String(row.id));
-      const scheduleAssignmentId = assignmentIdByInUse.get(String(row.id)) ?? null;
-      const display = assignmentFromLive(row, scheduleAssignmentId);
-      if (display) rows.push(display);
+      if (row?.id != null) liveById.set(String(row.id), row);
     }
 
-    for (const snap of snapshots) {
-      if (snap.in_use_unit_id != null && liveIds.has(String(snap.in_use_unit_id))) {
-        continue;
+    const rows = [];
+    const acceptsNew = weekAcceptsNewAssignments(weekStartISO);
+
+    if (acceptsNew) {
+      const liveIds = new Set();
+      for (const row of liveAssigned ?? []) {
+        if (!row?.driver || !row?.unit) continue;
+        liveIds.add(String(row.id));
+        const scheduleAssignmentId =
+          assignmentIdByInUse.get(String(row.id)) ?? null;
+        const display = assignmentFromLive(row, scheduleAssignmentId);
+        if (display) rows.push(display);
       }
-      const hasLabels =
-        String(snap.driver_name ?? "").trim() || String(snap.unit_label ?? "").trim();
-      if (!hasLabels) continue;
-      const display = assignmentFromSnapshot(snap);
-      if (display) rows.push(display);
+
+      for (const snap of snapshots) {
+        if (
+          snap.in_use_unit_id != null &&
+          liveIds.has(String(snap.in_use_unit_id))
+        ) {
+          continue;
+        }
+        const hasLabels =
+          String(snap.driver_name ?? "").trim() ||
+          String(snap.unit_label ?? "").trim();
+        if (!hasLabels) continue;
+        const display = assignmentFromSnapshot(snap);
+        if (display) rows.push(display);
+      }
+    } else {
+      for (const snap of snapshots) {
+        const hasLabels =
+          String(snap.driver_name ?? "").trim() ||
+          String(snap.unit_label ?? "").trim();
+        if (!hasLabels) continue;
+
+        const liveId =
+          snap.in_use_unit_id != null ? String(snap.in_use_unit_id) : null;
+        const live = liveId ? liveById.get(liveId) : null;
+        if (live?.driver && live?.unit) {
+          const display = assignmentFromLive(live, String(snap.id));
+          if (display) rows.push(display);
+          continue;
+        }
+
+        const display = assignmentFromSnapshot(snap);
+        if (display) rows.push(display);
+      }
     }
 
     return rows.sort(compareAssignedRows);
-  }, [liveAssigned, snapshots, assignmentIdByInUse]);
+  }, [liveAssigned, snapshots, assignmentIdByInUse, weekStartISO]);
 
   return [displayRows, refreshSnapshots];
 }

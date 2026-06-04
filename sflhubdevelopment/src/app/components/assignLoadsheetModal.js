@@ -17,9 +17,6 @@ import {
   persistScheduleLoad,
   scheduleLoadErrorMessage,
 } from "@/lib/scheduleLoadsPersist";
-import { useConfirm } from "@/context/confirmContext";
-import { applyToScheduleConfirmOptions } from "@/lib/confirmEdit";
-
 const LOADS_PER_DAY = 3;
 
 function isoDateKey(raw) {
@@ -87,7 +84,6 @@ export default function AssignLoadsheetModal({
   onAssigned,
   onLoadPatched,
 }) {
-  const confirm = useConfirm();
   const supabase = useMemo(() => createClient(), []);
   const [loadsheetId, setLoadsheetId] = useState("");
   const [slotId, setSlotId] = useState("");
@@ -247,23 +243,6 @@ export default function AssignLoadsheetModal({
         alert("No load slots available. Fix load_slots access, then try again.");
         return;
       }
-      const cellCount = assignTargetCount;
-      if (
-        !(await confirm(
-          applyToScheduleConfirmOptions({
-            cellCount,
-            dayCount: selectedDayIsos.length,
-            dayTitle:
-              selectedDayIsos.length === 1
-                ? weekDays.find((d) => isoDateKey(d.iso) === selectedDayIsos[0])
-                    ?.columnTitle ?? selectedDayIsos[0]
-                : null,
-          }),
-        ))
-      ) {
-        return;
-      }
-
       setSaving(true);
       let applied = 0;
       let lastError = null;
@@ -318,14 +297,6 @@ export default function AssignLoadsheetModal({
       alert("Choose a load sheet and a slot.");
       return;
     }
-    if (
-      !(await confirm(
-        applyToScheduleConfirmOptions({ dayTitle: dayTitle || dayIso }),
-      ))
-    ) {
-      return;
-    }
-
     setSaving(true);
     const { data, error } = await persistToCell(dayIso, inUseUnitId, slotId);
     setSaving(false);

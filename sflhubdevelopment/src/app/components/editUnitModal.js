@@ -9,8 +9,6 @@ import {
   isEmptyUpdateResult,
   updateEntityRow,
 } from "@/lib/entityUpdate";
-import { useConfirm } from "@/context/confirmContext";
-import { saveChangesConfirmOptions } from "@/lib/confirmEdit";
 
 function hasOwn(obj, key) {
   return obj != null && Object.prototype.hasOwnProperty.call(obj, key);
@@ -55,7 +53,6 @@ function buildUnitPatches(unit, values) {
 }
 
 export default function EditUnitModal({ open, onClose, unit, onSaved }) {
-  const confirm = useConfirm();
   const supabase = useMemo(() => createClient(), []);
   const [unitNum, setUnitNum] = useState("");
   const [petro, setPetro] = useState("");
@@ -79,7 +76,6 @@ export default function EditUnitModal({ open, onClose, unit, onSaved }) {
   async function handleSubmit(e) {
     e.preventDefault();
     if (saving || !unit?.id) return;
-    if (!(await confirm(saveChangesConfirmOptions("this unit")))) return;
     setSaving(true);
     try {
       const values = {

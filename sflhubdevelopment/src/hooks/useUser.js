@@ -1,6 +1,7 @@
 "use client";
 
 import { createClient } from "@/lib/supabase/client";
+import { getAuthUser } from "@/lib/supabase/authUser";
 import { useEffect, useMemo, useState } from "react";
 
 export function useUser() {
@@ -11,10 +12,7 @@ export function useUser() {
     let cancelled = false;
 
     (async () => {
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
+      const { user, error: userError } = await getAuthUser(supabase);
       if (cancelled) return;
       if (userError || !user) {
         console.log("No User");

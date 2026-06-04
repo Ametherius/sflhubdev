@@ -1,6 +1,7 @@
 "use client";
 
 import { createClient } from "@/lib/supabase/client";
+import { getAuthUser } from "@/lib/supabase/authUser";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePostgresRealtime } from "./usePostgresRealtime";
 
@@ -9,10 +10,7 @@ export function useUnits() {
   const supabase = useMemo(() => createClient(), []);
 
   const refreshUnits = useCallback(async () => {
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
+    const { user, error: userError } = await getAuthUser(supabase);
     if (userError || !user) {
       console.log("No User");
       return;

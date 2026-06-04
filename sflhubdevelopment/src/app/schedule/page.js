@@ -40,7 +40,10 @@ import { isScheduleWeekFkError } from "@/lib/scheduleLoadsPersist";
 import AssignedMenu from "../components/assignedMenu";
 import LoadsheetMenu from "../components/loadsheetMenu";
 import CattleLoadsheet from "../components/cattleLoadsheet";
-import { resolveDefaultScheduleWeekId } from "@/lib/weekDates";
+import {
+  resolveDefaultScheduleWeekId,
+  weekAcceptsNewAssignments,
+} from "@/lib/weekDates";
 import { useConfirm } from "@/context/confirmContext";
 import {
   deleteDriverConfirmOptions,
@@ -124,7 +127,16 @@ export default function Schedule() {
     await refreshLoadSheets();
   }
 
-  const [weekDisplayRows] = useWeekAssignments(resolvedWeekId, assigned);
+  const selectedWeek = useMemo(
+    () => weeks.find((w) => w.id === resolvedWeekId) ?? null,
+    [weeks, resolvedWeekId],
+  );
+
+  const [weekDisplayRows] = useWeekAssignments(
+    resolvedWeekId,
+    assigned,
+    selectedWeek?.week_start_date ?? null,
+  );
 
   const scheduleRowsForDisplay = useMemo(() => {
     let rows = weekDisplayRows ?? [];
@@ -155,11 +167,6 @@ export default function Schedule() {
     [weekDisplayRows],
   );
 
-  const selectedWeek = useMemo(
-    () => weeks.find((w) => w.id === resolvedWeekId) ?? null,
-    [weeks, resolvedWeekId],
-  );
-
   const assignmentIdsKey = useMemo(
     () =>
       assigned
@@ -172,6 +179,11 @@ export default function Schedule() {
 
   useEffect(() => {
     if (!resolvedWeekId || !assignmentIdsKey) return;
+    if (
+      !weekAcceptsNewAssignments(selectedWeek?.week_start_date ?? null)
+    ) {
+      return;
+    }
     void (async () => {
       const { error } = await supabase.rpc("ensure_schedule_loads_for_week", {
         p_week_id: resolvedWeekId,
@@ -194,7 +206,13 @@ export default function Schedule() {
       }
       await refreshLoads();
     })();
-  }, [resolvedWeekId, assignmentIdsKey, supabase, refreshLoads]);
+  }, [
+    resolvedWeekId,
+    assignmentIdsKey,
+    selectedWeek?.week_start_date,
+    supabase,
+    refreshLoads,
+  ]);
 
   async function handleDelete(id) {
     const { error } = await supabase.from("in_use_units").delete().eq("id", id);
@@ -537,7 +555,10 @@ export default function Schedule() {
               loadSlots={loadSlots}
               loadSheets={loadSheets}
               onDelete={
-                row.inUseUnitId ? () => handleDelete(row.inUseUnitId) : undefined
+                row.inUseUnitId &&
+                weekAcceptsNewAssignments(selectedWeek?.week_start_date ?? null)
+                  ? () => handleDelete(row.inUseUnitId)
+                  : undefined
               }
               onLoadsUpdated={refreshLoads}
               onLoadPatched={mergeScheduleLoad}
