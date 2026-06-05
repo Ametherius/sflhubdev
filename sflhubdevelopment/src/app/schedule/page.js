@@ -629,9 +629,6 @@ export default function Schedule() {
           onCopy={handleCopyLoadsheet}
         />
       </div>
-      {/* <div className="bg-white border-2 border-green-950 shadow-2xl fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 rounded-xl p-4 z-50">
-        <CattleLoadsheet />
-      </div> */}
     </div>
   );
 }
