@@ -100,7 +100,7 @@ export function useWeekAssignments(
           String(snap.unit_label ?? "").trim();
         if (!hasLabels) continue;
         const display = assignmentFromSnapshot(snap, { liveIds });
-        if (display) rows.push(display);
+        if (display && !display.isArchived) rows.push(display);
       }
     } else {
       for (const snap of snapshots) {

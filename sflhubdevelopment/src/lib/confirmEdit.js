@@ -87,7 +87,7 @@ export function vacateUnitConfirmOptions() {
   return {
     title: "Vacate unit?",
     message:
-      "Remove this driver and unit from the live board? Their load data for this week will stay on the schedule.",
+      "Remove this driver and unit from the live board? Schedule load data for the current and future weeks will be deleted. Past weeks are kept for history.",
     confirmLabel: "Vacate",
     cancelLabel: "Cancel",
     variant: "danger",

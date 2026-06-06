@@ -56,6 +56,9 @@ alter table public.schedule_loads
   references public.in_use_units (id)
   on delete set null;
 
+alter table public.schedule_loads
+  alter column in_use_unit_id drop not null;
+
 create index if not exists schedule_loads_schedule_assignment_id_idx
   on public.schedule_loads (schedule_assignment_id);
 
