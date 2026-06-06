@@ -1,11 +1,15 @@
 /** Map schedule_assignments row → shape expected by ScheduleRow / AssignedCard. */
-export function assignmentFromSnapshot(row) {
+export function assignmentFromSnapshot(row, { liveIds = null } = {}) {
   if (!row) return null;
+  const inUseUnitId = row.in_use_unit_id ?? null;
+  const isArchived =
+    inUseUnitId == null ||
+    (liveIds != null && !liveIds.has(String(inUseUnitId)));
   return {
     id: row.id,
     scheduleAssignmentId: row.id,
-    inUseUnitId: row.in_use_unit_id ?? null,
-    isArchived: row.in_use_unit_id == null,
+    inUseUnitId,
+    isArchived,
     driver: {
       id: row.driverid,
       name: row.driver_name ?? "",

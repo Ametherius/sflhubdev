@@ -99,7 +99,7 @@ export function useWeekAssignments(
           String(snap.driver_name ?? "").trim() ||
           String(snap.unit_label ?? "").trim();
         if (!hasLabels) continue;
-        const display = assignmentFromSnapshot(snap);
+        const display = assignmentFromSnapshot(snap, { liveIds });
         if (display) rows.push(display);
       }
     } else {

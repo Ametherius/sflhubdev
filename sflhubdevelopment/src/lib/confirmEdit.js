@@ -82,3 +82,14 @@ export function deleteDriverConfirmOptions() {
     variant: "danger",
   };
 }
+
+export function vacateUnitConfirmOptions() {
+  return {
+    title: "Vacate unit?",
+    message:
+      "Remove this driver and unit from the live board? Their load data for this week will stay on the schedule.",
+    confirmLabel: "Vacate",
+    cancelLabel: "Cancel",
+    variant: "danger",
+  };
+}

@@ -48,6 +48,7 @@ import { useConfirm } from "@/context/confirmContext";
 import {
   deleteDriverConfirmOptions,
   deleteLoadsheetConfirmOptions,
+  vacateUnitConfirmOptions,
 } from "@/lib/confirmEdit";
 
 export default function Schedule() {
@@ -132,7 +133,7 @@ export default function Schedule() {
     [weeks, resolvedWeekId],
   );
 
-  const [weekDisplayRows] = useWeekAssignments(
+  const [weekDisplayRows, refreshSnapshots] = useWeekAssignments(
     resolvedWeekId,
     assigned,
     selectedWeek?.week_start_date ?? null,
@@ -215,13 +216,17 @@ export default function Schedule() {
   ]);
 
   async function handleDelete(id) {
+    if (!(await confirm(vacateUnitConfirmOptions()))) return;
+
     const { error } = await supabase.from("in_use_units").delete().eq("id", id);
 
     if (error) {
+      alert(error.message);
       console.error(error.message);
       return;
     }
     await refreshAssigned();
+    await refreshSnapshots();
     await refreshLoads();
   }
 
@@ -556,6 +561,7 @@ export default function Schedule() {
               loadSheets={loadSheets}
               onDelete={
                 row.inUseUnitId &&
+                !row.isArchived &&
                 weekAcceptsNewAssignments(selectedWeek?.week_start_date ?? null)
                   ? () => handleDelete(row.inUseUnitId)
                   : undefined

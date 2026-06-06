@@ -97,11 +97,13 @@ export default function AssignedCard({
           </p>
         </div>
       </div>
-      <div
-        className={`flex justify-center ${embedded ? "mt-auto pt-4" : "mt-2"}`}
-      >
-        <ButtonDark onClick={onDelete} text="Vacate Unit" type="button" />
-      </div>
+      {typeof onDelete === "function" ? (
+        <div
+          className={`flex justify-center ${embedded ? "mt-auto pt-4" : "mt-2"}`}
+        >
+          <ButtonDark onClick={onDelete} text="Vacate Unit" type="button" />
+        </div>
+      ) : null}
     </div>
   );
 }
