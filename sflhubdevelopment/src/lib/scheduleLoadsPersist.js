@@ -1,4 +1,6 @@
 /** PostgREST / Postgres errors when schedule_loads.week_id is not in schedule_weeks. */
+import { weekIsComplete } from "@/lib/weekDates";
+
 export function isScheduleWeekFkError(message) {
   return /schedule_loads_week_id_fkey|week_id.*foreign key/i.test(
     message ?? "",
@@ -39,13 +41,16 @@ export const SCHEDULE_LOAD_RETURN_SELECT =
 /**
  * Update an existing schedule_loads row, or ensure scaffold rows then update/insert.
  * Avoids client inserts with a missing week_id (schedule_loads_week_id_fkey).
+ * Completed weeks skip ensure_schedule_loads_for_week so live-board units are not added retroactively.
  */
 export async function persistScheduleLoad(supabase, {
   scheduleLoadId,
   weekId,
+  weekStartISO = null,
   loadDate,
   loadSlotId,
   inUseUnitId,
+  scheduleAssignmentId = null,
   payload,
 }) {
   if (scheduleLoadId) {
@@ -61,17 +66,26 @@ export async function persistScheduleLoad(supabase, {
   const wk = weekId != null ? String(weekId).trim() : "";
   const slotId = loadSlotId != null ? String(loadSlotId).trim() : "";
   const unitId = inUseUnitId != null ? String(inUseUnitId).trim() : "";
+  const assignmentId =
+    scheduleAssignmentId != null ? String(scheduleAssignmentId).trim() : "";
   const dayIso = isoDateKey(loadDate);
 
-  if (!wk || !slotId || !dayIso || !unitId) {
+  if (!wk || !slotId || !dayIso) {
     return {
-      error: { message: "Missing week, day, slot, or unit — cannot save this load." },
+      error: { message: "Missing week, day, or slot — cannot save this load." },
+    };
+  }
+  if (!unitId && !assignmentId) {
+    return {
+      error: {
+        message: "Missing unit or assignment — cannot save this load.",
+      },
     };
   }
 
   const { data: weekRow, error: weekErr } = await supabase
     .from("schedule_weeks")
-    .select("id")
+    .select("id, week_start_date")
     .eq("id", wk)
     .maybeSingle();
 
@@ -84,27 +98,39 @@ export async function persistScheduleLoad(supabase, {
     };
   }
 
-  const { error: ensureErr } = await supabase.rpc(
-    "ensure_schedule_loads_for_week",
-    { p_week_id: wk },
+  const weekComplete = weekIsComplete(
+    weekStartISO ?? weekRow.week_start_date ?? null,
   );
-  if (
-    ensureErr &&
-    !/load_slot_id|in_use_unit_id|column .* does not exist|function .* does not exist/i.test(
-      ensureErr.message ?? "",
-    )
-  ) {
-    return { error: ensureErr };
+
+  if (!weekComplete) {
+    const { error: ensureErr } = await supabase.rpc(
+      "ensure_schedule_loads_for_week",
+      { p_week_id: wk },
+    );
+    if (
+      ensureErr &&
+      !/load_slot_id|in_use_unit_id|column .* does not exist|function .* does not exist/i.test(
+        ensureErr.message ?? "",
+      )
+    ) {
+      return { error: ensureErr };
+    }
   }
 
-  const { data: existing, error: findErr } = await supabase
+  let findQuery = supabase
     .from("schedule_loads")
     .select("id")
     .eq("week_id", wk)
     .eq("load_date", dayIso)
-    .eq("load_slot_id", slotId)
-    .eq("in_use_unit_id", unitId)
-    .maybeSingle();
+    .eq("load_slot_id", slotId);
+
+  if (unitId) {
+    findQuery = findQuery.eq("in_use_unit_id", unitId);
+  } else {
+    findQuery = findQuery.eq("schedule_assignment_id", assignmentId);
+  }
+
+  const { data: existing, error: findErr } = await findQuery.maybeSingle();
 
   if (findErr) return { error: findErr };
 
@@ -118,15 +144,18 @@ export async function persistScheduleLoad(supabase, {
     return { data, error };
   }
 
+  const insertRow = {
+    week_id: wk,
+    load_date: dayIso,
+    load_slot_id: slotId,
+    ...payload,
+  };
+  if (unitId) insertRow.in_use_unit_id = unitId;
+  if (assignmentId) insertRow.schedule_assignment_id = assignmentId;
+
   const { data, error } = await supabase
     .from("schedule_loads")
-    .insert({
-      week_id: wk,
-      load_date: dayIso,
-      load_slot_id: slotId,
-      in_use_unit_id: unitId,
-      ...payload,
-    })
+    .insert(insertRow)
     .select(SCHEDULE_LOAD_RETURN_SELECT)
     .single();
   return { data, error };

@@ -3,11 +3,7 @@
 import { useMemo } from "react";
 import AssignedCard from "./assignedCard";
 import UnitWeekLoadsGrid from "./unitWeekLoadsGrid";
-import {
-  addDays,
-  parseISODateLocal,
-  weekAllowsOnlyMtAndCompleted,
-} from "@/lib/weekDates";
+import { addDays, parseISODateLocal } from "@/lib/weekDates";
 import { formatLoadTotalCad } from "@/lib/loadTotal";
 import { formatWeekRevenuePerKm } from "@/lib/revenuePerKm";
 import {
@@ -55,7 +51,6 @@ export default function ScheduleRow({
   if (!driver || !unit) return null;
 
   const banner = formatWeekBanner(weekStartISO);
-  const weekComplete = weekAllowsOnlyMtAndCompleted(weekStartISO);
 
   const { weekTotalDisplay, weekRevenuePerKmDisplay } = useMemo(() => {
     const revenue = sumWeekUnitRevenue(loads);
@@ -90,9 +85,7 @@ export default function ScheduleRow({
             ufaPIN={unit.ufaPIN}
             weekTotalDisplay={weekTotalDisplay}
             weekRevenuePerKmDisplay={weekRevenuePerKmDisplay}
-            onDelete={
-              assignment.isArchived || weekComplete ? undefined : onDelete
-            }
+            onDelete={assignment.isArchived ? undefined : onDelete}
           />
           <div className="min-h-0 min-w-0 flex-1 overflow-x-auto overscroll-x-contain bg-white p-2 lg:rounded-tr-2xl">
             <UnitWeekLoadsGrid
@@ -100,6 +93,7 @@ export default function ScheduleRow({
               weekStartISO={weekStartISO}
               weekId={weekId}
               inUseUnitId={assignment.inUseUnitId}
+              scheduleAssignmentId={assignment.scheduleAssignmentId}
               loads={loads}
               allWeekLoads={allWeekLoads}
               assignableUnits={assignableUnits}

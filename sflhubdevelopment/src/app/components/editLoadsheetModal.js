@@ -35,7 +35,6 @@ import {
 } from "@/lib/scheduleLoadsPersist";
 import { useConfirm } from "@/context/confirmContext";
 import { saveChangesConfirmOptions } from "@/lib/confirmEdit";
-import { weekAllowsOnlyMtAndCompleted } from "@/lib/weekDates";
 
 function nullIfEmpty(s) {
   const t = String(s ?? "").trim();
@@ -60,8 +59,6 @@ export default function EditLoadsheetModal({
   scheduleInvoiced = undefined,
   scheduleLoadCategory = undefined,
   scheduleUsdCadRate = undefined,
-  /** Week containing this slot (for closed-week edit rules). */
-  weekStartISO = null,
   onSaved,
   /** Called after syncing this slot's schedule_loads row (refresh week loads) */
   onScheduleUpdated,
@@ -72,9 +69,6 @@ export default function EditLoadsheetModal({
 }) {
   const confirm = useConfirm();
   const supabase = useMemo(() => createClient(), []);
-  const slotLocked = Boolean(
-    scheduleLoadId && weekAllowsOnlyMtAndCompleted(weekStartISO),
-  );
   const [selectedId, setSelectedId] = useState("");
   const [loadNumber, setLoadNumber] = useState("");
   const [origin, setOrigin] = useState("");
@@ -325,46 +319,24 @@ export default function EditLoadsheetModal({
       const categoryStored = loadCategoryStorageValue(cat);
 
       if (scheduleLoadId) {
-        let schedulePayload;
-        if (slotLocked) {
-          const loadTotalDisplay = computeLoadTotalDisplay(
-            values.mt,
-            values.rate,
-            values.fsc,
-            {
-              loadCategory: cat,
-              usdCadRate: values.usdCadRate,
-              kms: values.kms,
-              flatRate: cat === "legacy_flat",
-            },
-          );
-          schedulePayload = {
-            mt: nullIfEmpty(values.mt),
-            load_total: nullIfEmpty(loadTotalDisplay),
-          };
-          if (overrides.includeInvoicedOnSchedule === true) {
-            schedulePayload.invoiced = values.invoiced;
-          }
-        } else {
-          schedulePayload = buildScheduleLoadPayload({
-            loadsheetId: selectedId,
-            loadNumber: values.loadNumber,
-            origin: values.origin,
-            endUser: values.endUser,
-            mt: values.mt,
-            rate: values.rate,
-            fsc: values.fsc,
-            broker: values.broker,
-            flatRate: cat === "legacy_flat",
-            loadCategory: cat,
-            usdCadRate: values.usdCadRate,
-            kms: values.kms,
-            categoryStored,
-            ...(overrides.includeInvoicedOnSchedule === true
-              ? { invoiced: values.invoiced }
-              : {}),
-          });
-        }
+        const schedulePayload = buildScheduleLoadPayload({
+          loadsheetId: selectedId,
+          loadNumber: values.loadNumber,
+          origin: values.origin,
+          endUser: values.endUser,
+          mt: values.mt,
+          rate: values.rate,
+          fsc: values.fsc,
+          broker: values.broker,
+          flatRate: cat === "legacy_flat",
+          loadCategory: cat,
+          usdCadRate: values.usdCadRate,
+          kms: values.kms,
+          categoryStored,
+          ...(overrides.includeInvoicedOnSchedule === true
+            ? { invoiced: values.invoiced }
+            : {}),
+        });
         const { data: scheduleRow, error: scheduleError } =
           await persistScheduleLoad(supabase, {
             scheduleLoadId,
@@ -424,7 +396,6 @@ export default function EditLoadsheetModal({
       usdCadRate,
       invoiced,
       scheduleLoadId,
-      slotLocked,
       supabase,
       onSaved,
       onScheduleUpdated,
@@ -432,8 +403,7 @@ export default function EditLoadsheetModal({
     ],
   );
 
-  const fieldLocked = (idSelected = selectedId) =>
-    !idSelected || slotLocked;
+  const fieldLocked = (idSelected = selectedId) => !idSelected;
 
   function reportSaveError(error) {
     const msg = error?.message ?? String(error);
@@ -471,7 +441,7 @@ export default function EditLoadsheetModal({
   );
 
   useEffect(() => {
-    if (!open || !selectedId || !liveSyncReadyRef.current || scheduleLoadId) {
+    if (!open || !selectedId || !liveSyncReadyRef.current) {
       return;
     }
 
@@ -497,13 +467,11 @@ export default function EditLoadsheetModal({
     loadCategory,
     usdCadRate,
     persistLive,
-    scheduleLoadId,
   ]);
 
   function handleLoadCategoryChange(next) {
-    if (slotLocked) return;
     setLoadCategory(next);
-    if (!selectedId || scheduleLoadId) return;
+    if (!selectedId) return;
     void (async () => {
       const { error } = await saveLoadsheet({ loadCategory: next });
       if (error) reportSaveError(error);
@@ -709,14 +677,12 @@ export default function EditLoadsheetModal({
           Edit load sheet
         </h2>
         <p className="mb-4 text-sm text-green-900/80">
-          {slotLocked
-            ? "This week is closed. You can only change MT and mark loads as completed."
-            : scheduleLoadId
-              ? "Edits this schedule slot only. The load sheet library template is not changed."
-              : "Updates the saved template in your library."}
+          {scheduleLoadId
+            ? "Edits this schedule slot only. The load sheet library template is not changed."
+            : "Updates the saved template in your library."}
         </p>
 
-        {scheduleLoadId && !slotLocked ? (
+        {scheduleLoadId ? (
           <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950">
             <p className="mb-2 font-medium">This slot</p>
             <button
@@ -743,7 +709,6 @@ export default function EditLoadsheetModal({
               value={selectedId}
               onChange={(e) => setSelectedId(e.target.value)}
               required
-              disabled={slotLocked}
             >
               <option value="">Select a load sheet…</option>
               {loadSheets.map((s) => {
@@ -778,7 +743,6 @@ export default function EditLoadsheetModal({
               onChange={(e) => setOrigin(e.target.value)}
               placeholder="Origin"
               disabled={fieldLocked()}
-              readOnly={slotLocked}
             />
           </label>
           <label className="block text-sm font-medium">
@@ -789,7 +753,6 @@ export default function EditLoadsheetModal({
               onChange={(e) => setEndUser(e.target.value)}
               placeholder="End user"
               disabled={fieldLocked()}
-              readOnly={slotLocked}
             />
           </label>
           <label className="block text-sm font-medium">
@@ -822,7 +785,6 @@ export default function EditLoadsheetModal({
                   onChange={(e) => setMt(e.target.value)}
                   placeholder="MT"
                   disabled={fieldLocked()}
-                  readOnly={slotLocked}
                 />
               </label>
             ) : null}
@@ -836,7 +798,6 @@ export default function EditLoadsheetModal({
                   fieldRules.rateIsFlatTotal ? "Total amount (CAD)" : "Rate"
                 }
                 disabled={fieldLocked()}
-                readOnly={slotLocked}
               />
             </label>
           </div>
@@ -858,7 +819,6 @@ export default function EditLoadsheetModal({
                 onChange={(e) => setFsc(e.target.value)}
                 placeholder="e.g. 150"
                 disabled={fieldLocked()}
-                readOnly={slotLocked}
               />
             </label>
           ) : null}
@@ -875,7 +835,6 @@ export default function EditLoadsheetModal({
                   onChange={(e) => setUsdCadRate(e.target.value)}
                   placeholder="e.g. 1.38"
                   disabled={fieldLocked()}
-                  readOnly={slotLocked}
                 />
               </label>
               <button
@@ -916,7 +875,6 @@ export default function EditLoadsheetModal({
               onChange={(e) => setKms(e.target.value)}
               placeholder="e.g. 450"
               disabled={fieldLocked()}
-              readOnly={slotLocked}
             />
           </label>
           <label className="block text-sm font-medium">
@@ -938,7 +896,6 @@ export default function EditLoadsheetModal({
               onChange={(e) => setBroker(e.target.value)}
               placeholder="Broker"
               disabled={fieldLocked()}
-              readOnly={slotLocked}
             />
           </label>
 
@@ -976,9 +933,7 @@ export default function EditLoadsheetModal({
               <ButtonDark
                 type="submit"
                 text={saving ? "Saving…" : "Done"}
-                disabled={
-                  !selectedId || (!slotLocked && loadSheets.length === 0)
-                }
+                disabled={!selectedId || loadSheets.length === 0}
               />
             </div>
           </div>

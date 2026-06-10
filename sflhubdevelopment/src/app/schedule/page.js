@@ -560,9 +560,7 @@ export default function Schedule() {
               loadSlots={loadSlots}
               loadSheets={loadSheets}
               onDelete={
-                row.inUseUnitId &&
-                !row.isArchived &&
-                weekAcceptsNewAssignments(selectedWeek?.week_start_date ?? null)
+                row.inUseUnitId && !row.isArchived
                   ? () => handleDelete(row.inUseUnitId)
                   : undefined
               }

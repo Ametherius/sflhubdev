@@ -47,15 +47,33 @@ function toggleId(list, id) {
   return list.includes(key) ? list.filter((x) => x !== key) : [...list, key];
 }
 
-function findScheduleRowForCell(weekLoads, dayIso, slotId, inUseUnitId) {
+function findScheduleRowForCell(
+  weekLoads,
+  dayIso,
+  slotId,
+  { inUseUnitId = null, scheduleAssignmentId = null } = {},
+) {
   const dk = isoDateKey(dayIso);
+  const unitId =
+    inUseUnitId != null && String(inUseUnitId).trim() !== ""
+      ? String(inUseUnitId)
+      : null;
+  const assignmentId =
+    scheduleAssignmentId != null && String(scheduleAssignmentId).trim() !== ""
+      ? String(scheduleAssignmentId)
+      : null;
   return (weekLoads ?? []).find((l) => {
     const sid = l.load_slot_id ?? l.load_slots?.id;
-    return (
-      isoDateKey(l.load_date) === dk &&
-      String(sid) === String(slotId) &&
-      String(l.in_use_unit_id ?? "") === String(inUseUnitId)
-    );
+    if (isoDateKey(l.load_date) !== dk || String(sid) !== String(slotId)) {
+      return false;
+    }
+    if (unitId) {
+      return String(l.in_use_unit_id ?? "") === unitId;
+    }
+    if (assignmentId) {
+      return String(l.schedule_assignment_id ?? "") === assignmentId;
+    }
+    return false;
   });
 }
 
@@ -69,7 +87,9 @@ export default function AssignLoadsheetModal({
   dayIso,
   dayTitle,
   weekId,
+  weekStartISO = null,
   inUseUnitId,
+  scheduleAssignmentId = null,
   loadSlots,
   loads,
   /** Full week schedule_loads (required for multi-driver assign). */
@@ -183,14 +203,17 @@ export default function AssignLoadsheetModal({
       }
     : null;
 
-  async function persistToCell(targetDayIso, targetUnitId, targetSlotId) {
+  async function persistToCell(
+    targetDayIso,
+    targetUnitId,
+    targetSlotId,
+    targetAssignmentId = null,
+  ) {
     const dk = isoDateKey(targetDayIso);
-    const row = findScheduleRowForCell(
-      weekLoadsForLookup,
-      dk,
-      targetSlotId,
-      targetUnitId,
-    );
+    const row = findScheduleRowForCell(weekLoadsForLookup, dk, targetSlotId, {
+      inUseUnitId: targetUnitId,
+      scheduleAssignmentId: targetAssignmentId,
+    });
 
     const calc = calcOptionsFromSheet(selectedSheet);
     const payload = buildScheduleLoadPayload({
@@ -212,9 +235,11 @@ export default function AssignLoadsheetModal({
     return persistScheduleLoad(supabase, {
       scheduleLoadId: row?.id ?? null,
       weekId,
+      weekStartISO,
       loadDate: dk,
       loadSlotId: targetSlotId,
       inUseUnitId: targetUnitId,
+      scheduleAssignmentId: targetAssignmentId,
       payload,
     });
   }
@@ -293,12 +318,17 @@ export default function AssignLoadsheetModal({
       return;
     }
 
-    if (!inUseUnitId || !slotId) {
+    if ((!inUseUnitId && !scheduleAssignmentId) || !slotId) {
       alert("Choose a load sheet and a slot.");
       return;
     }
     setSaving(true);
-    const { data, error } = await persistToCell(dayIso, inUseUnitId, slotId);
+    const { data, error } = await persistToCell(
+      dayIso,
+      inUseUnitId,
+      slotId,
+      scheduleAssignmentId,
+    );
     setSaving(false);
     if (error) {
       if (

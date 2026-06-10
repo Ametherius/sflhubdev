@@ -76,14 +76,6 @@ export function weekAcceptsNewAssignments(
   return !weekIsComplete(weekStartISO, todayISO);
 }
 
-/** Closed weeks: schedule slots may only change MT and completed (invoiced). */
-export function weekAllowsOnlyMtAndCompleted(
-  weekStartISO,
-  todayISO = toISODate(new Date()),
-) {
-  return weekIsComplete(weekStartISO, todayISO);
-}
-
 /** Id of the schedule week whose range contains dateISO (latest start if overlap). */
 export function findWeekIdContainingDate(weeks, dateISO = toISODate(new Date())) {
   let best = null;
