@@ -22,6 +22,9 @@ export function ConfirmProvider({ children }) {
     resolve?.(result);
   }, []);
 
+  const handleConfirm = useCallback(() => finish(true), [finish]);
+  const handleCancel = useCallback(() => finish(false), [finish]);
+
   const confirm = useCallback((options = {}) => {
     return new Promise((resolve) => {
       resolveRef.current = resolve;
@@ -45,8 +48,8 @@ export function ConfirmProvider({ children }) {
         confirmLabel={dialog?.confirmLabel}
         cancelLabel={dialog?.cancelLabel}
         variant={dialog?.variant}
-        onConfirm={() => finish(true)}
-        onCancel={() => finish(false)}
+        onConfirm={handleConfirm}
+        onCancel={handleCancel}
       />
     </ConfirmContext.Provider>
   );

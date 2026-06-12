@@ -5,7 +5,7 @@ import AssignedCard from "./assignedCard";
 import UnitWeekLoadsGrid from "./unitWeekLoadsGrid";
 import { addDays, parseISODateLocal } from "@/lib/weekDates";
 import { formatLoadTotalCad } from "@/lib/loadTotal";
-import { formatWeekRevenuePerKm } from "@/lib/revenuePerKm";
+import { formatWeekRevenuePerKm, kmToMiles } from "@/lib/revenuePerKm";
 import {
   sumWeekUnitKms,
   sumWeekUnitRevenue,
@@ -55,9 +55,10 @@ export default function ScheduleRow({
   const { weekTotalDisplay, weekRevenuePerKmDisplay } = useMemo(() => {
     const revenue = sumWeekUnitRevenue(loads);
     const kms = sumWeekUnitKms(loads);
+    const miles = kmToMiles(kms)
     return {
       weekTotalDisplay: formatLoadTotalCad(String(revenue)) || "$0.00",
-      weekRevenuePerKmDisplay: formatWeekRevenuePerKm(revenue, kms),
+      weekRevenuePerKmDisplay: formatWeekRevenuePerKm(revenue, miles),
     };
   }, [loads]);
 
@@ -85,7 +86,7 @@ export default function ScheduleRow({
             ufaPIN={unit.ufaPIN}
             weekTotalDisplay={weekTotalDisplay}
             weekRevenuePerKmDisplay={weekRevenuePerKmDisplay}
-            onDelete={assignment.isArchived ? undefined : onDelete}
+            onDelete={onDelete}
           />
           <div className="min-h-0 min-w-0 flex-1 overflow-x-auto overscroll-x-contain bg-white p-2 lg:rounded-tr-2xl">
             <UnitWeekLoadsGrid

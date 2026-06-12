@@ -32,7 +32,10 @@ import EditLoadsheetModal from "../components/editLoadsheetModal";
 import { insertLoadsheetCopy } from "@/lib/loadsheetCopy";
 import { useWeekLoads } from "@/hooks/useWeekLoads";
 import { useWeekAssignments } from "@/hooks/useWeekAssignments";
-import { loadBelongsToAssignment } from "@/lib/scheduleAssignmentDisplay";
+import {
+  loadBelongsToAssignment,
+  resolveVacateTarget,
+} from "@/lib/scheduleAssignmentDisplay";
 import { useLoadSlots } from "@/hooks/useLoadSlots";
 import { useLoadSheets } from "@/hooks/useLoadSheets";
 import ScheduleRow from "../components/scheduleRow";
@@ -43,11 +46,13 @@ import CattleLoadsheet from "../components/cattleLoadsheet";
 import {
   resolveDefaultScheduleWeekId,
   weekAcceptsNewAssignments,
+  weekIsComplete,
 } from "@/lib/weekDates";
 import { useConfirm } from "@/context/confirmContext";
 import {
   deleteDriverConfirmOptions,
   deleteLoadsheetConfirmOptions,
+  vacateEmptyScheduleConfirmOptions,
   vacateUnitConfirmOptions,
 } from "@/lib/confirmEdit";
 
@@ -215,10 +220,99 @@ export default function Schedule() {
     refreshLoads,
   ]);
 
-  async function handleDelete(id) {
-    if (!(await confirm(vacateUnitConfirmOptions()))) return;
+  function vacateHandlerForRow(row) {
+    const target = resolveVacateTarget(
+      row,
+      loads,
+      assigned,
+      resolvedWeekId,
+    );
+    if (!target) return undefined;
+    const weekStart = selectedWeek?.week_start_date ?? null;
+    if (target.type === "live" && !target.scheduleOnly) {
+      return () => void handleVacateUnit(target.inUseUnitId, weekStart);
+    }
+    return () => void handleVacateEmptySchedule(target, weekStart);
+  }
 
-    const { error } = await supabase.from("in_use_units").delete().eq("id", id);
+  async function handleVacateEmptySchedule(target, weekStartISO = null) {
+    if (!target?.weekId) return;
+    const viewingPastWeek = weekIsComplete(weekStartISO);
+    if (!(await confirm(vacateEmptyScheduleConfirmOptions({ viewingPastWeek })))) {
+      return;
+    }
+
+    if (target.type === "live") {
+      const unitId = target.inUseUnitId;
+      const { error: loadsErr } = await supabase
+        .from("schedule_loads")
+        .delete()
+        .eq("week_id", target.weekId)
+        .eq("in_use_unit_id", unitId);
+      if (loadsErr) {
+        alert(loadsErr.message);
+        return;
+      }
+
+      const { error: assignErr } = await supabase
+        .from("schedule_assignments")
+        .delete()
+        .eq("week_id", target.weekId)
+        .eq("in_use_unit_id", unitId);
+      if (assignErr && !/does not exist/i.test(assignErr.message ?? "")) {
+        alert(assignErr.message);
+        return;
+      }
+
+      const { error: unitErr } = await supabase
+        .from("in_use_units")
+        .delete()
+        .eq("id", unitId);
+      if (unitErr) {
+        alert(unitErr.message);
+        return;
+      }
+
+      await refreshAssigned();
+      await refreshSnapshots();
+      await refreshLoads();
+      return;
+    }
+
+    const assignmentId = target.scheduleAssignmentId;
+    const { error: loadsErr } = await supabase
+      .from("schedule_loads")
+      .delete()
+      .eq("schedule_assignment_id", assignmentId);
+    if (loadsErr) {
+      alert(loadsErr.message);
+      return;
+    }
+
+    const { error: assignErr } = await supabase
+      .from("schedule_assignments")
+      .delete()
+      .eq("id", assignmentId);
+    if (assignErr) {
+      alert(assignErr.message);
+      return;
+    }
+
+    await refreshSnapshots();
+    await refreshLoads();
+  }
+
+  async function handleVacateUnit(inUseUnitId, weekStartISO = null) {
+    if (inUseUnitId == null) return;
+    const viewingPastWeek = weekIsComplete(weekStartISO);
+    if (!(await confirm(vacateUnitConfirmOptions({ viewingPastWeek })))) {
+      return;
+    }
+
+    const { error } = await supabase
+      .from("in_use_units")
+      .delete()
+      .eq("id", inUseUnitId);
 
     if (error) {
       alert(error.message);
@@ -559,11 +653,7 @@ export default function Schedule() {
               assignableUnits={assignableUnits}
               loadSlots={loadSlots}
               loadSheets={loadSheets}
-              onDelete={
-                row.inUseUnitId && !row.isArchived
-                  ? () => handleDelete(row.inUseUnitId)
-                  : undefined
-              }
+              onDelete={vacateHandlerForRow(row)}
               onLoadsUpdated={refreshLoads}
               onLoadPatched={mergeScheduleLoad}
               onLoadSheetsUpdated={refreshLoadSheets}

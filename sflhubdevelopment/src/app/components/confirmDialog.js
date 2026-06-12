@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import ButtonDark from "./buttonDark";
 
 /**
@@ -15,6 +16,27 @@ export default function ConfirmDialog({
   onConfirm,
   onCancel,
 }) {
+  const cancelRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    cancelRef.current?.focus();
+
+    function onKeyDown(ev) {
+      if (ev.key === "Escape") {
+        ev.preventDefault();
+        onCancel?.();
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open, onCancel]);
+
   if (!open) return null;
 
   const confirmBtnClass =
@@ -47,6 +69,7 @@ export default function ConfirmDialog({
         </p>
         <div className="flex flex-wrap justify-end gap-2">
           <button
+            ref={cancelRef}
             type="button"
             className="rounded-full px-4 py-2 text-sm font-semibold text-green-950 hover:bg-green-950/10"
             onClick={onCancel}

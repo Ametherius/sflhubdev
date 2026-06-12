@@ -44,7 +44,7 @@ export default function AssignedCard({
             <span className="tabular-nums">{weekTotalDisplay || "$0.00"}</span>
           </p>
           <p className="text-xs font-medium text-green-950/85">
-            Revenue/km:{" "}
+            Revenue/mi:{" "}
             <span className="tabular-nums">
               {weekRevenuePerKmDisplay || "—"}
             </span>
@@ -101,7 +101,11 @@ export default function AssignedCard({
         <div
           className={`flex justify-center ${embedded ? "mt-auto pt-4" : "mt-2"}`}
         >
-          <ButtonDark onClick={onDelete} text="Vacate Unit" type="button" />
+          <ButtonDark
+            onClick={() => void onDelete()}
+            text="Vacate Unit"
+            type="button"
+          />
         </div>
       ) : null}
     </div>

@@ -111,7 +111,19 @@ export function useWeekAssignments(
 
         const liveId =
           snap.in_use_unit_id != null ? String(snap.in_use_unit_id) : null;
-        const live = liveId ? liveById.get(liveId) : null;
+        let live = liveId ? liveById.get(liveId) : null;
+        if (!live?.driver || !live?.unit) {
+          live =
+            (liveAssigned ?? []).find(
+              (row) =>
+                row?.driver &&
+                row?.unit &&
+                snap.driverid != null &&
+                snap.unitid != null &&
+                String(row.driverid) === String(snap.driverid) &&
+                String(row.unitid) === String(snap.unitid),
+            ) ?? null;
+        }
         if (live?.driver && live?.unit) {
           const display = assignmentFromLive(live, String(snap.id));
           if (display) rows.push(display);

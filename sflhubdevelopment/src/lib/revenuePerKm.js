@@ -32,7 +32,7 @@ export function computeRevenuePerKm(revenue, kms) {
 
 export function formatRevenuePerKmCad(revenuePerKm) {
   if (revenuePerKm == null || !Number.isFinite(revenuePerKm)) return "";
-  return `${CAD_PER_KM_FORMAT.format(revenuePerKm)}/km`;
+  return `${CAD_PER_KM_FORMAT.format(revenuePerKm)}/mi`;
 }
 
 /** Revenue from a loadsheets library row (MT/rate/FSC/flat rate). */
@@ -58,4 +58,9 @@ export function formatWeekRevenuePerKm(totalRevenue, totalKms) {
   const perKm = computeRevenuePerKm(totalRevenue, totalKms);
   if (perKm == null) return "—";
   return formatRevenuePerKmCad(perKm);
+}
+
+export function kmToMiles(kms) {
+  const kmsToMiles = kms * 0.621371;
+  return kmsToMiles;
 }
