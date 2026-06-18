@@ -1,80 +1,19 @@
-function strHasValue(v) {
-  return v != null && String(v).trim() !== "";
-}
-
-/** True when a schedule_loads row has user-entered or assigned content (not empty scaffold). */
-export function scheduleLoadHasData(load) {
-  if (!load) return false;
-  if (load.invoiced) return true;
-  return (
-    strHasValue(load.origin) ||
-    strHasValue(load.end_user) ||
-    strHasValue(load.mt) ||
-    strHasValue(load.rate) ||
-    strHasValue(load.fsc) ||
-    strHasValue(load.load_note) ||
-    strHasValue(load.loadsheet_id) ||
-    strHasValue(load.load_number) ||
-    strHasValue(load.load_total) ||
-    strHasValue(load.kms)
-  );
-}
-
-/** True when any load on this assignment row has schedule content. */
-export function assignmentHasScheduleData(assignment, loads) {
-  return (loads ?? []).some(
-    (load) =>
-      loadBelongsToAssignment(load, assignment) && scheduleLoadHasData(load),
-  );
-}
-
-/**
- * Vacate target for a schedule row.
- * - live + scheduleOnly: empty schedule on the live board — clear this week and remove assignment.
- * - live + !scheduleOnly: full vacate (unit has load data).
- * - schedule: archived empty row — remove schedule snapshot only.
- */
-export function resolveVacateTarget(
-  assignment,
-  loads,
-  liveAssigned,
-  weekId,
-) {
-  if (!assignment || !weekId) return null;
-  const empty = !assignmentHasScheduleData(assignment, loads);
-  const liveId = resolveVacatableInUseUnitId(assignment, liveAssigned);
-
-  if (liveId) {
-    return {
-      type: "live",
-      inUseUnitId: liveId,
-      weekId,
-      scheduleOnly: empty,
-    };
-  }
-
-  if (empty && assignment.scheduleAssignmentId) {
-    return {
-      type: "schedule",
-      scheduleAssignmentId: assignment.scheduleAssignmentId,
-      weekId,
-    };
-  }
-
-  return null;
-}
-
 /** Map schedule_assignments row → shape expected by ScheduleRow / AssignedCard. */
 export function assignmentFromSnapshot(row, { liveIds = null } = {}) {
   if (!row) return null;
   const inUseUnitId = row.in_use_unit_id ?? null;
+  const isWeekOnly = row.week_only === true;
   const isArchived =
-    inUseUnitId == null ||
-    (liveIds != null && !liveIds.has(String(inUseUnitId)));
+    !isWeekOnly &&
+    (inUseUnitId == null ||
+      (liveIds != null &&
+        inUseUnitId != null &&
+        !liveIds.has(String(inUseUnitId))));
   return {
     id: row.id,
     scheduleAssignmentId: row.id,
     inUseUnitId,
+    isWeekOnly,
     isArchived,
     driver: {
       id: row.driverid,
@@ -103,40 +42,11 @@ export function assignmentFromLive(inUseRow, scheduleAssignmentId = null) {
     id: inUseRow.id,
     scheduleAssignmentId,
     inUseUnitId: inUseRow.id,
+    isWeekOnly: false,
     isArchived: false,
     driver: inUseRow.driver,
     unit: inUseRow.unit,
   };
-}
-
-function liveAssignedRowById(liveAssigned, id) {
-  if (id == null || String(id).trim() === "") return null;
-  const key = String(id);
-  const row = (liveAssigned ?? []).find(
-    (entry) => entry?.id != null && String(entry.id) === key,
-  );
-  if (!row?.driver || !row?.unit) return null;
-  return row;
-}
-
-/** Live-board id when this row can be vacated (unit still on in_use_units). */
-export function resolveVacatableInUseUnitId(assignment, liveAssigned = []) {
-  const direct = assignment?.inUseUnitId;
-  const byId = liveAssignedRowById(liveAssigned, direct);
-  if (byId) return byId.id;
-
-  const driverId = assignment?.driver?.id;
-  const unitId = assignment?.unit?.id;
-  if (driverId == null || unitId == null) return null;
-
-  const byDriverUnit = (liveAssigned ?? []).find(
-    (row) =>
-      row?.driver &&
-      row?.unit &&
-      String(row.driverid ?? row.driver?.id) === String(driverId) &&
-      String(row.unitid ?? row.unit?.id) === String(unitId),
-  );
-  return byDriverUnit?.id ?? null;
 }
 
 export function loadBelongsToAssignment(load, assignment) {

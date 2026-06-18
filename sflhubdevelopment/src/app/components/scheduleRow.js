@@ -86,7 +86,7 @@ export default function ScheduleRow({
             ufaPIN={unit.ufaPIN}
             weekTotalDisplay={weekTotalDisplay}
             weekRevenuePerKmDisplay={weekRevenuePerKmDisplay}
-            onDelete={onDelete}
+            onDelete={assignment.isArchived ? undefined : onDelete}
           />
           <div className="min-h-0 min-w-0 flex-1 overflow-x-auto overscroll-x-contain bg-white p-2 lg:rounded-tr-2xl">
             <UnitWeekLoadsGrid

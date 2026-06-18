@@ -11,7 +11,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePostgresRealtime } from "./usePostgresRealtime";
 
 const ASSIGNMENT_SELECT =
-  "id, week_id, in_use_unit_id, driverid, unitid, driver_name, driver_phone, driver_user, driver_pass, driver_pin, driver_division, unit_label, unit_petro, unit_petro_pin, unit_ufa, unit_ufa_pin";
+  "id, week_id, in_use_unit_id, week_only, driverid, unitid, driver_name, driver_phone, driver_user, driver_pass, driver_pin, driver_division, unit_label, unit_petro, unit_petro_pin, unit_ufa, unit_ufa_pin";
 
 /**
  * Rows to render on the schedule for one week: live board units + archived snapshots.
@@ -111,19 +111,7 @@ export function useWeekAssignments(
 
         const liveId =
           snap.in_use_unit_id != null ? String(snap.in_use_unit_id) : null;
-        let live = liveId ? liveById.get(liveId) : null;
-        if (!live?.driver || !live?.unit) {
-          live =
-            (liveAssigned ?? []).find(
-              (row) =>
-                row?.driver &&
-                row?.unit &&
-                snap.driverid != null &&
-                snap.unitid != null &&
-                String(row.driverid) === String(snap.driverid) &&
-                String(row.unitid) === String(snap.unitid),
-            ) ?? null;
-        }
+        const live = liveId ? liveById.get(liveId) : null;
         if (live?.driver && live?.unit) {
           const display = assignmentFromLive(live, String(snap.id));
           if (display) rows.push(display);

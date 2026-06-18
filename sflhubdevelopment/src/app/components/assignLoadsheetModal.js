@@ -17,6 +17,7 @@ import {
   persistScheduleLoad,
   scheduleLoadErrorMessage,
 } from "@/lib/scheduleLoadsPersist";
+import { assignableUnitRowKey } from "@/lib/scheduleWeekAssign";
 const LOADS_PER_DAY = 3;
 
 function isoDateKey(raw) {
@@ -175,7 +176,7 @@ export default function AssignLoadsheetModal({
   useEffect(() => {
     if (!multiAssignMode) return;
     const valid = new Set(
-      filteredAssignableUnits.map((u) => String(u.inUseUnitId)),
+      filteredAssignableUnits.map((u) => assignableUnitRowKey(u)),
     );
     setSelectedUnitIds((prev) => prev.filter((id) => valid.has(id)));
   }, [multiAssignMode, filteredAssignableUnits, loadsheetId]);
@@ -273,9 +274,17 @@ export default function AssignLoadsheetModal({
       let lastError = null;
 
       for (const dayKey of selectedDayIsos) {
-        for (const uid of selectedUnitIds) {
+        for (const rowKey of selectedUnitIds) {
+          const unitRow = filteredAssignableUnits.find(
+            (u) => assignableUnitRowKey(u) === rowKey,
+          );
           for (const sid of selectedSlotIds) {
-            const { data, error } = await persistToCell(dayKey, uid, sid);
+            const { data, error } = await persistToCell(
+              dayKey,
+              unitRow?.inUseUnitId ?? null,
+              sid,
+              unitRow?.scheduleAssignmentId ?? null,
+            );
             if (error) {
               lastError = error;
               break;
@@ -504,7 +513,7 @@ export default function AssignLoadsheetModal({
                       className="text-xs font-semibold text-green-900 underline hover:no-underline"
                       onClick={() => {
                         const all = filteredAssignableUnits.map((u) =>
-                          String(u.inUseUnitId),
+                          assignableUnitRowKey(u),
                         );
                         const allSelected =
                           all.length > 0 &&
@@ -513,7 +522,7 @@ export default function AssignLoadsheetModal({
                       }}
                     >
                       {filteredAssignableUnits.every((u) =>
-                        selectedUnitIds.includes(String(u.inUseUnitId)),
+                        selectedUnitIds.includes(assignableUnitRowKey(u)),
                       )
                         ? "Clear all"
                         : "Select all"}
@@ -534,7 +543,7 @@ export default function AssignLoadsheetModal({
                 ) : (
                   <div className="max-h-40 space-y-0.5 overflow-y-auto">
                     {filteredAssignableUnits.map((u) => {
-                      const id = String(u.inUseUnitId);
+                      const id = assignableUnitRowKey(u);
                       return (
                         <label key={id} className={checkRowClass}>
                           <input

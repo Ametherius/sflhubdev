@@ -32,27 +32,23 @@ import EditLoadsheetModal from "../components/editLoadsheetModal";
 import { insertLoadsheetCopy } from "@/lib/loadsheetCopy";
 import { useWeekLoads } from "@/hooks/useWeekLoads";
 import { useWeekAssignments } from "@/hooks/useWeekAssignments";
-import {
-  loadBelongsToAssignment,
-  resolveVacateTarget,
-} from "@/lib/scheduleAssignmentDisplay";
+import { loadBelongsToAssignment } from "@/lib/scheduleAssignmentDisplay";
 import { useLoadSlots } from "@/hooks/useLoadSlots";
 import { useLoadSheets } from "@/hooks/useLoadSheets";
 import ScheduleRow from "../components/scheduleRow";
 import { isScheduleWeekFkError } from "@/lib/scheduleLoadsPersist";
 import AssignedMenu from "../components/assignedMenu";
 import LoadsheetMenu from "../components/loadsheetMenu";
-import CattleLoadsheet from "../components/cattleLoadsheet";
 import {
   resolveDefaultScheduleWeekId,
   weekAcceptsNewAssignments,
   weekIsComplete,
 } from "@/lib/weekDates";
+import { assignDriverUnitToWeeks } from "@/lib/scheduleWeekAssign";
 import { useConfirm } from "@/context/confirmContext";
 import {
   deleteDriverConfirmOptions,
   deleteLoadsheetConfirmOptions,
-  vacateEmptyScheduleConfirmOptions,
   vacateUnitConfirmOptions,
 } from "@/lib/confirmEdit";
 
@@ -78,6 +74,9 @@ export default function Schedule() {
   const [searchUnits, setSearchUnits] = useState("");
   const [searchAssigned, setSearchAssigned] = useState("");
   const [assignModal, setAssignModal] = useState(false);
+  const [assignWeekIds, setAssignWeekIds] = useState([]);
+  const [addToLiveBoard, setAddToLiveBoard] = useState(true);
+  const [assignSaving, setAssignSaving] = useState(false);
   const [driverValue, setDriverValue] = useState("");
   const [unitValue, setUnitValue] = useState("");
   const [editDriver, setEditDriver] = useState(null);
@@ -164,14 +163,48 @@ export default function Schedule() {
   const assignableUnits = useMemo(
     () =>
       (weekDisplayRows ?? [])
-        .filter((r) => r.inUseUnitId != null && !r.isArchived)
+        .filter(
+          (r) =>
+            !r.isArchived && (r.inUseUnitId != null || r.isWeekOnly),
+        )
         .map((r) => ({
-          inUseUnitId: r.inUseUnitId,
+          rowKey: r.inUseUnitId
+            ? String(r.inUseUnitId)
+            : `sa:${r.scheduleAssignmentId}`,
+          inUseUnitId: r.inUseUnitId ?? null,
+          scheduleAssignmentId: r.scheduleAssignmentId ?? null,
           label: `${r.driver?.name ?? "Driver"} · ${r.unit?.unit ?? "Unit"}`,
           division: r.driver?.division ?? "",
         })),
     [weekDisplayRows],
   );
+
+  const sortedScheduleWeeks = useMemo(
+    () =>
+      [...(weeks ?? [])].sort((a, b) =>
+        String(b.week_start_date).localeCompare(String(a.week_start_date)),
+      ),
+    [weeks],
+  );
+
+  const assignWeekSelectionPastOnly = useMemo(() => {
+    if (!assignWeekIds.length) return false;
+    const weekById = new Map(weeks.map((w) => [String(w.id), w]));
+    return assignWeekIds.every((id) => {
+      const w = weekById.get(String(id));
+      return weekIsComplete(w?.week_start_date ?? null);
+    });
+  }, [assignWeekIds, weeks]);
+
+  useEffect(() => {
+    if (!assignModal || !resolvedWeekId) return;
+    queueMicrotask(() => {
+      setAssignWeekIds([resolvedWeekId]);
+      setAddToLiveBoard(
+        !weekIsComplete(selectedWeek?.week_start_date ?? null),
+      );
+    });
+  }, [assignModal, resolvedWeekId, selectedWeek?.week_start_date]);
 
   const assignmentIdsKey = useMemo(
     () =>
@@ -220,94 +253,9 @@ export default function Schedule() {
     refreshLoads,
   ]);
 
-  function vacateHandlerForRow(row) {
-    const target = resolveVacateTarget(
-      row,
-      loads,
-      assigned,
-      resolvedWeekId,
-    );
-    if (!target) return undefined;
-    const weekStart = selectedWeek?.week_start_date ?? null;
-    if (target.type === "live" && !target.scheduleOnly) {
-      return () => void handleVacateUnit(target.inUseUnitId, weekStart);
-    }
-    return () => void handleVacateEmptySchedule(target, weekStart);
-  }
-
-  async function handleVacateEmptySchedule(target, weekStartISO = null) {
-    if (!target?.weekId) return;
-    const viewingPastWeek = weekIsComplete(weekStartISO);
-    if (!(await confirm(vacateEmptyScheduleConfirmOptions({ viewingPastWeek })))) {
-      return;
-    }
-
-    if (target.type === "live") {
-      const unitId = target.inUseUnitId;
-      const { error: loadsErr } = await supabase
-        .from("schedule_loads")
-        .delete()
-        .eq("week_id", target.weekId)
-        .eq("in_use_unit_id", unitId);
-      if (loadsErr) {
-        alert(loadsErr.message);
-        return;
-      }
-
-      const { error: assignErr } = await supabase
-        .from("schedule_assignments")
-        .delete()
-        .eq("week_id", target.weekId)
-        .eq("in_use_unit_id", unitId);
-      if (assignErr && !/does not exist/i.test(assignErr.message ?? "")) {
-        alert(assignErr.message);
-        return;
-      }
-
-      const { error: unitErr } = await supabase
-        .from("in_use_units")
-        .delete()
-        .eq("id", unitId);
-      if (unitErr) {
-        alert(unitErr.message);
-        return;
-      }
-
-      await refreshAssigned();
-      await refreshSnapshots();
-      await refreshLoads();
-      return;
-    }
-
-    const assignmentId = target.scheduleAssignmentId;
-    const { error: loadsErr } = await supabase
-      .from("schedule_loads")
-      .delete()
-      .eq("schedule_assignment_id", assignmentId);
-    if (loadsErr) {
-      alert(loadsErr.message);
-      return;
-    }
-
-    const { error: assignErr } = await supabase
-      .from("schedule_assignments")
-      .delete()
-      .eq("id", assignmentId);
-    if (assignErr) {
-      alert(assignErr.message);
-      return;
-    }
-
-    await refreshSnapshots();
-    await refreshLoads();
-  }
-
-  async function handleVacateUnit(inUseUnitId, weekStartISO = null) {
+  async function handleDelete(inUseUnitId) {
     if (inUseUnitId == null) return;
-    const viewingPastWeek = weekIsComplete(weekStartISO);
-    if (!(await confirm(vacateUnitConfirmOptions({ viewingPastWeek })))) {
-      return;
-    }
+    if (!(await confirm(vacateUnitConfirmOptions()))) return;
 
     const { error } = await supabase
       .from("in_use_units")
@@ -392,10 +340,23 @@ export default function Schedule() {
     setAssignedMenu(!assignedMenu);
   }
 
+  function toggleAssignWeek(weekId) {
+    const key = String(weekId);
+    setAssignWeekIds((prev) =>
+      prev.some((id) => String(id) === key)
+        ? prev.filter((id) => String(id) !== key)
+        : [...prev, weekId],
+    );
+  }
+
   async function createAssigned() {
     if (!activeUser) return;
     if (!driverValue.trim() || !unitValue.trim()) {
       alert("Please select both a driver and a unit.");
+      return;
+    }
+    if (!assignWeekIds.length) {
+      alert("Select at least one week.");
       return;
     }
 
@@ -415,16 +376,34 @@ export default function Schedule() {
     }
     const selectedUnitID = selectedUnit.id;
 
-    const { error } = await supabase.from("in_use_units").insert({
-      driverid: selectedDriverID,
-      unitid: selectedUnitID,
+    setAssignSaving(true);
+    const { error } = await assignDriverUnitToWeeks(supabase, {
+      driverId: selectedDriverID,
+      unitId: selectedUnitID,
+      weekIds: assignWeekIds,
+      weeks,
+      addToLiveBoard: assignWeekSelectionPastOnly ? false : addToLiveBoard,
     });
+    setAssignSaving(false);
 
     if (error) {
-      console.error(error.message);
+      const msg = error.message ?? "";
+      if (/week_only|create_schedule_week_assignment|function .* does not exist/i.test(msg)) {
+        alert(
+          "Apply the latest Supabase migration (week-only schedule assignments), then try again.",
+        );
+      } else {
+        alert(msg || "Could not assign unit.");
+      }
+      console.error(msg);
       return;
     }
-    await refreshAssigned();
+
+    if (!assignWeekSelectionPastOnly && addToLiveBoard) {
+      await refreshAssigned();
+    }
+    await refreshSnapshots();
+    await refreshLoads();
     setDriverValue("");
     setUnitValue("");
     setAssignModal(false);
@@ -476,7 +455,7 @@ export default function Schedule() {
       </div>
 
       <Modal
-        className={`fixed p-6 z-50 rounded-lg bottom-0 right-0 ${assignModal ? "" : "hidden"}`}
+        className={`fixed p-6 z-50 rounded-lg bottom-0 right-0 max-w-lg ${assignModal ? "" : "hidden"}`}
       >
         <button
           type="button"
@@ -485,8 +464,8 @@ export default function Schedule() {
         >
           <FaTimes />
         </button>
-        <div className="flex flex-col">
-          <div className="flex">
+        <div className="flex flex-col gap-3 pr-8">
+          <div className="flex flex-wrap">
             <FormSelect
               label="Select Driver"
               placeholder="Select a driver…"
@@ -502,8 +481,76 @@ export default function Schedule() {
               onChange={(e) => setUnitValue(e.target.value)}
             />
           </div>
+
+          <div className="rounded-lg border border-green-950/20 bg-green-950/5 p-3">
+            <p className="mb-2 text-sm font-semibold text-green-950">
+              Schedule weeks
+            </p>
+            {sortedScheduleWeeks.length === 0 ? (
+              <p className="text-sm text-green-900/80">Create a week first.</p>
+            ) : (
+              <div className="max-h-36 space-y-1 overflow-y-auto">
+                {sortedScheduleWeeks.map((w) => {
+                  const past = weekIsComplete(w.week_start_date);
+                  const checked = assignWeekIds.some(
+                    (id) => String(id) === String(w.id),
+                  );
+                  return (
+                    <label
+                      key={w.id}
+                      className="flex cursor-pointer items-center gap-2 text-sm text-green-950"
+                    >
+                      <input
+                        type="checkbox"
+                        className="size-4 accent-green-950"
+                        checked={checked}
+                        onChange={() => toggleAssignWeek(w.id)}
+                      />
+                      <span>
+                        Week of{" "}
+                        {new Date(
+                          `${w.week_start_date}T12:00:00`,
+                        ).toLocaleDateString(undefined, {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })}
+                        {past ? " (past)" : ""}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+            {assignWeekSelectionPastOnly ? (
+              <p className="mt-2 text-xs text-green-900/75">
+                Past weeks are assigned only to the selected week — not the live
+                board.
+              </p>
+            ) : null}
+          </div>
+
+          {!assignWeekSelectionPastOnly ? (
+            <label className="flex cursor-pointer items-start gap-2 text-sm text-green-950">
+              <input
+                type="checkbox"
+                className="mt-0.5 size-4 accent-green-950"
+                checked={addToLiveBoard}
+                onChange={(e) => setAddToLiveBoard(e.target.checked)}
+              />
+              <span>
+                <span className="font-semibold">Add to live assigned board</span>
+                <span className="block text-xs text-green-900/75">
+                  {addToLiveBoard
+                    ? "Unit appears on the assigned board and the selected open week(s)."
+                    : "Unit appears only on the selected week(s), not the live board."}
+                </span>
+              </span>
+            </label>
+          ) : null}
+
           <ButtonDark
-            text="Assign Unit"
+            text={assignSaving ? "Assigning…" : "Assign Unit"}
             type="button"
             onClick={createAssigned}
           />
@@ -653,7 +700,11 @@ export default function Schedule() {
               assignableUnits={assignableUnits}
               loadSlots={loadSlots}
               loadSheets={loadSheets}
-              onDelete={vacateHandlerForRow(row)}
+              onDelete={
+                row.inUseUnitId && !row.isArchived
+                  ? () => void handleDelete(row.inUseUnitId)
+                  : undefined
+              }
               onLoadsUpdated={refreshLoads}
               onLoadPatched={mergeScheduleLoad}
               onLoadSheetsUpdated={refreshLoadSheets}

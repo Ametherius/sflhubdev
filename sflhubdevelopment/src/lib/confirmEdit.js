@@ -83,26 +83,11 @@ export function deleteDriverConfirmOptions() {
   };
 }
 
-export function vacateEmptyScheduleConfirmOptions({ viewingPastWeek = false } = {}) {
-  const message = viewingPastWeek
-    ? "Remove this empty unit from this week’s schedule? The archived row and blank load slots will be deleted."
-    : "Remove this empty unit from the schedule and live board? No load data will be kept for this assignment.";
-  return {
-    title: "Vacate empty schedule?",
-    message,
-    confirmLabel: "Vacate schedule",
-    cancelLabel: "Cancel",
-    variant: "danger",
-  };
-}
-
-export function vacateUnitConfirmOptions({ viewingPastWeek = false } = {}) {
-  const message = viewingPastWeek
-    ? "Remove this driver and unit from the live board? This week’s schedule will be archived for history. Open weeks will have their schedule data cleared."
-    : "Remove this driver and unit from the live board? Schedule load data for the current and future weeks will be deleted. Past weeks are kept for history.";
+export function vacateUnitConfirmOptions() {
   return {
     title: "Vacate unit?",
-    message,
+    message:
+      "Remove this driver and unit from the live board? Schedule load data for the current and future weeks will be deleted. Past weeks are kept for history.",
     confirmLabel: "Vacate",
     cancelLabel: "Cancel",
     variant: "danger",
