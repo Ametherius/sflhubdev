@@ -13,6 +13,7 @@ export default function AssignedCard({
   ufa,
   ufaPIN,
   onDelete,
+  deleteLabel = "Vacate Unit",
   /** CAD week revenue total for this unit (embedded schedule rows). */
   weekTotalDisplay = "",
   /** CAD revenue per km for the week (embedded schedule rows). */
@@ -103,7 +104,7 @@ export default function AssignedCard({
         >
           <ButtonDark
             onClick={() => void onDelete()}
-            text="Vacate Unit"
+            text={deleteLabel}
             type="button"
           />
         </div>

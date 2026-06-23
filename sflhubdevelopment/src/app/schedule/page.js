@@ -16,7 +16,7 @@ import { useDrivers } from "@/hooks/useDrivers";
 import DriverCard from "../components/driverCard";
 import UnitCard from "../components/unitCard";
 import Modal from "../components/modal";
-import FormSelect from "../components/formSelect";
+import SearchableSelect from "../components/searchableSelect";
 import ButtonDark from "../components/buttonDark";
 import EditDriverModal from "../components/editDriverModal";
 import EditUnitModal from "../components/editUnitModal";
@@ -49,11 +49,15 @@ import { useConfirm } from "@/context/confirmContext";
 import {
   deleteDriverConfirmOptions,
   deleteLoadsheetConfirmOptions,
+  removeWeekAssignmentConfirmOptions,
   vacateUnitConfirmOptions,
 } from "@/lib/confirmEdit";
+import { usePermissions } from "@/context/permissionsContext";
 
 export default function Schedule() {
   const confirm = useConfirm();
+  const { canEdit } = usePermissions();
+  const readOnly = !canEdit;
   const [drivers, refreshDrivers] = useDrivers();
   const [units, refreshUnits] = useUnits();
   const [activeUser] = useUser();
@@ -203,6 +207,8 @@ export default function Schedule() {
       setAddToLiveBoard(
         !weekIsComplete(selectedWeek?.week_start_date ?? null),
       );
+      setDriverValue("");
+      setUnitValue("");
     });
   }, [assignModal, resolvedWeekId, selectedWeek?.week_start_date]);
 
@@ -272,6 +278,48 @@ export default function Schedule() {
     await refreshLoads();
   }
 
+  async function handleRemoveWeekAssignment(scheduleAssignmentId) {
+    if (scheduleAssignmentId == null) return;
+    if (!(await confirm(removeWeekAssignmentConfirmOptions()))) return;
+
+    const { error: loadsErr } = await supabase
+      .from("schedule_loads")
+      .delete()
+      .eq("schedule_assignment_id", scheduleAssignmentId);
+    if (loadsErr) {
+      alert(loadsErr.message);
+      return;
+    }
+
+    const { error: assignErr } = await supabase
+      .from("schedule_assignments")
+      .delete()
+      .eq("id", scheduleAssignmentId);
+    if (assignErr) {
+      alert(assignErr.message);
+      return;
+    }
+
+    await refreshSnapshots();
+    await refreshLoads();
+  }
+
+  function deleteHandlerForRow(row) {
+    if (row.isArchived) return undefined;
+    if (row.inUseUnitId) {
+      return () => void handleDelete(row.inUseUnitId);
+    }
+    if (row.isWeekOnly && row.scheduleAssignmentId) {
+      return () => void handleRemoveWeekAssignment(row.scheduleAssignmentId);
+    }
+    return undefined;
+  }
+
+  function deleteLabelForRow(row) {
+    if (row.isWeekOnly && !row.inUseUnitId) return "Remove from week";
+    return "Vacate Unit";
+  }
+
   async function handleDeleteDriver(id) {
     if (!(await confirm(deleteDriverConfirmOptions()))) return;
     const { error } = await supabase.from("drivers").delete().eq("id", id);
@@ -307,6 +355,10 @@ export default function Schedule() {
     if (Number.isFinite(numA) && Number.isFinite(numB)) {
       return numA - numB;
     }
+    return String(unitA ?? "").localeCompare(String(unitB ?? ""), undefined, {
+      sensitivity: "base",
+      numeric: true,
+    });
   });
 
   async function handleCreateWeek(weekStartISO) {
@@ -415,6 +467,11 @@ export default function Schedule() {
       </div>
       <div className="shrink-0 py-6 text-center text-3xl font-bold text-white">
         <h2>Weekly Schedule</h2>
+        {readOnly ? (
+          <p className="mt-2 text-sm font-normal text-amber-200/90">
+            View only — contact an admin for edit access.
+          </p>
+        ) : null}
       </div>
 
       <NewWeekModal
@@ -465,20 +522,26 @@ export default function Schedule() {
           <FaTimes />
         </button>
         <div className="flex flex-col gap-3 pr-8">
-          <div className="flex flex-wrap">
-            <FormSelect
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <SearchableSelect
+              open={assignModal}
               label="Select Driver"
-              placeholder="Select a driver…"
+              placeholder="Search drivers…"
+              emptyMessage="No drivers match."
               options={sortedDrivers}
               value={driverValue}
-              onChange={(e) => setDriverValue(e.target.value)}
+              onChange={setDriverValue}
+              getOptionLabel={(d) => d.name ?? ""}
             />
-            <FormSelect
+            <SearchableSelect
+              open={assignModal}
               label="Select Unit"
-              placeholder="Select a unit…"
+              placeholder="Search units…"
+              emptyMessage="No units match."
               options={sortedUnits}
               value={unitValue}
-              onChange={(e) => setUnitValue(e.target.value)}
+              onChange={setUnitValue}
+              getOptionLabel={(u) => String(u.unit ?? "")}
             />
           </div>
 
@@ -567,15 +630,17 @@ export default function Schedule() {
           <FaTimes />
         </button>
         <div className="mt-8 flex w-80 items-center gap-2">
-          <button
-            type="button"
-            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-green-950 text-xl text-white shadow-md hover:bg-green-900"
-            onClick={() => setNewUnitModalOpen(true)}
-            aria-label="Add unit"
-            title="Add unit"
-          >
-            <FaPlus />
-          </button>
+          {canEdit ? (
+            <button
+              type="button"
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-green-950 text-xl text-white shadow-md hover:bg-green-900"
+              onClick={() => setNewUnitModalOpen(true)}
+              aria-label="Add unit"
+              title="Add unit"
+            >
+              <FaPlus />
+            </button>
+          ) : null}
           <input
             type="search"
             value={searchUnits}
@@ -589,7 +654,7 @@ export default function Schedule() {
             <UnitCard
               key={u.id}
               unit={u}
-              onEdit={(unitRow) => setEditUnit(unitRow)}
+              onEdit={canEdit ? (unitRow) => setEditUnit(unitRow) : undefined}
             />
           );
         })}
@@ -617,15 +682,17 @@ export default function Schedule() {
           <FaTimes />
         </button>
         <div className="mt-8 flex w-80 items-center gap-2">
-          <button
-            type="button"
-            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-green-950 text-xl text-white shadow-md hover:bg-green-900"
-            onClick={() => setNewDriverModalOpen(true)}
-            aria-label="Add driver"
-            title="Add driver"
-          >
-            <FaPlus />
-          </button>
+          {canEdit ? (
+            <button
+              type="button"
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-green-950 text-xl text-white shadow-md hover:bg-green-900"
+              onClick={() => setNewDriverModalOpen(true)}
+              aria-label="Add driver"
+              title="Add driver"
+            >
+              <FaPlus />
+            </button>
+          ) : null}
           <input
             type="search"
             value={searchDrivers}
@@ -638,8 +705,8 @@ export default function Schedule() {
           <DriverCard
             key={d.id}
             driver={d}
-            onEdit={(drv) => setEditDriver(drv)}
-            onDelete={() => handleDeleteDriver(d.id)}
+            onEdit={canEdit ? (drv) => setEditDriver(drv) : undefined}
+            onDelete={canEdit ? () => handleDeleteDriver(d.id) : undefined}
           />
         ))}
       </div>
@@ -647,24 +714,28 @@ export default function Schedule() {
         <BtnWhite text="Loadsheets" Icon={FaList} onClick={toggleLoadsheets} />
         <BtnWhite text="Units" Icon={FaTruck} onClick={toggleUnitMenu} />
         <BtnWhite text="Drivers" Icon={FaUser} onClick={toggleDriverMenu} />
-        <BtnWhite
-          Icon={FaPlus}
-          text="Assign Unit"
-          onClick={() => setAssignModal(!assignModal)}
-        />
-        <BtnWhite
-          Icon={FaCalendar}
-          text="New week"
-          onClick={() => {
-            setNewWeekModalKey((k) => k + 1);
-            setNewWeekModalOpen(true);
-          }}
-        />
-        <BtnWhite
-          Icon={FaPlus}
-          text="New load sheet"
-          onClick={() => setNewLoadsheetModalOpen(true)}
-        />
+        {canEdit ? (
+          <>
+            <BtnWhite
+              Icon={FaPlus}
+              text="Assign Unit"
+              onClick={() => setAssignModal(!assignModal)}
+            />
+            <BtnWhite
+              Icon={FaCalendar}
+              text="New week"
+              onClick={() => {
+                setNewWeekModalKey((k) => k + 1);
+                setNewWeekModalOpen(true);
+              }}
+            />
+            <BtnWhite
+              Icon={FaPlus}
+              text="New load sheet"
+              onClick={() => setNewLoadsheetModalOpen(true)}
+            />
+          </>
+        ) : null}
         <BtnWhite
           Icon={FaTruck}
           text="Assigned Units"
@@ -700,11 +771,9 @@ export default function Schedule() {
               assignableUnits={assignableUnits}
               loadSlots={loadSlots}
               loadSheets={loadSheets}
-              onDelete={
-                row.inUseUnitId && !row.isArchived
-                  ? () => void handleDelete(row.inUseUnitId)
-                  : undefined
-              }
+              readOnly={readOnly}
+              onDelete={canEdit ? deleteHandlerForRow(row) : undefined}
+              deleteLabel={deleteLabelForRow(row)}
               onLoadsUpdated={refreshLoads}
               onLoadPatched={mergeScheduleLoad}
               onLoadSheetsUpdated={refreshLoadSheets}
@@ -722,6 +791,7 @@ export default function Schedule() {
         open={editLoadsheetId != null}
         initialLoadsheetId={editLoadsheetId}
         loadSheets={loadSheets}
+        readOnly={readOnly}
         onClose={() => setEditLoadsheetId(null)}
         onSaved={refreshLoadSheets}
       />
@@ -769,9 +839,10 @@ export default function Schedule() {
         </div>
         <LoadsheetMenu
           loadsheets={loadSheets}
-          onEdit={handleEditLoadsheet}
-          onDelete={handleDeleteLoadsheet}
-          onCopy={handleCopyLoadsheet}
+          readOnly={readOnly}
+          onEdit={canEdit ? handleEditLoadsheet : undefined}
+          onDelete={canEdit ? handleDeleteLoadsheet : undefined}
+          onCopy={canEdit ? handleCopyLoadsheet : undefined}
         />
       </div>
     </div>

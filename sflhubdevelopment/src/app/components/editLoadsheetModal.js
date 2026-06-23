@@ -59,6 +59,7 @@ export default function EditLoadsheetModal({
   scheduleInvoiced = undefined,
   scheduleLoadCategory = undefined,
   scheduleUsdCadRate = undefined,
+  readOnly = false,
   onSaved,
   /** Called after syncing this slot's schedule_loads row (refresh week loads) */
   onScheduleUpdated,
@@ -403,7 +404,8 @@ export default function EditLoadsheetModal({
     ],
   );
 
-  const fieldLocked = (idSelected = selectedId) => !idSelected;
+  const fieldLocked = (idSelected = selectedId) =>
+    readOnly || !idSelected;
 
   function reportSaveError(error) {
     const msg = error?.message ?? String(error);
@@ -682,7 +684,7 @@ export default function EditLoadsheetModal({
             : "Updates the saved template in your library."}
         </p>
 
-        {scheduleLoadId ? (
+        {scheduleLoadId && !readOnly ? (
           <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950">
             <p className="mb-2 font-medium">This slot</p>
             <button
@@ -709,6 +711,7 @@ export default function EditLoadsheetModal({
               value={selectedId}
               onChange={(e) => setSelectedId(e.target.value)}
               required
+              disabled={readOnly}
             >
               <option value="">Select a load sheet…</option>
               {loadSheets.map((s) => {
@@ -904,7 +907,7 @@ export default function EditLoadsheetModal({
               type="checkbox"
               className="size-4 rounded border-green-950/30 text-green-950 focus:ring-green-950/30"
               checked={invoiced}
-              disabled={!selectedId}
+              disabled={fieldLocked()}
               onChange={(e) => void handleInvoicedChange(e.target.checked)}
             />
             Mark as completed
@@ -914,27 +917,33 @@ export default function EditLoadsheetModal({
           </label>
 
           <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-green-950/15 pt-4">
-            <button
-              type="button"
-              className="rounded-lg border border-green-950/30 bg-white px-3 py-2 text-sm font-semibold text-green-950 hover:bg-green-950/5 disabled:opacity-50"
-              disabled={fieldLocked() || copying}
-              onClick={() => void handleCopy()}
-            >
-              {copying ? "Copying…" : "Copy load sheet"}
-            </button>
+            {!readOnly ? (
+              <button
+                type="button"
+                className="rounded-lg border border-green-950/30 bg-white px-3 py-2 text-sm font-semibold text-green-950 hover:bg-green-950/5 disabled:opacity-50"
+                disabled={fieldLocked() || copying}
+                onClick={() => void handleCopy()}
+              >
+                {copying ? "Copying…" : "Copy load sheet"}
+              </button>
+            ) : (
+              <span />
+            )}
             <div className="flex gap-2">
               <button
                 type="button"
                 className="rounded-full px-4 py-2 text-sm font-semibold text-green-950 hover:bg-green-950/10"
                 onClick={onClose}
               >
-                Cancel
+                {readOnly ? "Close" : "Cancel"}
               </button>
-              <ButtonDark
-                type="submit"
-                text={saving ? "Saving…" : "Done"}
-                disabled={!selectedId || loadSheets.length === 0}
-              />
+              {!readOnly ? (
+                <ButtonDark
+                  type="submit"
+                  text={saving ? "Saving…" : "Done"}
+                  disabled={!selectedId || loadSheets.length === 0}
+                />
+              ) : null}
             </div>
           </div>
         </form>

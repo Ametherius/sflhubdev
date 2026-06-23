@@ -93,3 +93,14 @@ export function vacateUnitConfirmOptions() {
     variant: "danger",
   };
 }
+
+export function removeWeekAssignmentConfirmOptions() {
+  return {
+    title: "Remove from this week?",
+    message:
+      "Remove this driver and unit from this week’s schedule only? All load data for this week will be deleted. The live assigned board is not affected.",
+    confirmLabel: "Remove",
+    cancelLabel: "Cancel",
+    variant: "danger",
+  };
+}

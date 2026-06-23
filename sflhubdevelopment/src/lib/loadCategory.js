@@ -194,10 +194,9 @@ export function fieldRulesForCategory(loadCategory, flatRate = false) {
   };
 }
 
-/** Cattle and chicken loads can be assigned to multiple drivers/slots at once. */
-export function supportsMultiDriverAssign(loadCategory) {
-  const cat = loadCategoryFromStorage(loadCategory);
-  return cat === "cattle" || cat === "chicken";
+/** All load sheets support assigning to multiple drivers, slots, and days at once. */
+export function supportsMultiDriverAssign(_loadCategory) {
+  return true;
 }
 
 function normalizeDriverDivision(division) {
@@ -215,9 +214,28 @@ export function driverDivisionMatchesLoadCategory(
   const cat = loadCategoryFromStorage(loadCategory);
   const n = normalizeDriverDivision(driverDivision);
   if (!n) return false;
-  if (cat === "cattle") return n.includes("cattle");
-  if (cat === "chicken") return n.includes("chicken");
-  return true;
+
+  switch (cat) {
+    case "cattle":
+      return n.includes("cattle");
+    case "chicken":
+      return n.includes("chicken");
+    case "tanker":
+      return n.includes("tanker");
+    case "cargill":
+      return n.includes("cargill");
+    case "irm":
+      return n.includes("irm");
+    case "canadian_grain":
+      return /canadian/.test(n) && /grain/.test(n);
+    case "us_grain":
+      return (
+        (/\bus\b|u\.s\.|united states/.test(n) || n.startsWith("us ")) &&
+        /grain/.test(n)
+      );
+    default:
+      return true;
+  }
 }
 
 export function calcOptionsFromSheet(sheet) {

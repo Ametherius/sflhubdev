@@ -145,6 +145,7 @@ function LoadSplitCard({
   onPersist,
   onEditLoadsheet,
   slotInvoiced = false,
+  readOnly = false,
 }) {
   const slotTitle = slotLabel(slot);
   const saveGenRef = useRef(0);
@@ -248,7 +249,7 @@ function LoadSplitCard({
   ]);
 
   const save = useCallback(async () => {
-    if (!slotId) return;
+    if (readOnly || !slotId) return;
     const lid = loadsheetId.trim();
     const values = {
       origin,
@@ -307,10 +308,11 @@ function LoadSplitCard({
     rowUsdCad,
     onPersist,
     row,
+    readOnly,
   ]);
 
   useEffect(() => {
-    if (!slotId || !saveReadyRef.current) return;
+    if (readOnly || !slotId || !saveReadyRef.current) return;
     const gen = ++saveGenRef.current;
     const timer = setTimeout(() => {
       if (gen !== saveGenRef.current) return;
@@ -327,6 +329,7 @@ function LoadSplitCard({
     loadsheetId,
     slotId,
     save,
+    readOnly,
   ]);
 
   const rootGrow = fillColumn
@@ -351,6 +354,7 @@ function LoadSplitCard({
             onChange={(e) => setOrigin(e.target.value)}
             onBlur={() => void save()}
             placeholder="Origin"
+            readOnly={readOnly}
             aria-label={`${slotTitle} origin`}
           />
           <input
@@ -360,6 +364,7 @@ function LoadSplitCard({
             onChange={(e) => setEndUser(e.target.value)}
             onBlur={() => void save()}
             placeholder="End user"
+            readOnly={readOnly}
             aria-label={`${slotTitle} end user`}
           />
           <div className="grid min-h-9 min-w-0 grid-cols-[minmax(2.5rem,1fr)_minmax(2.75rem,1fr)_minmax(2.75rem,1fr)_minmax(3.75rem,1.1fr)] border-t border-neutral-300">
@@ -370,7 +375,8 @@ function LoadSplitCard({
               onChange={(e) => setMt(e.target.value)}
               onBlur={() => void save()}
               placeholder="MT"
-              disabled={!fieldRules.showMt}
+              disabled={readOnly || !fieldRules.showMt}
+              readOnly={readOnly}
               aria-label={`${slotTitle} MT`}
             />
             <input
@@ -380,6 +386,7 @@ function LoadSplitCard({
               onChange={(e) => setRate(e.target.value)}
               onBlur={() => void save()}
               placeholder="Rate"
+              readOnly={readOnly}
               aria-label={`${slotTitle} rate`}
             />
             <input
@@ -389,7 +396,8 @@ function LoadSplitCard({
               onChange={(e) => setFsc(e.target.value)}
               onBlur={() => void save()}
               placeholder="FSC"
-              disabled={!fieldRules.showFsc}
+              disabled={readOnly || !fieldRules.showFsc}
+              readOnly={readOnly}
               aria-label={`${slotTitle} FSC`}
             />
             <div
@@ -412,11 +420,12 @@ function LoadSplitCard({
             onChange={(e) => setLoadNote(e.target.value)}
             onBlur={() => void save()}
             placeholder="Load notes (load # and broker fill when you assign from a sheet)"
+            readOnly={readOnly}
             aria-label={`${slotTitle} load notes`}
           />
         </div>
       </div>
-      {typeof onEditLoadsheet === "function" && slot?.id ? (
+      {typeof onEditLoadsheet === "function" && slot?.id && !readOnly ? (
         <button
           type="button"
           className="absolute bottom-1 right-1 z-[1] rounded border border-white/40 bg-[#1b4332]/95 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white shadow-sm hover:bg-[#1b4332]"
@@ -440,6 +449,7 @@ function LoadSplitCard({
  */
 export default function UnitWeekLoadsGrid({
   embeddedInRow = false,
+  readOnly = false,
   weekStartISO,
   weekId,
   inUseUnitId,
@@ -515,7 +525,7 @@ export default function UnitWeekLoadsGrid({
       scheduleAssignmentId: assignmentId,
       payload,
     }) => {
-      if (!slotId || !dayIso) return false;
+      if (readOnly || !slotId || !dayIso) return false;
 
       const { data, error } = await persistScheduleLoad(supabase, {
         scheduleLoadId: scheduleLoadId ?? null,
@@ -571,7 +581,7 @@ export default function UnitWeekLoadsGrid({
       await onUpdated?.();
       return true;
     },
-    [supabase, weekStartISO, scheduleAssignmentId, onUpdated, onLoadPatched],
+    [supabase, weekStartISO, scheduleAssignmentId, onUpdated, onLoadPatched, readOnly],
   );
 
   if (!weekStartISO || days.length === 0) {
@@ -630,6 +640,7 @@ export default function UnitWeekLoadsGrid({
           <div key={d.iso} className={dayColShell}>
             <div className={dayHeaderShell}>
               {embeddedInRow &&
+              !readOnly &&
               weekId &&
               (inUseUnitId != null || scheduleAssignmentId != null) ? (
                 <>
@@ -675,6 +686,7 @@ export default function UnitWeekLoadsGrid({
                   <LoadSplitCard
                     key={`${d.iso}-${slot.id ?? `pad-${slot.sort_order}`}-${rowKey}`}
                     fillColumn={embeddedInRow}
+                    readOnly={readOnly}
                     row={row}
                     slotInvoiced={slotInvoiced}
                     scheduleLoadId={row?.id ?? null}
@@ -687,7 +699,11 @@ export default function UnitWeekLoadsGrid({
                     slot={slot}
                     onPersist={persistRow}
                     onEditLoadsheet={
-                      embeddedInRow && weekId && slot.id && row?.id
+                      !readOnly &&
+                      embeddedInRow &&
+                      weekId &&
+                      slot.id &&
+                      row?.id
                         ? () =>
                             setEditLoadsheetTarget({
                               initialLoadsheetId:
@@ -715,7 +731,7 @@ export default function UnitWeekLoadsGrid({
         ))}
       </div>
       <AssignLoadsheetModal
-        open={assignTarget != null}
+        open={!readOnly && assignTarget != null}
         onClose={() => setAssignTarget(null)}
         dayIso={assignTarget?.dayIso ?? ""}
         dayTitle={assignTarget?.dayTitle ?? ""}
@@ -743,6 +759,7 @@ export default function UnitWeekLoadsGrid({
         scheduleInvoiced={editLoadsheetTarget?.scheduleInvoiced}
         scheduleLoadCategory={editLoadsheetTarget?.scheduleLoadCategory}
         scheduleUsdCadRate={editLoadsheetTarget?.scheduleUsdCadRate}
+        readOnly={readOnly}
         loadSheets={loadSheets}
         onSaved={onLoadSheetsUpdated ?? (async () => {})}
         onScheduleUpdated={onUpdated}

@@ -42,6 +42,8 @@ export default function ScheduleRow({
   loadSlots,
   loadSheets = [],
   onDelete,
+  deleteLabel = "Vacate Unit",
+  readOnly = false,
   onLoadsUpdated,
   onLoadPatched,
   onLoadSheetsUpdated,
@@ -55,7 +57,7 @@ export default function ScheduleRow({
   const { weekTotalDisplay, weekRevenuePerKmDisplay } = useMemo(() => {
     const revenue = sumWeekUnitRevenue(loads);
     const kms = sumWeekUnitKms(loads);
-    const miles = kmToMiles(kms)
+    const miles = kmToMiles(kms);
     return {
       weekTotalDisplay: formatLoadTotalCad(String(revenue)) || "$0.00",
       weekRevenuePerKmDisplay: formatWeekRevenuePerKm(revenue, miles),
@@ -87,10 +89,12 @@ export default function ScheduleRow({
             weekTotalDisplay={weekTotalDisplay}
             weekRevenuePerKmDisplay={weekRevenuePerKmDisplay}
             onDelete={assignment.isArchived ? undefined : onDelete}
+            deleteLabel={deleteLabel}
           />
           <div className="min-h-0 min-w-0 flex-1 overflow-x-auto overscroll-x-contain bg-white p-2 lg:rounded-tr-2xl">
             <UnitWeekLoadsGrid
               embeddedInRow
+              readOnly={readOnly}
               weekStartISO={weekStartISO}
               weekId={weekId}
               inUseUnitId={assignment.inUseUnitId}

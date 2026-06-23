@@ -12,6 +12,7 @@ import { useUser } from "@/hooks/useUser";
 const navLinks = [
   { label: "Dashboard", href: "/dashboard" },
   { label: "Schedule", href: "/schedule" },
+  { label: "Load Planner", href: "/planner" },
 ];
 
 export default function Header() {

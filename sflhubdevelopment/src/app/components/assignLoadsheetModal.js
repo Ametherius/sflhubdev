@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import {
   calcOptionsFromSheet,
   driverDivisionMatchesLoadCategory,
+  loadCategoryLabel,
   supportsMultiDriverAssign,
 } from "@/lib/loadCategory";
 import {
@@ -80,7 +81,7 @@ function findScheduleRowForCell(
 
 /**
  * Pick a saved load sheet and a slot for that day; writes schedule_loads for this unit.
- * Cattle/chicken sheets support assigning to multiple drivers and slots via checkboxes.
+ * All load sheets support assigning to multiple drivers, days, and slots via checkboxes.
  */
 export default function AssignLoadsheetModal({
   open,
@@ -533,10 +534,9 @@ export default function AssignLoadsheetModal({
                   <p className="text-sm text-green-900/75">
                     No assigned units in the{" "}
                     <strong>
-                      {calcOptionsFromSheet(selectedSheet).loadCategory ===
-                      "cattle"
-                        ? "Cattle"
-                        : "Chicken"}
+                      {loadCategoryLabel(
+                        calcOptionsFromSheet(selectedSheet).loadCategory,
+                      )}
                     </strong>{" "}
                     division this week.
                   </p>
