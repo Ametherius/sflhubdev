@@ -22,11 +22,7 @@ export default function PlannerWeekDisplay({ weeks }) {
           }).format(date);
 
           return (
-            <option
-              key={w.id}
-              value={w.label}
-              className="bg-white text-green-950"
-            >
+            <option key={w.id} value={w.id} className="bg-white text-green-950">
               Week Of Sunday {label}
             </option>
           );

@@ -16,6 +16,7 @@ export const LOAD_CATEGORIES = [
   { id: "chicken", label: "Chicken", storage: "Chicken" },
   { id: "cattle", label: "Cattle", storage: "Cattle" },
   { id: "tanker", label: "Tanker", storage: "Tanker" },
+  { id: "generic", label: "Generic", storage: "Generic" },
 ];
 
 export const DEFAULT_LOAD_CATEGORY = "canadian_grain";
@@ -131,6 +132,7 @@ export function computeLoadTotalDisplay({
       return roundMoney(r * f);
     }
     case "canadian_grain":
+    case "generic":
     default: {
       const m = parseMetricNum(mt);
       if (m == null || r == null) return "";
@@ -164,6 +166,8 @@ export function totalFormulaHint(loadCategory, flatRate = false) {
       return "rate × MT + (rate × MT × FSC%)";
     case "legacy_flat":
       return "rate × FSC (legacy)";
+    case "generic":
+      return "MT × rate";
     default:
       return "MT × rate";
   }
@@ -174,6 +178,7 @@ export function fieldRulesForCategory(loadCategory, flatRate = false) {
   return {
     showMt:
       cat === "canadian_grain" ||
+      cat === "generic" ||
       cat === "us_grain" ||
       cat === "cargill" ||
       cat === "irm",
@@ -186,6 +191,7 @@ export function fieldRulesForCategory(loadCategory, flatRate = false) {
     showUsdCad: cat === "us_grain",
     mtRequired:
       cat === "canadian_grain" ||
+      cat === "generic" ||
       cat === "us_grain" ||
       cat === "cargill" ||
       cat === "irm",
@@ -212,6 +218,8 @@ export function driverDivisionMatchesLoadCategory(
   driverDivision,
 ) {
   const cat = loadCategoryFromStorage(loadCategory);
+  if (cat === "generic") return true;
+
   const n = normalizeDriverDivision(driverDivision);
   if (!n) return false;
 

@@ -1,5 +1,7 @@
 import BrokerColumn from "../components/brokerColumn";
 import Header from "../components/header";
+import PlannerDayGrid from "../components/plannerDayGrid";
+import PlannerRow from "../components/plannerRow";
 import PlannerWeekDisplay from "../components/plannerWeekDisplay";
 import { createClient } from "@/lib/supabase/server";
 
@@ -16,6 +18,11 @@ export default async function Planner() {
     .select("id, name")
     .order("name");
   const brokers = broker ?? [];
+
+  const { data: plannerSlots } = await supabase
+    .from("planner_slots")
+    .select("*");
+  const slots = plannerSlots ?? [];
   return (
     <div className="w-full h-full">
       <Header />
@@ -26,7 +33,10 @@ export default async function Planner() {
         <PlannerWeekDisplay weeks={weeks} />
       </div>
       <div className="w-full p-2 overflow-y-scroll overflow-contain flex">
-        <BrokerColumn brokers={brokers} />
+        <PlannerRow>
+          <BrokerColumn brokers={brokers} />
+          <PlannerDayGrid slots={slots} />
+        </PlannerRow>
       </div>
     </div>
   );
