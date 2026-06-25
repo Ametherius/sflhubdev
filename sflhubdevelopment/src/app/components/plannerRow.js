@@ -1,5 +1,3 @@
 export default function PlannerRow({ children }) {
-  return (
-    <div className="flex justify-start w-full overflow-scroll">{children}</div>
-  );
+  return <div className="flex flex-col w-full overflow-scroll">{children}</div>;
 }

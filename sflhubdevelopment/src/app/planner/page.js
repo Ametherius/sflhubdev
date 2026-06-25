@@ -1,9 +1,6 @@
-import BrokerColumn from "../components/brokerColumn";
 import Header from "../components/header";
-import PlannerDayGrid from "../components/plannerDayGrid";
-import PlannerRow from "../components/plannerRow";
-import PlannerWeekDisplay from "../components/plannerWeekDisplay";
 import { createClient } from "@/lib/supabase/server";
+import PlannerClient from "../components/plannerClient";
 
 export default async function Planner() {
   const supabase = await createClient();
@@ -29,14 +26,8 @@ export default async function Planner() {
       <div className="flex justify-center text-white text-3xl font-bold m-5">
         <h1>Grain Load Planner</h1>
       </div>
-      <div className="w-full h-full flex justify-start p-4">
-        <PlannerWeekDisplay weeks={weeks} />
-      </div>
-      <div className="w-full p-2 overflow-y-scroll overflow-contain flex">
-        <PlannerRow>
-          <BrokerColumn brokers={brokers} />
-          <PlannerDayGrid slots={slots} />
-        </PlannerRow>
+      <div className="w-full h-full">
+        <PlannerClient brokers={brokers} weeks={weeks} slots={slots} />
       </div>
     </div>
   );
