@@ -61,6 +61,29 @@ begin
   end loop;
 end $$;
 
+-- Required by admin RLS below (normally created in profiles_admin_rls).
+alter table if exists public.profiles
+  add column if not exists admin boolean not null default false;
+
+create or replace function public.is_admin()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select coalesce(
+    (
+      select p.admin
+      from public.profiles p
+      where p.id = auth.uid()
+    ),
+    false
+  );
+$$;
+
+grant execute on function public.is_admin() to authenticated;
+
 -- ── brokers ───────────────────────────────────────────────────────────────────
 alter table public.brokers enable row level security;
 
