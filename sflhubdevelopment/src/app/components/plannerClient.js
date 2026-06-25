@@ -44,7 +44,10 @@ export default function PlannerClient({ slots, brokers, weeks }) {
       </div>
       <PlannerRow>
         {brokers.map((b) => (
-          <div className="bg-white w-60 text-green-950 uppercase p-3 border-b-2 border-green-950">
+          <div
+            key={b.id}
+            className="bg-white w-60 text-green-950 uppercase p-3 border-b-2 border-green-950"
+          >
             <h3>{b.name}</h3>
           </div>
         ))}
