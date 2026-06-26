@@ -250,7 +250,6 @@ export default function PlannerClient({
           )}
         </select>
       </div>
-
       {brokers.map((b) => {
         const slotsForBroker = slotsForWeek.filter(
           (s) => String(readSlotBrokerId(s, slotCols)) === String(b.id),
