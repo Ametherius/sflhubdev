@@ -1,0 +1,206 @@
+/** Logical planner_slots fields → possible Supabase column names (first match wins). */
+export const PLANNER_SLOT_FIELD_ALIASES = {
+  broker: ["broker_id", "brokers", "broker"],
+  week: ["week_id", "schedule_weeks", "weeks"],
+  planDate: ["plan_date", "load_date", "slot_date", "day_date"],
+  sortOrder: ["sort_order", "sort_oder", "slot_order"],
+  origin: ["origin"],
+  endUser: ["end_user", "enduser"],
+  unitNumber: ["unit_number", "unit"],
+  dispatched: ["dispatched"],
+  unloaded: ["unloaded"],
+  completed: ["completed"],
+};
+
+const CANONICAL_DEFAULTS = {
+  broker: "broker_id",
+  week: "week_id",
+  planDate: "plan_date",
+  sortOrder: "sort_order",
+  origin: "origin",
+  endUser: "end_user",
+  unitNumber: "unit_number",
+  dispatched: "dispatched",
+  unloaded: "unloaded",
+  completed: "completed",
+};
+
+function pickColumn(sample, aliases, fallback) {
+  if (sample && typeof sample === "object") {
+    const hit = aliases.find((key) => key in sample);
+    if (hit) return hit;
+  }
+  return fallback;
+}
+
+/** Resolve DB column names from an existing row (or canonical defaults). */
+export function plannerSlotColumns(sampleSlot = null, overrides = null) {
+  if (overrides) {
+    return { ...CANONICAL_DEFAULTS, ...overrides };
+  }
+  return {
+    broker: pickColumn(
+      sampleSlot,
+      PLANNER_SLOT_FIELD_ALIASES.broker,
+      CANONICAL_DEFAULTS.broker,
+    ),
+    week: pickColumn(
+      sampleSlot,
+      PLANNER_SLOT_FIELD_ALIASES.week,
+      CANONICAL_DEFAULTS.week,
+    ),
+    planDate: pickColumn(
+      sampleSlot,
+      PLANNER_SLOT_FIELD_ALIASES.planDate,
+      CANONICAL_DEFAULTS.planDate,
+    ),
+    sortOrder: pickColumn(
+      sampleSlot,
+      PLANNER_SLOT_FIELD_ALIASES.sortOrder,
+      CANONICAL_DEFAULTS.sortOrder,
+    ),
+    origin: pickColumn(
+      sampleSlot,
+      PLANNER_SLOT_FIELD_ALIASES.origin,
+      CANONICAL_DEFAULTS.origin,
+    ),
+    endUser: pickColumn(
+      sampleSlot,
+      PLANNER_SLOT_FIELD_ALIASES.endUser,
+      CANONICAL_DEFAULTS.endUser,
+    ),
+    unitNumber: pickColumn(
+      sampleSlot,
+      PLANNER_SLOT_FIELD_ALIASES.unitNumber,
+      CANONICAL_DEFAULTS.unitNumber,
+    ),
+    dispatched: pickColumn(
+      sampleSlot,
+      PLANNER_SLOT_FIELD_ALIASES.dispatched,
+      CANONICAL_DEFAULTS.dispatched,
+    ),
+    unloaded: pickColumn(
+      sampleSlot,
+      PLANNER_SLOT_FIELD_ALIASES.unloaded,
+      CANONICAL_DEFAULTS.unloaded,
+    ),
+    completed: pickColumn(
+      sampleSlot,
+      PLANNER_SLOT_FIELD_ALIASES.completed,
+      CANONICAL_DEFAULTS.completed,
+    ),
+  };
+}
+
+/** Probe Supabase for which columns exist on planner_slots (server-side). */
+export async function detectPlannerSlotColumns(supabase) {
+  const resolved = {};
+  const missing = [];
+
+  for (const [logical, aliases] of Object.entries(PLANNER_SLOT_FIELD_ALIASES)) {
+    let found = null;
+    for (const col of aliases) {
+      const { error } = await supabase.from("planner_slots").select(col).limit(1);
+      if (!error) {
+        found = col;
+        break;
+      }
+    }
+    resolved[logical] = found ?? CANONICAL_DEFAULTS[logical];
+    if (!found && ["broker", "week", "planDate"].includes(logical)) {
+      missing.push(CANONICAL_DEFAULTS[logical]);
+    }
+  }
+
+  return {
+    columns: plannerSlotColumns(null, resolved),
+    schemaReady: missing.length === 0,
+    missing,
+  };
+}
+
+export function plannerSlotSchemaErrorMessage(missing = []) {
+  const cols = missing.length ? missing.join(", ") : "broker_id, week_id, plan_date";
+  return (
+    `Planner table is missing column(s): ${cols}. ` +
+    "Run supabase/migrations/20260630120000_planner_slots_schema.sql in the Supabase SQL editor, then reload."
+  );
+}
+
+export function readSlotBrokerId(slot, cols = plannerSlotColumns(slot)) {
+  return slot?.[cols.broker] ?? null;
+}
+
+export function readSlotWeekId(slot, cols = plannerSlotColumns(slot)) {
+  return slot?.[cols.week] ?? null;
+}
+
+export function readSlotPlanDate(slot, cols = plannerSlotColumns(slot)) {
+  const raw = slot?.[cols.planDate];
+  if (raw == null) return "";
+  return String(raw).slice(0, 10);
+}
+
+export function readSlotSortOrder(slot, cols = plannerSlotColumns(slot)) {
+  return Number(slot?.[cols.sortOrder]) || 0;
+}
+
+export function readSlotUnitNumber(slot, cols = plannerSlotColumns(slot)) {
+  const raw = slot?.[cols.unitNumber];
+  return raw == null ? "" : String(raw).trim();
+}
+
+export function readSlotDispatched(slot, cols = plannerSlotColumns(slot)) {
+  return Boolean(slot?.[cols.dispatched]);
+}
+
+export function readSlotUnloaded(slot, cols = plannerSlotColumns(slot)) {
+  return Boolean(slot?.[cols.unloaded]);
+}
+
+export function readSlotCompleted(slot, cols = plannerSlotColumns(slot)) {
+  return Boolean(slot?.[cols.completed]);
+}
+
+/** Highest matching status wins (completed → unloaded → dispatched → unit). */
+export function plannerSlotStatusClass(slot, cols = plannerSlotColumns(slot)) {
+  if (readSlotCompleted(slot, cols)) {
+    return "bg-gray-500 text-white";
+  }
+  if (readSlotUnloaded(slot, cols)) {
+    return "bg-red-700 text-white";
+  }
+  if (readSlotDispatched(slot, cols)) {
+    return "bg-blue-400 text-white";
+  }
+  if (readSlotUnitNumber(slot, cols)) {
+    return "bg-yellow-500 text-green-950";
+  }
+  return "bg-white text-green-950";
+}
+
+export function buildPlannerSlotInsert(
+  { brokerId, weekId, planDate, sortOrder, origin, endUser },
+  cols = plannerSlotColumns(),
+) {
+  return {
+    [cols.broker]: brokerId,
+    [cols.week]: weekId,
+    [cols.planDate]: planDate,
+    [cols.sortOrder]: sortOrder,
+    [cols.origin]: origin?.length ? origin : null,
+    [cols.endUser]: endUser?.length ? endUser : null,
+  };
+}
+
+export function buildPlannerSlotStatusUpdate(
+  { unitNumber, dispatched, unloaded, completed },
+  cols = plannerSlotColumns(),
+) {
+  return {
+    [cols.unitNumber]: unitNumber?.length ? unitNumber : null,
+    [cols.dispatched]: Boolean(dispatched),
+    [cols.unloaded]: Boolean(unloaded),
+    [cols.completed]: Boolean(completed),
+  };
+}

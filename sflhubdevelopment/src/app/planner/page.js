@@ -1,4 +1,5 @@
 import Header from "../components/header";
+import { detectPlannerSlotColumns } from "@/lib/plannerSlots";
 import { createClient } from "@/lib/supabase/server";
 import PlannerClient from "../components/plannerClient";
 
@@ -20,6 +21,10 @@ export default async function Planner() {
     .from("planner_slots")
     .select("*");
   const slots = plannerSlots ?? [];
+
+  const { columns: slotColumns, schemaReady, missing } =
+    await detectPlannerSlotColumns(supabase);
+
   return (
     <div className="w-full h-full">
       <Header />
@@ -27,7 +32,14 @@ export default async function Planner() {
         <h1>Grain Load Planner</h1>
       </div>
       <div className="w-full h-full">
-        <PlannerClient brokers={brokers} weeks={weeks} slots={slots} />
+        <PlannerClient
+          brokers={brokers}
+          weeks={weeks}
+          slots={slots}
+          slotColumns={slotColumns}
+          plannerSchemaReady={schemaReady}
+          plannerSchemaMissing={missing}
+        />
       </div>
     </div>
   );

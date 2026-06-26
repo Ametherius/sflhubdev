@@ -83,23 +83,22 @@ export function deleteDriverConfirmOptions() {
   };
 }
 
-export function vacateUnitConfirmOptions() {
+export function changeUnitConfirmOptions(driverName, unitLabel) {
   return {
-    title: "Vacate unit?",
-    message:
-      "Remove this driver and unit from the live board? Schedule load data for the current and future weeks will be deleted. Past weeks are kept for history.",
-    confirmLabel: "Vacate",
+    title: "Change unit?",
+    message: `Assign ${driverName} to unit ${unitLabel} on the live board? Load history for past weeks is kept.`,
+    confirmLabel: "Change unit",
     cancelLabel: "Cancel",
-    variant: "danger",
   };
 }
 
-export function removeWeekAssignmentConfirmOptions() {
+export function removeWeekAssignmentConfirmOptions({ pastWeek = false } = {}) {
   return {
-    title: "Remove from this week?",
-    message:
-      "Remove this driver and unit from this week’s schedule only? All load data for this week will be deleted. The live assigned board is not affected.",
-    confirmLabel: "Remove",
+    title: pastWeek ? "Delete unit from this week?" : "Remove from this week?",
+    message: pastWeek
+      ? "Delete this driver and unit from this past week only? All load data for this week will be removed. Other weeks and the live board are not affected."
+      : "Remove this driver and unit from this week’s schedule only? All load data for this week will be deleted. The live assigned board is not affected.",
+    confirmLabel: pastWeek ? "Delete unit" : "Remove",
     cancelLabel: "Cancel",
     variant: "danger",
   };

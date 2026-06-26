@@ -49,8 +49,8 @@ import { useConfirm } from "@/context/confirmContext";
 import {
   deleteDriverConfirmOptions,
   deleteLoadsheetConfirmOptions,
+  changeUnitConfirmOptions,
   removeWeekAssignmentConfirmOptions,
-  vacateUnitConfirmOptions,
 } from "@/lib/confirmEdit";
 import { usePermissions } from "@/context/permissionsContext";
 
@@ -81,6 +81,9 @@ export default function Schedule() {
   const [assignWeekIds, setAssignWeekIds] = useState([]);
   const [addToLiveBoard, setAddToLiveBoard] = useState(true);
   const [assignSaving, setAssignSaving] = useState(false);
+  const [changeUnitRow, setChangeUnitRow] = useState(null);
+  const [changeUnitValue, setChangeUnitValue] = useState("");
+  const [changeUnitSaving, setChangeUnitSaving] = useState(false);
   const [driverValue, setDriverValue] = useState("");
   const [unitValue, setUnitValue] = useState("");
   const [editDriver, setEditDriver] = useState(null);
@@ -139,6 +142,11 @@ export default function Schedule() {
   const selectedWeek = useMemo(
     () => weeks.find((w) => w.id === resolvedWeekId) ?? null,
     [weeks, resolvedWeekId],
+  );
+
+  const isLiveWeek = useMemo(
+    () => weekAcceptsNewAssignments(selectedWeek?.week_start_date ?? null),
+    [selectedWeek?.week_start_date],
   );
 
   const [weekDisplayRows, refreshSnapshots] = useWeekAssignments(
@@ -259,28 +267,44 @@ export default function Schedule() {
     refreshLoads,
   ]);
 
-  async function handleDelete(inUseUnitId) {
-    if (inUseUnitId == null) return;
-    if (!(await confirm(vacateUnitConfirmOptions()))) return;
+  async function handleChangeUnitSave() {
+    if (!changeUnitRow?.inUseUnitId) return;
+    const newUnitId = changeUnitValue.trim();
+    if (!newUnitId) {
+      alert("Select a unit.");
+      return;
+    }
+    if (String(newUnitId) === String(changeUnitRow.unit?.id ?? "")) {
+      setChangeUnitRow(null);
+      return;
+    }
 
+    const newUnit = units.find((u) => String(u.id) === newUnitId);
+    const driverName = changeUnitRow.driver?.name ?? "this driver";
+    const unitLabel = String(newUnit?.unit ?? newUnitId);
+    if (!(await confirm(changeUnitConfirmOptions(driverName, unitLabel)))) return;
+
+    setChangeUnitSaving(true);
     const { error } = await supabase
       .from("in_use_units")
-      .delete()
-      .eq("id", inUseUnitId);
+      .update({ unitid: newUnitId })
+      .eq("id", changeUnitRow.inUseUnitId);
+    setChangeUnitSaving(false);
 
     if (error) {
       alert(error.message);
-      console.error(error.message);
       return;
     }
     await refreshAssigned();
     await refreshSnapshots();
     await refreshLoads();
+    setChangeUnitRow(null);
+    setChangeUnitValue("");
   }
 
-  async function handleRemoveWeekAssignment(scheduleAssignmentId) {
+  async function handleRemoveWeekAssignment(scheduleAssignmentId, { pastWeek = false } = {}) {
     if (scheduleAssignmentId == null) return;
-    if (!(await confirm(removeWeekAssignmentConfirmOptions()))) return;
+    if (!(await confirm(removeWeekAssignmentConfirmOptions({ pastWeek })))) return;
 
     const { error: loadsErr } = await supabase
       .from("schedule_loads")
@@ -304,20 +328,31 @@ export default function Schedule() {
     await refreshLoads();
   }
 
-  function deleteHandlerForRow(row) {
+  function rowActionHandler(row) {
     if (row.isArchived) return undefined;
-    if (row.inUseUnitId) {
-      return () => void handleDelete(row.inUseUnitId);
+    if (row.inUseUnitId && isLiveWeek) {
+      return () => {
+        setChangeUnitRow(row);
+        setChangeUnitValue(String(row.unit?.id ?? ""));
+      };
     }
-    if (row.isWeekOnly && row.scheduleAssignmentId) {
+    if (!isLiveWeek && row.scheduleAssignmentId) {
+      return () =>
+        void handleRemoveWeekAssignment(row.scheduleAssignmentId, { pastWeek: true });
+    }
+    if (isLiveWeek && row.isWeekOnly && row.scheduleAssignmentId) {
       return () => void handleRemoveWeekAssignment(row.scheduleAssignmentId);
     }
     return undefined;
   }
 
-  function deleteLabelForRow(row) {
-    if (row.isWeekOnly && !row.inUseUnitId) return "Remove from week";
-    return "Vacate Unit";
+  function rowActionLabel(row) {
+    if (row.inUseUnitId && isLiveWeek) return "Change Unit";
+    if (!isLiveWeek && row.scheduleAssignmentId) return "Delete unit";
+    if (isLiveWeek && row.isWeekOnly && row.scheduleAssignmentId) {
+      return "Remove from week";
+    }
+    return "";
   }
 
   async function handleDeleteDriver(id) {
@@ -619,6 +654,46 @@ export default function Schedule() {
           />
         </div>
       </Modal>
+
+      <Modal
+        className={`fixed p-6 z-50 rounded-lg bottom-0 right-0 max-w-lg ${changeUnitRow ? "" : "hidden"}`}
+      >
+        <button
+          type="button"
+          className="text-green-950 text-2xl absolute top-0 right-0 m-3 cursor-pointer"
+          onClick={() => {
+            setChangeUnitRow(null);
+            setChangeUnitValue("");
+          }}
+        >
+          <FaTimes />
+        </button>
+        <div className="flex flex-col gap-3 pr-8">
+          <h3 className="text-lg font-bold text-green-950">Change unit</h3>
+          <p className="text-sm text-green-900/85">
+            Driver:{" "}
+            <span className="font-semibold text-green-950">
+              {changeUnitRow?.driver?.name ?? "—"}
+            </span>
+          </p>
+          <SearchableSelect
+            open={changeUnitRow != null}
+            label="New unit"
+            placeholder="Search units…"
+            emptyMessage="No units match."
+            options={sortedUnits}
+            value={changeUnitValue}
+            onChange={setChangeUnitValue}
+            getOptionLabel={(u) => String(u.unit ?? "")}
+          />
+          <ButtonDark
+            text={changeUnitSaving ? "Saving…" : "Change unit"}
+            type="button"
+            onClick={() => void handleChangeUnitSave()}
+          />
+        </div>
+      </Modal>
+
       <div
         className={`w-96 bg-white overflow-y-scroll max-h-screen z-50 fixed top-0 right-0 mx-0 p-3 border-2 flex flex-wrap ${unitsShowing ? "" : "hidden"} justify-center`}
       >
@@ -772,8 +847,8 @@ export default function Schedule() {
               loadSlots={loadSlots}
               loadSheets={loadSheets}
               readOnly={readOnly}
-              onDelete={canEdit ? deleteHandlerForRow(row) : undefined}
-              deleteLabel={deleteLabelForRow(row)}
+              onDelete={canEdit ? rowActionHandler(row) : undefined}
+              deleteLabel={rowActionLabel(row)}
               onLoadsUpdated={refreshLoads}
               onLoadPatched={mergeScheduleLoad}
               onLoadSheetsUpdated={refreshLoadSheets}

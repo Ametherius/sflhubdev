@@ -42,7 +42,7 @@ export default function ScheduleRow({
   loadSlots,
   loadSheets = [],
   onDelete,
-  deleteLabel = "Vacate Unit",
+  deleteLabel = "",
   readOnly = false,
   onLoadsUpdated,
   onLoadPatched,
