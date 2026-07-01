@@ -4,6 +4,7 @@ import { readSlotPlanDate, readSlotSortOrder } from "@/lib/plannerSlots";
 import { weekDayLabels } from "@/lib/weekDates";
 import { useMemo } from "react";
 import PlannerDayCell, {
+  PlannerAddMultipleSlotCell,
   PlannerAddSlotCell,
   plannerDayColumnClass,
 } from "./plannerDayCell";
@@ -16,6 +17,7 @@ export default function PlannerDayGrid({
   slotCols = null,
   canEdit = true,
   onRequestAddSlot,
+  onRequestAddMultipleSlots,
   onSelectSlot,
   onDeleteSlot,
   deletingSlotId = null,
@@ -46,45 +48,63 @@ export default function PlannerDayGrid({
   }
 
   return (
-    <div className="flex min-w-0 flex-1 gap-2 overflow-x-auto">
-      {days.map((d) => {
-        const daySlots = slotsByDay.get(d.iso) ?? [];
+    <div className="min-w-0 shrink-0 bg-white">
+      <div className="flex min-w-max gap-2 p-1">
+        {days.map((d) => {
+          const daySlots = slotsByDay.get(d.iso) ?? [];
 
-        return (
-          <div key={d.iso} className={plannerDayColumnClass}>
-            <div className="bg-green-950 p-3 text-start text-sm font-semibold text-white">
-              {d.columnTitle ?? d.label}
+          return (
+            <div key={d.iso} className={plannerDayColumnClass}>
+              <div className="bg-green-950 p-3 text-start text-sm font-semibold text-white">
+                {d.columnTitle ?? d.label}
+              </div>
+              <div className="flex flex-col gap-1 bg-white">
+                {daySlots.map((ds) => (
+                  <PlannerDayCell
+                    key={ds.id ?? `${d.iso}-${readSlotSortOrder(ds, slotCols)}`}
+                    slot={ds}
+                    slotCols={slotCols}
+                    canEdit={canEdit}
+                    onSelect={onSelectSlot}
+                    onDelete={onDeleteSlot}
+                    deleting={deletingSlotId != null && deletingSlotId === ds.id}
+                  />
+                ))}
+                {canEdit ? (
+                  <>
+                    <PlannerAddSlotCell
+                      disabled={!weekId || !brokerId}
+                      onClick={() =>
+                        onRequestAddSlot?.({
+                          brokerId,
+                          weekId,
+                          planDate: d.iso,
+                          dayTitle: d.columnTitle ?? d.label,
+                          existingDaySlots: daySlots,
+                          bulk: false,
+                        })
+                      }
+                    />
+                    <PlannerAddMultipleSlotCell
+                      disabled={!weekId || !brokerId}
+                      onClick={() =>
+                        onRequestAddMultipleSlots?.({
+                          brokerId,
+                          weekId,
+                          planDate: d.iso,
+                          dayTitle: d.columnTitle ?? d.label,
+                          existingDaySlots: daySlots,
+                          bulk: true,
+                        })
+                      }
+                    />
+                  </>
+                ) : null}
+              </div>
             </div>
-            <div className="flex flex-col gap-1 bg-white/95">
-              {daySlots.map((ds) => (
-                <PlannerDayCell
-                  key={ds.id ?? `${d.iso}-${readSlotSortOrder(ds, slotCols)}`}
-                  slot={ds}
-                  slotCols={slotCols}
-                  canEdit={canEdit}
-                  onSelect={onSelectSlot}
-                  onDelete={onDeleteSlot}
-                  deleting={deletingSlotId != null && deletingSlotId === ds.id}
-                />
-              ))}
-              {canEdit ? (
-                <PlannerAddSlotCell
-                  disabled={!weekId || !brokerId}
-                  onClick={() =>
-                    onRequestAddSlot?.({
-                      brokerId,
-                      weekId,
-                      planDate: d.iso,
-                      dayTitle: d.columnTitle ?? d.label,
-                      existingDaySlots: daySlots,
-                    })
-                  }
-                />
-              ) : null}
-            </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }

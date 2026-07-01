@@ -20,8 +20,12 @@ export default function AssignedCard({
   weekRevenuePerKmDisplay = "",
   /** When true, sits flush inside ScheduleRow (no outer margin / full-height column). */
   embedded = false,
+  /** Full-width card inside Assigned Units panel (no sticky / margins). */
+  listItem = false,
 }) {
-  const shell = embedded
+  const shell = listItem
+    ? "m-0 flex w-full flex-col rounded-none bg-white p-5 shadow-none"
+    : embedded
     ? "m-0 flex h-auto min-h-0 w-[22rem] min-w-[22rem] max-w-[22rem] shrink-0 flex-col rounded-none border-0 border-r border-green-950/25 bg-white p-5 shadow-none lg:h-full"
     : "m-1 ml-3 w-90 rounded-lg rounded-r-none bg-white p-5";
 

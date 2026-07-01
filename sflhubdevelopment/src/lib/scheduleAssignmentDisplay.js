@@ -52,10 +52,20 @@ export function assignmentFromLive(inUseRow, scheduleAssignmentId = null) {
 export function loadBelongsToAssignment(load, assignment) {
   if (!load || !assignment) return false;
   if (assignment.scheduleAssignmentId) {
-    return (
+    if (
       String(load.schedule_assignment_id ?? "") ===
       String(assignment.scheduleAssignmentId)
-    );
+    ) {
+      return true;
+    }
+    if (
+      load.schedule_assignment_id == null &&
+      assignment.inUseUnitId != null &&
+      String(load.in_use_unit_id ?? "") === String(assignment.inUseUnitId)
+    ) {
+      return true;
+    }
+    return false;
   }
   return String(load.in_use_unit_id ?? "") === String(assignment.id);
 }

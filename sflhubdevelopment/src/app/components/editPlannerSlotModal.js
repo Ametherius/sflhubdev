@@ -25,6 +25,8 @@ export default function EditPlannerSlotModal({
     [slotColsProp, slot],
   );
 
+  const [origin, setOrigin] = useState("");
+  const [endUser, setEndUser] = useState("");
   const [unitNumber, setUnitNumber] = useState("");
   const [dispatched, setDispatched] = useState(false);
   const [unloaded, setUnloaded] = useState(false);
@@ -32,6 +34,8 @@ export default function EditPlannerSlotModal({
 
   useEffect(() => {
     if (!open || !slot) return;
+    setOrigin(String(slot[slotCols.origin] ?? "").trim());
+    setEndUser(String(slot[slotCols.endUser] ?? "").trim());
     setUnitNumber(readSlotUnitNumber(slot, slotCols));
     setDispatched(readSlotDispatched(slot, slotCols));
     setUnloaded(readSlotUnloaded(slot, slotCols));
@@ -42,6 +46,8 @@ export default function EditPlannerSlotModal({
     e.preventDefault();
     if (saving || !canEdit) return;
     await onSubmit?.({
+      origin: origin.trim(),
+      endUser: endUser.trim(),
       unitNumber: unitNumber.trim(),
       dispatched,
       unloaded,
@@ -51,8 +57,6 @@ export default function EditPlannerSlotModal({
 
   if (!open || !slot) return null;
 
-  const origin = slot[slotCols.origin] ?? "";
-  const endUser = slot[slotCols.endUser] ?? "";
   const inputClass =
     "mt-1 w-full rounded-lg border border-green-950/25 bg-white px-3 py-2 text-sm text-green-950 outline-none focus:border-green-950/50 disabled:cursor-not-allowed disabled:bg-green-950/5";
   const checkboxClass = "h-4 w-4 rounded border-green-950/30 text-green-950";
@@ -78,14 +82,31 @@ export default function EditPlannerSlotModal({
         >
           <FaTimes />
         </button>
-        <h2 id="edit-planner-slot-title" className="mb-1 text-xl font-bold">
+        <h2 id="edit-planner-slot-title" className="mb-4 text-xl font-bold">
           Planner slot
         </h2>
-        <p className="mb-4 text-sm text-green-900/80">
-          {[origin, endUser].filter(Boolean).join(" · ") || "Slot details"}
-        </p>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <label className="block text-sm font-medium">
+            Origin
+            <input
+              className={inputClass}
+              value={origin}
+              onChange={(e) => setOrigin(e.target.value)}
+              placeholder="Origin"
+              disabled={!canEdit || saving}
+            />
+          </label>
+          <label className="block text-sm font-medium">
+            End user
+            <input
+              className={inputClass}
+              value={endUser}
+              onChange={(e) => setEndUser(e.target.value)}
+              placeholder="End user"
+              disabled={!canEdit || saving}
+            />
+          </label>
           <label className="block text-sm font-medium">
             Unit number
             <input

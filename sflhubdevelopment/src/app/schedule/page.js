@@ -37,7 +37,7 @@ import { useLoadSlots } from "@/hooks/useLoadSlots";
 import { useLoadSheets } from "@/hooks/useLoadSheets";
 import ScheduleRow from "../components/scheduleRow";
 import { isScheduleWeekFkError } from "@/lib/scheduleLoadsPersist";
-import AssignedMenu from "../components/assignedMenu";
+import AssignedUnitsPanel from "../components/assignedUnitsPanel";
 import LoadsheetMenu from "../components/loadsheetMenu";
 import {
   resolveDefaultScheduleWeekId,
@@ -265,6 +265,33 @@ export default function Schedule() {
     selectedWeek?.week_start_date,
     supabase,
     refreshLoads,
+  ]);
+
+  useEffect(() => {
+    if (!resolvedWeekId) return;
+    if (weekAcceptsNewAssignments(selectedWeek?.week_start_date ?? null)) {
+      return;
+    }
+    void (async () => {
+      const { error } = await supabase.rpc("link_schedule_assignments_for_week", {
+        p_week_id: resolvedWeekId,
+      });
+      if (error) {
+        if (/function .* does not exist/i.test(error.message ?? "")) {
+          return;
+        }
+        console.error(error.message);
+        return;
+      }
+      await refreshSnapshots();
+      await refreshLoads();
+    })();
+  }, [
+    resolvedWeekId,
+    selectedWeek?.week_start_date,
+    supabase,
+    refreshLoads,
+    refreshSnapshots,
   ]);
 
   async function handleChangeUnitSave() {
@@ -495,6 +522,7 @@ export default function Schedule() {
     setUnitValue("");
     setAssignModal(false);
   }
+
   return (
     <div className="flex h-dvh min-h-0 w-full max-w-full flex-col overflow-hidden">
       <div className="shrink-0">
@@ -734,18 +762,11 @@ export default function Schedule() {
           );
         })}
       </div>
-      <div
-        className={`w-130 bg-white overflow-y-scroll max-h-screen fixed top-0 right-0 z-50 flex flex-wrap ${assignedMenu ? "" : "hidden"} justify-center`}
-      >
-        <button
-          type="button"
-          className="text-green-950 absolute top-0 right-0 m-3 text-2xl cursor-pointer"
-          onClick={() => setAssignedMenu(false)}
-        >
-          <FaTimes />
-        </button>
-        <AssignedMenu assigned={assigned} />
-      </div>
+      <AssignedUnitsPanel
+        open={assignedMenu}
+        onClose={() => setAssignedMenu(false)}
+        assigned={assigned}
+      />
       <div
         className={`w-130 bg-white overflow-y-scroll max-h-screen fixed top-0 right-0 mx-0 p-3 z-50 border-2 flex flex-wrap ${driversShowing ? "" : "hidden"} justify-center`}
       >
@@ -818,42 +839,44 @@ export default function Schedule() {
         />
       </div>
       <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-4 pb-28">
-          <div className="flex flex-row flex-1 fixed top-30 right-10 min-h-0 max-h-12">
+        <div className="flex h-full min-h-0 flex-1 flex-col px-4 pb-28">
+          <div className="flex shrink-0 flex-row flex-wrap gap-2 pt-2">
             <input
               type="search"
               value={searchAssigned}
               placeholder="Search By Division"
               onChange={(e) => setSearchAssigned(e.target.value)}
-              className="mb-4 w-full max-w-md rounded-xl py-6 bg-white p-2 text-green-950 placeholder:text-green-950"
+              className="w-full max-w-md rounded-xl bg-white p-2 py-2 text-green-950 placeholder:text-green-950"
             />
             <input
               type="search"
               value={searchByName}
               placeholder="Search By Name"
               onChange={(e) => setSearchByName(e.target.value)}
-              className="bg-white rounded-xl max-w-md placeholder:text-green-950 p-2 ml-2 text-green-950"
+              className="max-w-md rounded-xl bg-white p-2 text-green-950 placeholder:text-green-950"
             />
           </div>
-          {scheduleRowsForDisplay.map((row) => (
-            <ScheduleRow
-              key={row.scheduleAssignmentId ?? row.id}
-              assignment={row}
-              weekStartISO={selectedWeek?.week_start_date ?? null}
-              weekId={resolvedWeekId}
-              loads={loads.filter((l) => loadBelongsToAssignment(l, row))}
-              allWeekLoads={loads}
-              assignableUnits={assignableUnits}
-              loadSlots={loadSlots}
-              loadSheets={loadSheets}
-              readOnly={readOnly}
-              onDelete={canEdit ? rowActionHandler(row) : undefined}
-              deleteLabel={rowActionLabel(row)}
-              onLoadsUpdated={refreshLoads}
-              onLoadPatched={mergeScheduleLoad}
-              onLoadSheetsUpdated={refreshLoadSheets}
-            />
-          ))}
+          <div className="mt-3 h-[calc(100dvh-14rem)] min-h-[calc(100dvh-14rem)] overflow-y-auto overflow-x-hidden">
+            {scheduleRowsForDisplay.map((row) => (
+              <ScheduleRow
+                key={row.scheduleAssignmentId ?? row.id}
+                assignment={row}
+                weekStartISO={selectedWeek?.week_start_date ?? null}
+                weekId={resolvedWeekId}
+                loads={loads.filter((l) => loadBelongsToAssignment(l, row))}
+                allWeekLoads={loads}
+                assignableUnits={assignableUnits}
+                loadSlots={loadSlots}
+                loadSheets={loadSheets}
+                readOnly={readOnly}
+                onDelete={canEdit ? rowActionHandler(row) : undefined}
+                deleteLabel={rowActionLabel(row)}
+                onLoadsUpdated={refreshLoads}
+                onLoadPatched={mergeScheduleLoad}
+                onLoadSheetsUpdated={refreshLoadSheets}
+              />
+            ))}
+          </div>
         </div>
       </main>
 

@@ -8,14 +8,17 @@ import {
 } from "@/lib/weekDates";
 import {
   buildPlannerSlotInsert,
-  buildPlannerSlotStatusUpdate,
+  buildPlannerSlotUpdate,
   plannerSlotColumns,
   plannerSlotSchemaErrorMessage,
   readSlotBrokerId,
   readSlotWeekId,
 } from "@/lib/plannerSlots";
 import { useMemo, useState } from "react";
+import { FaPlus } from "react-icons/fa";
+import BtnWhite from "./btnWhite";
 import EditPlannerSlotModal from "./editPlannerSlotModal";
+import NewBrokerModal from "./newBrokerModal";
 import NewPlannerSlotModal from "./newPlannerSlotModal";
 import PlannerDayGrid from "./plannerDayGrid";
 import PlannerRow from "./plannerRow";
@@ -23,8 +26,7 @@ import PlannerRow from "./plannerRow";
 function nextSortOrder(existingDaySlots, cols) {
   return (
     existingDaySlots.reduce(
-      (max, slot) =>
-        Math.max(max, Number(slot[cols.sortOrder]) || 0),
+      (max, slot) => Math.max(max, Number(slot[cols.sortOrder]) || 0),
       0,
     ) + 1
   );
@@ -32,7 +34,7 @@ function nextSortOrder(existingDaySlots, cols) {
 
 export default function PlannerClient({
   slots: initialSlots,
-  brokers,
+  brokers: initialBrokers,
   weeks,
   slotColumns: slotColumnsProp = null,
   plannerSchemaReady = true,
@@ -41,7 +43,9 @@ export default function PlannerClient({
   const { canEdit } = usePermissions();
   const supabase = useMemo(() => createClient(), []);
   const [slots, setSlots] = useState(initialSlots ?? []);
+  const [brokers, setBrokers] = useState(initialBrokers ?? []);
   const [selectedWeekId, setSelectedWeekId] = useState("");
+  const [addBrokerOpen, setAddBrokerOpen] = useState(false);
   const [addSlotTarget, setAddSlotTarget] = useState(null);
   const [editSlotTarget, setEditSlotTarget] = useState(null);
   const [savingSlot, setSavingSlot] = useState(false);
@@ -84,6 +88,16 @@ export default function PlannerClient({
     }
   }
 
+  async function refreshBrokers() {
+    const { data, error } = await supabase
+      .from("brokers")
+      .select("id, name")
+      .order("name");
+    if (!error && data) {
+      setBrokers(data);
+    }
+  }
+
   async function handleDeleteSlot(slot) {
     if (!slot?.id || !plannerSchemaReady) return;
     setDeletingSlotId(slot.id);
@@ -104,12 +118,19 @@ export default function PlannerClient({
     }
   }
 
-  async function handleUpdateSlot({ unitNumber, dispatched, unloaded, completed }) {
+  async function handleUpdateSlot({
+    origin,
+    endUser,
+    unitNumber,
+    dispatched,
+    unloaded,
+    completed,
+  }) {
     if (!editSlotTarget?.id || !plannerSchemaReady) return;
     setSavingSlotEdit(true);
     try {
-      const patch = buildPlannerSlotStatusUpdate(
-        { unitNumber, dispatched, unloaded, completed },
+      const patch = buildPlannerSlotUpdate(
+        { origin, endUser, unitNumber, dispatched, unloaded, completed },
         slotCols,
       );
       const { data, error } = await supabase
@@ -131,9 +152,7 @@ export default function PlannerClient({
       }
 
       if (data) {
-        setSlots((prev) =>
-          prev.map((s) => (s.id === data.id ? data : s)),
-        );
+        setSlots((prev) => prev.map((s) => (s.id === data.id ? data : s)));
       }
       setEditSlotTarget(null);
     } finally {
@@ -141,7 +160,12 @@ export default function PlannerClient({
     }
   }
 
-  async function handleCreateSlot({ brokerId, origin, endUser }) {
+  async function handleCreateSlot({
+    brokerId,
+    origin,
+    endUser,
+    slotCount = 1,
+  }) {
     if (!plannerSchemaReady) {
       alert(plannerSlotSchemaErrorMessage(plannerSchemaMissing));
       return;
@@ -149,22 +173,25 @@ export default function PlannerClient({
     if (!addSlotTarget?.weekId || !addSlotTarget?.planDate) return;
     setSavingSlot(true);
     try {
-      const row = buildPlannerSlotInsert(
-        {
-          brokerId,
-          weekId: addSlotTarget.weekId,
-          planDate: addSlotTarget.planDate,
-          sortOrder: nextSortOrder(addSlotTarget.existingDaySlots ?? [], slotCols),
-          origin,
-          endUser,
-        },
+      const count = Math.max(1, Math.min(50, Number(slotCount) || 1));
+      const startSort = nextSortOrder(
+        addSlotTarget.existingDaySlots ?? [],
         slotCols,
       );
-      const { data, error } = await supabase
-        .from("planner_slots")
-        .insert(row)
-        .select()
-        .single();
+      const rows = Array.from({ length: count }, (_, index) =>
+        buildPlannerSlotInsert(
+          {
+            brokerId,
+            weekId: addSlotTarget.weekId,
+            planDate: addSlotTarget.planDate,
+            sortOrder: startSort + index,
+            origin,
+            endUser,
+          },
+          slotCols,
+        ),
+      );
+      const { error } = await supabase.from("planner_slots").insert(rows);
 
       if (error) {
         if (/schema cache|could not find the/i.test(error.message ?? "")) {
@@ -175,9 +202,7 @@ export default function PlannerClient({
         return;
       }
 
-      if (data) {
-        await refreshSlots();
-      }
+      await refreshSlots();
       setAddSlotTarget(null);
     } finally {
       setSavingSlot(false);
@@ -196,15 +221,20 @@ export default function PlannerClient({
         onSubmit={handleUpdateSlot}
       />
 
+      <NewBrokerModal
+        open={addBrokerOpen}
+        onClose={() => setAddBrokerOpen(false)}
+        onCreated={refreshBrokers}
+      />
+
       <NewPlannerSlotModal
         open={addSlotTarget != null}
         onClose={() => setAddSlotTarget(null)}
         brokers={brokers}
         initialBrokerId={addSlotTarget?.brokerId ?? ""}
+        bulk={Boolean(addSlotTarget?.bulk)}
         dayTitle={
-          addSlotTarget?.dayTitle
-            ? `Day: ${addSlotTarget.dayTitle}`
-            : ""
+          addSlotTarget?.dayTitle ? `Day: ${addSlotTarget.dayTitle}` : ""
         }
         saving={savingSlot}
         onSubmit={handleCreateSlot}
@@ -221,7 +251,7 @@ export default function PlannerClient({
         </p>
       ) : null}
 
-      <div className="m-2 flex p-3">
+      <div className="m-2 flex flex-wrap items-center gap-3 p-3">
         <select
           value={resolveWeekId ?? ""}
           onChange={(e) => setSelectedWeekId(e.target.value || null)}
@@ -249,35 +279,43 @@ export default function PlannerClient({
             })
           )}
         </select>
+        {canEdit ? (
+          <BtnWhite
+            Icon={FaPlus}
+            text="Add Broker"
+            onClick={() => setAddBrokerOpen(true)}
+          />
+        ) : null}
       </div>
-      {brokers.map((b) => {
-        const slotsForBroker = slotsForWeek.filter(
-          (s) => String(readSlotBrokerId(s, slotCols)) === String(b.id),
-        );
-        return (
-          <PlannerRow key={b.id}>
-            <div
-              key={`${b.id}-label`}
-              className="w-60 shrink-0 border-b-2 border-green-950 bg-white p-3 text-xl font-bold uppercase text-green-950"
-            >
-              {b.name}
-            </div>
-            <PlannerDayGrid
-              key={`${b.id}-grid`}
-              brokerId={b.id}
-              weekId={resolveWeekId}
-              weekStartISO={weekStartISO}
-              slots={slotsForBroker}
-              slotCols={slotCols}
-              canEdit={canEdit && plannerSchemaReady}
-              onRequestAddSlot={setAddSlotTarget}
-              onSelectSlot={setEditSlotTarget}
-              onDeleteSlot={canEdit && plannerSchemaReady ? handleDeleteSlot : undefined}
-              deletingSlotId={deletingSlotId}
-            />
-          </PlannerRow>
-        );
-      })}
+      <div className="mx-2 max-h-[calc(100dvh-14rem)] overflow-auto rounded-md border border-green-950/25 bg-white">
+        {brokers.map((b) => {
+          const slotsForBroker = slotsForWeek.filter(
+            (s) => String(readSlotBrokerId(s, slotCols)) === String(b.id),
+          );
+          return (
+            <PlannerRow key={b.id}>
+              <div className="sticky left-0 z-10 flex w-60 shrink-0 items-center self-stretch border-b-2 border-r-2 border-green-950 bg-white p-3 text-xl font-bold uppercase text-green-950">
+                {b.name}
+              </div>
+              <PlannerDayGrid
+                brokerId={b.id}
+                weekId={resolveWeekId}
+                weekStartISO={weekStartISO}
+                slots={slotsForBroker}
+                slotCols={slotCols}
+                canEdit={canEdit && plannerSchemaReady}
+                onRequestAddSlot={setAddSlotTarget}
+                onRequestAddMultipleSlots={setAddSlotTarget}
+                onSelectSlot={setEditSlotTarget}
+                onDeleteSlot={
+                  canEdit && plannerSchemaReady ? handleDeleteSlot : undefined
+                }
+                deletingSlotId={deletingSlotId}
+              />
+            </PlannerRow>
+          );
+        })}
+      </div>
     </div>
   );
 }

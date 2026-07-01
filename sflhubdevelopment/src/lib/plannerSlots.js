@@ -204,3 +204,17 @@ export function buildPlannerSlotStatusUpdate(
     [cols.completed]: Boolean(completed),
   };
 }
+
+export function buildPlannerSlotUpdate(
+  { origin, endUser, unitNumber, dispatched, unloaded, completed },
+  cols = plannerSlotColumns(),
+) {
+  return {
+    [cols.origin]: origin?.length ? origin : null,
+    [cols.endUser]: endUser?.length ? endUser : null,
+    [cols.unitNumber]: unitNumber?.length ? unitNumber : null,
+    [cols.dispatched]: Boolean(dispatched),
+    [cols.unloaded]: Boolean(unloaded),
+    [cols.completed]: Boolean(completed),
+  };
+}

@@ -10,18 +10,21 @@ export default function NewPlannerSlotModal({
   brokers = [],
   initialBrokerId = "",
   dayTitle = "",
+  bulk = false,
   saving = false,
   onSubmit,
 }) {
   const [brokerId, setBrokerId] = useState("");
   const [origin, setOrigin] = useState("");
   const [endUser, setEndUser] = useState("");
+  const [slotCount, setSlotCount] = useState(2);
 
   useEffect(() => {
     if (!open) return;
     setBrokerId(initialBrokerId ? String(initialBrokerId) : "");
     setOrigin("");
     setEndUser("");
+    setSlotCount(2);
   }, [open, initialBrokerId]);
 
   const brokerOptions = useMemo(
@@ -41,10 +44,12 @@ export default function NewPlannerSlotModal({
       alert("Select a broker.");
       return;
     }
+    const count = bulk ? Math.max(1, Math.min(50, Number(slotCount) || 1)) : 1;
     await onSubmit?.({
       brokerId,
       origin: origin.trim(),
       endUser: endUser.trim(),
+      slotCount: count,
     });
   }
 
@@ -77,13 +82,27 @@ export default function NewPlannerSlotModal({
           <FaTimes />
         </button>
         <h2 id="new-planner-slot-title" className="mb-1 text-xl font-bold">
-          New planner slot
+          {bulk ? "Add multiple slots" : "New planner slot"}
         </h2>
         {dayTitle ? (
           <p className="mb-4 text-sm text-green-900/80">{dayTitle}</p>
         ) : null}
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+          {bulk ? (
+            <label className="block text-sm font-medium">
+              Number of slots
+              <input
+                type="number"
+                min={1}
+                max={50}
+                className={inputClass}
+                value={slotCount}
+                onChange={(e) => setSlotCount(e.target.value)}
+                required
+              />
+            </label>
+          ) : null}
           <label className="block text-sm font-medium">
             Broker
             <select
@@ -126,7 +145,16 @@ export default function NewPlannerSlotModal({
             >
               Cancel
             </button>
-            <ButtonDark type="submit" text={saving ? "Saving…" : "Add slot"} />
+            <ButtonDark
+              type="submit"
+              text={
+                saving
+                  ? "Saving…"
+                  : bulk
+                    ? "Add slots"
+                    : "Add slot"
+              }
+            />
           </div>
         </form>
       </div>
