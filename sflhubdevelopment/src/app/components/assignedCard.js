@@ -1,4 +1,5 @@
 import ButtonDark from "./buttonDark";
+import BtnRed from "./btnRed";
 
 export default function AssignedCard({
   name,
@@ -14,6 +15,8 @@ export default function AssignedCard({
   ufaPIN,
   onDelete,
   deleteLabel = "",
+  onSecondaryAction,
+  secondaryLabel = "",
   /** CAD week revenue total for this unit (embedded schedule rows). */
   weekTotalDisplay = "",
   /** CAD revenue per km for the week (embedded schedule rows). */
@@ -102,15 +105,25 @@ export default function AssignedCard({
           </p>
         </div>
       </div>
-      {typeof onDelete === "function" ? (
+      {typeof onDelete === "function" ||
+      typeof onSecondaryAction === "function" ? (
         <div
-          className={`flex justify-center ${embedded ? "mt-auto pt-4" : "mt-2"}`}
+          className={`flex flex-wrap items-center justify-center gap-2 ${embedded ? "mt-auto pt-4" : "mt-2"}`}
         >
-          <ButtonDark
-            onClick={() => void onDelete()}
-            text={deleteLabel}
-            type="button"
-          />
+          {typeof onDelete === "function" ? (
+            <BtnRed
+              onClick={() => void onDelete()}
+              text={deleteLabel}
+              type="button"
+            />
+          ) : null}
+          {typeof onSecondaryAction === "function" ? (
+            <ButtonDark
+              onClick={() => void onSecondaryAction()}
+              text={secondaryLabel}
+              type="button"
+            />
+          ) : null}
         </div>
       ) : null}
     </div>

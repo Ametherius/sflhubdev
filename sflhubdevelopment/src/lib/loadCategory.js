@@ -231,9 +231,17 @@ export function driverDivisionMatchesLoadCategory(
     case "tanker":
       return n.includes("tanker");
     case "cargill":
-      return n.includes("cargill");
+      // Cargill is under Canadian Grain Division — both match.
+      return (
+        n.includes("cargill") ||
+        (/canadian/.test(n) && /grain/.test(n))
+      );
     case "irm":
-      return n.includes("irm");
+      // IRM is under Canadian Grain Division — both match.
+      return (
+        n.includes("irm") ||
+        (/canadian/.test(n) && /grain/.test(n))
+      );
     case "canadian_grain":
       return /canadian/.test(n) && /grain/.test(n);
     case "us_grain":

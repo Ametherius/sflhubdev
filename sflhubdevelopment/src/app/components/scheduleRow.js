@@ -43,14 +43,15 @@ export default function ScheduleRow({
   loadSheets = [],
   onDelete,
   deleteLabel = "",
+  onSecondaryAction,
+  secondaryLabel = "",
   readOnly = false,
   onLoadsUpdated,
   onLoadPatched,
   onLoadSheetsUpdated,
 }) {
-  const driver = assignment.driver;
-  const unit = assignment.unit;
-  if (!driver || !unit) return null;
+  const driver = assignment?.driver;
+  const unit = assignment?.unit;
 
   const banner = formatWeekBanner(weekStartISO);
 
@@ -63,6 +64,8 @@ export default function ScheduleRow({
       weekRevenuePerKmDisplay: formatWeekRevenuePerKm(revenue, miles),
     };
   }, [loads]);
+
+  if (!driver || !unit) return null;
 
   return (
     <article className="mb-10 w-full min-w-0 max-w-full">
@@ -90,6 +93,10 @@ export default function ScheduleRow({
             weekRevenuePerKmDisplay={weekRevenuePerKmDisplay}
             onDelete={assignment.isArchived ? undefined : onDelete}
             deleteLabel={deleteLabel}
+            onSecondaryAction={
+              assignment.isArchived ? undefined : onSecondaryAction
+            }
+            secondaryLabel={secondaryLabel}
           />
           <div className="min-h-0 min-w-0 flex-1 overflow-x-auto overscroll-x-contain bg-white p-2 lg:rounded-tr-2xl">
             <UnitWeekLoadsGrid

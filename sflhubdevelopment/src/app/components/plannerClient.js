@@ -125,14 +125,26 @@ export default function PlannerClient({
     dispatched,
     unloaded,
     completed,
+    rejected,
   }) {
     if (!editSlotTarget?.id || !plannerSchemaReady) return;
     setSavingSlotEdit(true);
     try {
       const patch = buildPlannerSlotUpdate(
-        { origin, endUser, unitNumber, dispatched, unloaded, completed },
+        {
+          origin,
+          endUser,
+          unitNumber,
+          dispatched,
+          unloaded,
+          completed,
+          rejected: Boolean(rejected),
+        },
         slotCols,
       );
+      // Always persist rejected explicitly (true when checked, false when not).
+      patch[slotCols.rejected] = Boolean(rejected);
+
       const { data, error } = await supabase
         .from("planner_slots")
         .update(patch)
@@ -141,9 +153,9 @@ export default function PlannerClient({
         .single();
 
       if (error) {
-        if (/schema cache|could not find the/i.test(error.message ?? "")) {
+        if (/schema cache|could not find the|rejected/i.test(error.message ?? "")) {
           alert(
-            "Planner status columns may be missing. Run supabase/migrations/20260630130000_planner_slots_status_fields.sql in the Supabase SQL editor, then refresh.",
+            "Planner rejected column may be missing. Run supabase/migrations/20260717160000_planner_slots_rejected.sql in the Supabase SQL editor (or npm run db:push), then refresh.",
           );
         } else {
           alert(error.message);
@@ -151,9 +163,10 @@ export default function PlannerClient({
         return;
       }
 
-      if (data) {
-        setSlots((prev) => prev.map((s) => (s.id === data.id ? data : s)));
-      }
+      const nextRow = data ? { ...data, ...patch } : { ...editSlotTarget, ...patch };
+      setSlots((prev) =>
+        prev.map((s) => (s.id === editSlotTarget.id ? nextRow : s)),
+      );
       setEditSlotTarget(null);
     } finally {
       setSavingSlotEdit(false);

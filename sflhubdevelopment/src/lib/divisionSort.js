@@ -37,13 +37,6 @@ export function compareAssignedRows(a, b) {
   const divCmp = divisionSortRank(a.driver?.division) - divisionSortRank(b.driver?.division);
   if (divCmp !== 0) return divCmp;
 
-  const byName = (a.driver?.name ?? "")
-    .trim()
-    .localeCompare((b.driver?.name ?? "").trim(), undefined, {
-      sensitivity: "base",
-    });
-  if (byName !== 0) return byName;
-
   const unitA = a.unit?.unit;
   const unitB = b.unit?.unit;
   const numA = Number(unitA);

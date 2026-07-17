@@ -1,4 +1,7 @@
-import { plannerSlotStatusClass } from "@/lib/plannerSlots";
+import {
+  plannerSlotStatusClass,
+  readSlotRejected,
+} from "@/lib/plannerSlots";
 
 export const plannerCellWidthClass = "w-[25rem] min-w-[25rem]";
 export const plannerUnitColumnClass = "w-14 min-w-14";
@@ -17,9 +20,9 @@ export function PlannerAddMultipleSlotCell({ onClick, disabled = false }) {
       className={`${plannerCellShellClass} !items-center justify-center gap-0.5 border-dashed bg-green-950/5 text-green-950 transition hover:bg-green-950/10 disabled:cursor-not-allowed disabled:opacity-50`}
       aria-label="Add multiple planner slots"
     >
-      <span className="text-sm font-bold leading-none">++</span>
+      <span className="text-sm font-bold leading-none">+</span>
       <span className="text-[9px] font-semibold uppercase leading-tight tracking-wide">
-        Add multiple
+        Add Slots
       </span>
     </button>
   );
@@ -55,6 +58,7 @@ export default function PlannerDayCell({
   const unitNumber = slotCols?.unitNumber
     ? slot[slotCols.unitNumber]
     : slot.unit_number;
+  const rejected = readSlotRejected(slot, slotCols);
   const statusClass = plannerSlotStatusClass(slot, slotCols);
   const onDarkBg = /text-white/.test(statusClass);
   const subTextClass = onDarkBg ? "text-white/80" : "text-green-900/75";
@@ -89,14 +93,22 @@ export default function PlannerDayCell({
         </button>
       ) : null}
 
-      <div className="flex min-w-0 flex-1 items-center justify-end gap-2 overflow-hidden bg-inherit px-2 pl-7">
-        <span className="min-w-0 truncate text-right font-medium">
+      <div className="flex min-w-0 flex-1 items-center justify-center gap-2 overflow-hidden bg-inherit px-2 pl-7">
+        <span className="min-w-0 truncate text-center font-medium">
           {origin || "—"}
         </span>
-        <span className={`min-w-0 truncate text-right text-xs ${subTextClass}`}>
+        <span className={`min-w-0 truncate text-center text-xs ${subTextClass}`}>
           {endUser || "End user —"}
         </span>
       </div>
+
+      {rejected ? (
+        <div
+          className={`flex shrink-0 items-center justify-center border-l bg-inherit px-2 text-[10px] font-bold uppercase tracking-wide ${unitBorderClass}`}
+        >
+          Rejected
+        </div>
+      ) : null}
 
       <div
         className={`flex ${plannerUnitColumnClass} shrink-0 items-center justify-center border-l bg-inherit px-1 text-xs font-bold tabular-nums ${unitBorderClass}`}

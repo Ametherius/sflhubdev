@@ -10,6 +10,7 @@ export const PLANNER_SLOT_FIELD_ALIASES = {
   dispatched: ["dispatched"],
   unloaded: ["unloaded"],
   completed: ["completed"],
+  rejected: ["rejected"],
 };
 
 const CANONICAL_DEFAULTS = {
@@ -23,6 +24,7 @@ const CANONICAL_DEFAULTS = {
   dispatched: "dispatched",
   unloaded: "unloaded",
   completed: "completed",
+  rejected: "rejected",
 };
 
 function pickColumn(sample, aliases, fallback) {
@@ -88,6 +90,11 @@ export function plannerSlotColumns(sampleSlot = null, overrides = null) {
       sampleSlot,
       PLANNER_SLOT_FIELD_ALIASES.completed,
       CANONICAL_DEFAULTS.completed,
+    ),
+    rejected: pickColumn(
+      sampleSlot,
+      PLANNER_SLOT_FIELD_ALIASES.rejected,
+      CANONICAL_DEFAULTS.rejected,
     ),
   };
 }
@@ -162,8 +169,15 @@ export function readSlotCompleted(slot, cols = plannerSlotColumns(slot)) {
   return Boolean(slot?.[cols.completed]);
 }
 
-/** Highest matching status wins (completed → unloaded → dispatched → unit). */
+export function readSlotRejected(slot, cols = plannerSlotColumns(slot)) {
+  return Boolean(slot?.[cols.rejected]);
+}
+
+/** Highest matching status wins (rejected → completed → unloaded → dispatched → unit). */
 export function plannerSlotStatusClass(slot, cols = plannerSlotColumns(slot)) {
+  if (readSlotRejected(slot, cols)) {
+    return "bg-orange-500 text-white";
+  }
   if (readSlotCompleted(slot, cols)) {
     return "bg-gray-500 text-white";
   }
@@ -194,7 +208,7 @@ export function buildPlannerSlotInsert(
 }
 
 export function buildPlannerSlotStatusUpdate(
-  { unitNumber, dispatched, unloaded, completed },
+  { unitNumber, dispatched, unloaded, completed, rejected },
   cols = plannerSlotColumns(),
 ) {
   return {
@@ -202,11 +216,12 @@ export function buildPlannerSlotStatusUpdate(
     [cols.dispatched]: Boolean(dispatched),
     [cols.unloaded]: Boolean(unloaded),
     [cols.completed]: Boolean(completed),
+    [cols.rejected]: Boolean(rejected),
   };
 }
 
 export function buildPlannerSlotUpdate(
-  { origin, endUser, unitNumber, dispatched, unloaded, completed },
+  { origin, endUser, unitNumber, dispatched, unloaded, completed, rejected },
   cols = plannerSlotColumns(),
 ) {
   return {
@@ -216,5 +231,6 @@ export function buildPlannerSlotUpdate(
     [cols.dispatched]: Boolean(dispatched),
     [cols.unloaded]: Boolean(unloaded),
     [cols.completed]: Boolean(completed),
+    [cols.rejected]: Boolean(rejected),
   };
 }

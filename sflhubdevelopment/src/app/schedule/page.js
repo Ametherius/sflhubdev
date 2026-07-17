@@ -257,6 +257,7 @@ export default function Schedule() {
         }
         console.error(error.message);
       }
+      await refreshSnapshots();
       await refreshLoads();
     })();
   }, [
@@ -265,6 +266,7 @@ export default function Schedule() {
     selectedWeek?.week_start_date,
     supabase,
     refreshLoads,
+    refreshSnapshots,
   ]);
 
   useEffect(() => {
@@ -355,7 +357,42 @@ export default function Schedule() {
     await refreshLoads();
   }
 
+  async function handleRemoveWeekRow(row) {
+    if (!row || row.isArchived) return;
+
+    let assignmentId = row.scheduleAssignmentId ?? null;
+    if (!assignmentId && resolvedWeekId && row.inUseUnitId) {
+      const { data, error } = await supabase
+        .from("schedule_assignments")
+        .select("id")
+        .eq("week_id", resolvedWeekId)
+        .eq("in_use_unit_id", row.inUseUnitId);
+      if (error) {
+        alert(error.message);
+        return;
+      }
+      assignmentId = data?.[0]?.id ?? null;
+    }
+
+    if (!assignmentId) {
+      alert("No schedule assignment found for this unit on this week.");
+      return;
+    }
+
+    await handleRemoveWeekAssignment(assignmentId, { pastWeek: !isLiveWeek });
+  }
+
   function rowActionHandler(row) {
+    if (row.isArchived) return undefined;
+    return () => void handleRemoveWeekRow(row);
+  }
+
+  function rowActionLabel(row) {
+    if (row.isArchived) return "";
+    return "Delete unit";
+  }
+
+  function rowSecondaryHandler(row) {
     if (row.isArchived) return undefined;
     if (row.inUseUnitId && isLiveWeek) {
       return () => {
@@ -363,22 +400,11 @@ export default function Schedule() {
         setChangeUnitValue(String(row.unit?.id ?? ""));
       };
     }
-    if (!isLiveWeek && row.scheduleAssignmentId) {
-      return () =>
-        void handleRemoveWeekAssignment(row.scheduleAssignmentId, { pastWeek: true });
-    }
-    if (isLiveWeek && row.isWeekOnly && row.scheduleAssignmentId) {
-      return () => void handleRemoveWeekAssignment(row.scheduleAssignmentId);
-    }
     return undefined;
   }
 
-  function rowActionLabel(row) {
+  function rowSecondaryLabel(row) {
     if (row.inUseUnitId && isLiveWeek) return "Change Unit";
-    if (!isLiveWeek && row.scheduleAssignmentId) return "Delete unit";
-    if (isLiveWeek && row.isWeekOnly && row.scheduleAssignmentId) {
-      return "Remove from week";
-    }
     return "";
   }
 
@@ -871,6 +897,10 @@ export default function Schedule() {
                 readOnly={readOnly}
                 onDelete={canEdit ? rowActionHandler(row) : undefined}
                 deleteLabel={rowActionLabel(row)}
+                onSecondaryAction={
+                  canEdit ? rowSecondaryHandler(row) : undefined
+                }
+                secondaryLabel={rowSecondaryLabel(row)}
                 onLoadsUpdated={refreshLoads}
                 onLoadPatched={mergeScheduleLoad}
                 onLoadSheetsUpdated={refreshLoadSheets}

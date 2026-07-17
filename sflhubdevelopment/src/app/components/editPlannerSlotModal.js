@@ -4,6 +4,7 @@ import {
   plannerSlotColumns,
   readSlotCompleted,
   readSlotDispatched,
+  readSlotRejected,
   readSlotUnitNumber,
   readSlotUnloaded,
 } from "@/lib/plannerSlots";
@@ -31,6 +32,7 @@ export default function EditPlannerSlotModal({
   const [dispatched, setDispatched] = useState(false);
   const [unloaded, setUnloaded] = useState(false);
   const [completed, setCompleted] = useState(false);
+  const [rejected, setRejected] = useState(false);
 
   useEffect(() => {
     if (!open || !slot) return;
@@ -40,6 +42,7 @@ export default function EditPlannerSlotModal({
     setDispatched(readSlotDispatched(slot, slotCols));
     setUnloaded(readSlotUnloaded(slot, slotCols));
     setCompleted(readSlotCompleted(slot, slotCols));
+    setRejected(readSlotRejected(slot, slotCols));
   }, [open, slot, slotCols]);
 
   async function handleSubmit(e) {
@@ -52,6 +55,7 @@ export default function EditPlannerSlotModal({
       dispatched,
       unloaded,
       completed,
+      rejected,
     });
   }
 
@@ -118,7 +122,10 @@ export default function EditPlannerSlotModal({
             />
           </label>
 
-          <fieldset className="flex flex-col gap-2" disabled={!canEdit || saving}>
+          <fieldset
+            className="flex flex-col gap-2"
+            disabled={!canEdit || saving}
+          >
             <legend className="mb-1 text-sm font-medium">Status</legend>
             <label className="flex items-center gap-2 text-sm">
               <input
@@ -146,6 +153,15 @@ export default function EditPlannerSlotModal({
                 onChange={(e) => setCompleted(e.target.checked)}
               />
               100% complete
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                className={checkboxClass}
+                checked={rejected}
+                onChange={(e) => setRejected(e.target.checked)}
+              />
+              Rejected
             </label>
           </fieldset>
 

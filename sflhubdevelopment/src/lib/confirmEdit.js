@@ -94,11 +94,11 @@ export function changeUnitConfirmOptions(driverName, unitLabel) {
 
 export function removeWeekAssignmentConfirmOptions({ pastWeek = false } = {}) {
   return {
-    title: pastWeek ? "Delete unit from this week?" : "Remove from this week?",
+    title: "Delete unit from this week?",
     message: pastWeek
       ? "Delete this driver and unit from this past week only? All load data for this week will be removed. Other weeks and the live board are not affected."
-      : "Remove this driver and unit from this week’s schedule only? All load data for this week will be deleted. The live assigned board is not affected.",
-    confirmLabel: pastWeek ? "Delete unit" : "Remove",
+      : "Delete this driver and unit from this week’s schedule only? All load data for this week will be deleted. The live assigned board is not affected.",
+    confirmLabel: "Delete unit",
     cancelLabel: "Cancel",
     variant: "danger",
   };

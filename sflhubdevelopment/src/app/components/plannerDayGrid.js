@@ -37,7 +37,8 @@ export default function PlannerDayGrid({
     }
     for (const list of map.values()) {
       list.sort(
-        (a, b) => readSlotSortOrder(a, slotCols) - readSlotSortOrder(b, slotCols),
+        (a, b) =>
+          readSlotSortOrder(a, slotCols) - readSlotSortOrder(b, slotCols),
       );
     }
     return map;
@@ -67,12 +68,14 @@ export default function PlannerDayGrid({
                     canEdit={canEdit}
                     onSelect={onSelectSlot}
                     onDelete={onDeleteSlot}
-                    deleting={deletingSlotId != null && deletingSlotId === ds.id}
+                    deleting={
+                      deletingSlotId != null && deletingSlotId === ds.id
+                    }
                   />
                 ))}
                 {canEdit ? (
                   <>
-                    <PlannerAddSlotCell
+                    {/* <PlannerAddSlotCell
                       disabled={!weekId || !brokerId}
                       onClick={() =>
                         onRequestAddSlot?.({
@@ -84,7 +87,7 @@ export default function PlannerDayGrid({
                           bulk: false,
                         })
                       }
-                    />
+                    /> */}
                     <PlannerAddMultipleSlotCell
                       disabled={!weekId || !brokerId}
                       onClick={() =>
