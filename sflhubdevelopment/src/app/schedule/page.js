@@ -297,60 +297,202 @@ export default function Schedule() {
   ]);
 
   async function handleChangeUnitSave() {
-    if (!changeUnitRow?.inUseUnitId) return;
     const newUnitId = changeUnitValue.trim();
     if (!newUnitId) {
       alert("Select a unit.");
       return;
     }
-    if (String(newUnitId) === String(changeUnitRow.unit?.id ?? "")) {
+    if (String(newUnitId) === String(changeUnitRow?.unit?.id ?? "")) {
       setChangeUnitRow(null);
       return;
     }
 
     const newUnit = units.find((u) => String(u.id) === newUnitId);
-    const driverName = changeUnitRow.driver?.name ?? "this driver";
-    const unitLabel = String(newUnit?.unit ?? newUnitId);
-    if (!(await confirm(changeUnitConfirmOptions(driverName, unitLabel)))) return;
+    if (!newUnit) {
+      alert("Unit not found.");
+      return;
+    }
+
+    const driverName = changeUnitRow?.driver?.name ?? "this driver";
+    const unitLabel = String(newUnit.unit ?? newUnitId);
+    const pastWeek = !isLiveWeek;
+    if (
+      !(await confirm(
+        changeUnitConfirmOptions(driverName, unitLabel, { pastWeek }),
+      ))
+    ) {
+      return;
+    }
+
+    const unitSnapshot = {
+      unitid: newUnitId,
+      unit_label: String(newUnit.unit ?? "").trim() || null,
+      unit_petro: newUnit.petro != null ? String(newUnit.petro) : null,
+      unit_petro_pin:
+        newUnit.petroPIN != null
+          ? String(newUnit.petroPIN)
+          : newUnit.petro_pin != null
+            ? String(newUnit.petro_pin)
+            : null,
+      unit_ufa: newUnit.ufa != null ? String(newUnit.ufa) : null,
+      unit_ufa_pin:
+        newUnit.ufaPIN != null
+          ? String(newUnit.ufaPIN)
+          : newUnit.ufa_pin != null
+            ? String(newUnit.ufa_pin)
+            : null,
+    };
 
     setChangeUnitSaving(true);
-    const { error } = await supabase
-      .from("in_use_units")
-      .update({ unitid: newUnitId })
-      .eq("id", changeUnitRow.inUseUnitId);
-    setChangeUnitSaving(false);
+    try {
+      if (pastWeek) {
+        // Past week only: update this week's assignment snapshot — never live board.
+        const assignmentId = changeUnitRow?.scheduleAssignmentId;
+        if (!assignmentId || !resolvedWeekId) {
+          alert("No week assignment found to update.");
+          return;
+        }
+        const { error } = await supabase
+          .from("schedule_assignments")
+          .update(unitSnapshot)
+          .eq("id", assignmentId)
+          .eq("week_id", resolvedWeekId);
+        if (error) {
+          alert(error.message);
+          return;
+        }
+      } else {
+        // Live/current week: update live board (and this week's snapshot if present).
+        if (!changeUnitRow?.inUseUnitId) {
+          // Week-only row on an open week — change that week assignment only.
+          const assignmentId = changeUnitRow?.scheduleAssignmentId;
+          if (!assignmentId || !resolvedWeekId) {
+            alert("No week assignment found to update.");
+            return;
+          }
+          const { error } = await supabase
+            .from("schedule_assignments")
+            .update(unitSnapshot)
+            .eq("id", assignmentId)
+            .eq("week_id", resolvedWeekId);
+          if (error) {
+            alert(error.message);
+            return;
+          }
+        } else {
+          const { error } = await supabase
+            .from("in_use_units")
+            .update({ unitid: newUnitId })
+            .eq("id", changeUnitRow.inUseUnitId);
+          if (error) {
+            alert(error.message);
+            return;
+          }
 
-    if (error) {
-      alert(error.message);
-      return;
+          if (changeUnitRow.scheduleAssignmentId && resolvedWeekId) {
+            const { error: snapErr } = await supabase
+              .from("schedule_assignments")
+              .update(unitSnapshot)
+              .eq("id", changeUnitRow.scheduleAssignmentId)
+              .eq("week_id", resolvedWeekId);
+            if (snapErr) {
+              console.error(snapErr.message);
+            }
+          }
+        }
+      }
+
+      await refreshAssigned();
+      await refreshSnapshots();
+      await refreshLoads();
+      setChangeUnitRow(null);
+      setChangeUnitValue("");
+    } finally {
+      setChangeUnitSaving(false);
     }
-    await refreshAssigned();
-    await refreshSnapshots();
-    await refreshLoads();
-    setChangeUnitRow(null);
-    setChangeUnitValue("");
   }
 
-  async function handleRemoveWeekAssignment(scheduleAssignmentId, { pastWeek = false } = {}) {
-    if (scheduleAssignmentId == null) return;
+  async function handleRemoveWeekAssignment(
+    scheduleAssignmentId,
+    {
+      pastWeek = false,
+      weekId = null,
+      inUseUnitId = null,
+    } = {},
+  ) {
+    if (scheduleAssignmentId == null && (weekId == null || inUseUnitId == null)) {
+      return;
+    }
     if (!(await confirm(removeWeekAssignmentConfirmOptions({ pastWeek })))) return;
 
-    const { error: loadsErr } = await supabase
-      .from("schedule_loads")
-      .delete()
-      .eq("schedule_assignment_id", scheduleAssignmentId);
-    if (loadsErr) {
-      alert(loadsErr.message);
+    const targetWeekId = weekId ?? resolvedWeekId;
+    if (!targetWeekId) {
+      alert("No week selected.");
       return;
     }
 
-    const { error: assignErr } = await supabase
-      .from("schedule_assignments")
-      .delete()
-      .eq("id", scheduleAssignmentId);
-    if (assignErr) {
-      alert(assignErr.message);
-      return;
+    // Strictly this week only — never delete other weeks for this unit.
+    if (scheduleAssignmentId != null) {
+      const { error: loadsByAssignErr } = await supabase
+        .from("schedule_loads")
+        .delete()
+        .eq("week_id", targetWeekId)
+        .eq("schedule_assignment_id", scheduleAssignmentId);
+      if (loadsByAssignErr) {
+        alert(loadsByAssignErr.message);
+        return;
+      }
+    }
+
+    if (inUseUnitId != null) {
+      const { error: loadsByUnitErr } = await supabase
+        .from("schedule_loads")
+        .delete()
+        .eq("week_id", targetWeekId)
+        .eq("in_use_unit_id", inUseUnitId);
+      if (loadsByUnitErr) {
+        alert(loadsByUnitErr.message);
+        return;
+      }
+    }
+
+    if (scheduleAssignmentId != null) {
+      const { error: assignErr } = await supabase
+        .from("schedule_assignments")
+        .delete()
+        .eq("id", scheduleAssignmentId)
+        .eq("week_id", targetWeekId);
+      if (assignErr) {
+        alert(assignErr.message);
+        return;
+      }
+    } else if (inUseUnitId != null) {
+      const { error: assignErr } = await supabase
+        .from("schedule_assignments")
+        .delete()
+        .eq("week_id", targetWeekId)
+        .eq("in_use_unit_id", inUseUnitId);
+      if (assignErr) {
+        alert(assignErr.message);
+        return;
+      }
+    }
+
+    // Keep live-board units off this week after delete (ensure won't re-add).
+    if (inUseUnitId != null) {
+      const { error: exErr } = await supabase
+        .from("schedule_week_unit_exclusions")
+        .upsert(
+          { week_id: targetWeekId, in_use_unit_id: inUseUnitId },
+          { onConflict: "week_id,in_use_unit_id" },
+        );
+      if (
+        exErr &&
+        !/schedule_week_unit_exclusions|does not exist/i.test(exErr.message ?? "")
+      ) {
+        alert(exErr.message);
+        return;
+      }
     }
 
     await refreshSnapshots();
@@ -359,14 +501,19 @@ export default function Schedule() {
 
   async function handleRemoveWeekRow(row) {
     if (!row || row.isArchived) return;
+    if (!resolvedWeekId) {
+      alert("No week selected.");
+      return;
+    }
 
     let assignmentId = row.scheduleAssignmentId ?? null;
-    if (!assignmentId && resolvedWeekId && row.inUseUnitId) {
+    if (!assignmentId && row.inUseUnitId) {
       const { data, error } = await supabase
         .from("schedule_assignments")
         .select("id")
         .eq("week_id", resolvedWeekId)
-        .eq("in_use_unit_id", row.inUseUnitId);
+        .eq("in_use_unit_id", row.inUseUnitId)
+        .limit(1);
       if (error) {
         alert(error.message);
         return;
@@ -374,12 +521,16 @@ export default function Schedule() {
       assignmentId = data?.[0]?.id ?? null;
     }
 
-    if (!assignmentId) {
+    if (!assignmentId && !row.inUseUnitId) {
       alert("No schedule assignment found for this unit on this week.");
       return;
     }
 
-    await handleRemoveWeekAssignment(assignmentId, { pastWeek: !isLiveWeek });
+    await handleRemoveWeekAssignment(assignmentId, {
+      pastWeek: !isLiveWeek,
+      weekId: resolvedWeekId,
+      inUseUnitId: row.inUseUnitId ?? null,
+    });
   }
 
   function rowActionHandler(row) {
@@ -393,8 +544,19 @@ export default function Schedule() {
   }
 
   function rowSecondaryHandler(row) {
-    if (row.isArchived) return undefined;
-    if (row.inUseUnitId && isLiveWeek) {
+    // Live week: change live board (or week-only assignment). Past week: that week only.
+    if (isLiveWeek) {
+      if (row.isArchived) return undefined;
+      if (row.inUseUnitId || row.scheduleAssignmentId) {
+        return () => {
+          setChangeUnitRow(row);
+          setChangeUnitValue(String(row.unit?.id ?? ""));
+        };
+      }
+      return undefined;
+    }
+    // Past weeks: allow changing the unit on that week's assignment snapshot only.
+    if (row.scheduleAssignmentId) {
       return () => {
         setChangeUnitRow(row);
         setChangeUnitValue(String(row.unit?.id ?? ""));
@@ -404,7 +566,12 @@ export default function Schedule() {
   }
 
   function rowSecondaryLabel(row) {
-    if (row.inUseUnitId && isLiveWeek) return "Change Unit";
+    if (isLiveWeek) {
+      if (row.isArchived) return "";
+      if (row.inUseUnitId || row.scheduleAssignmentId) return "Change Unit";
+      return "";
+    }
+    if (row.scheduleAssignmentId) return "Change Unit";
     return "";
   }
 
@@ -729,6 +896,13 @@ export default function Schedule() {
             <span className="font-semibold text-green-950">
               {changeUnitRow?.driver?.name ?? "—"}
             </span>
+          </p>
+          <p className="text-xs text-green-900/70">
+            {isLiveWeek
+              ? changeUnitRow?.inUseUnitId
+                ? "Updates the live board and this week."
+                : "Updates this week only (not on the live board)."
+              : "Updates this past week only. Live board and other weeks are unchanged."}
           </p>
           <SearchableSelect
             open={changeUnitRow != null}

@@ -22,11 +22,13 @@ export function useWeekAssignments(
   weekStartISO = null,
 ) {
   const [snapshots, setSnapshots] = useState([]);
+  const [excludedInUseIds, setExcludedInUseIds] = useState(() => new Set());
   const supabase = useMemo(() => createClient(), []);
 
   const refreshSnapshots = useCallback(async () => {
     if (!weekId) {
       setSnapshots([]);
+      setExcludedInUseIds(new Set());
       return;
     }
     const { data, error } = await supabase
@@ -47,15 +49,55 @@ export function useWeekAssignments(
     setSnapshots(data ?? []);
   }, [supabase, weekId]);
 
+  const refreshExclusions = useCallback(async () => {
+    if (!weekId) {
+      setExcludedInUseIds(new Set());
+      return;
+    }
+    const { data, error } = await supabase
+      .from("schedule_week_unit_exclusions")
+      .select("in_use_unit_id")
+      .eq("week_id", weekId);
+
+    if (error) {
+      if (/schedule_week_unit_exclusions|does not exist/i.test(error.message ?? "")) {
+        setExcludedInUseIds(new Set());
+        return;
+      }
+      if (!/abort/i.test(error.message ?? "")) {
+        console.error(error.message);
+      }
+      return;
+    }
+    setExcludedInUseIds(
+      new Set(
+        (data ?? [])
+          .map((r) => (r.in_use_unit_id != null ? String(r.in_use_unit_id) : null))
+          .filter(Boolean),
+      ),
+    );
+  }, [supabase, weekId]);
+
+  const refreshAll = useCallback(async () => {
+    await Promise.all([refreshSnapshots(), refreshExclusions()]);
+  }, [refreshSnapshots, refreshExclusions]);
+
   useEffect(() => {
-    void refreshSnapshots();
-  }, [refreshSnapshots]);
+    void refreshAll();
+  }, [refreshAll]);
 
   usePostgresRealtime(
     supabase,
     weekId ? "schedule_assignments" : null,
     weekId ? `week_id=eq.${weekId}` : undefined,
-    refreshSnapshots,
+    refreshAll,
+  );
+
+  usePostgresRealtime(
+    supabase,
+    weekId ? "schedule_week_unit_exclusions" : null,
+    weekId ? `week_id=eq.${weekId}` : undefined,
+    refreshAll,
   );
 
   const assignmentIdByInUse = useMemo(() => {
@@ -81,9 +123,10 @@ export function useWeekAssignments(
       const liveIds = new Set();
       for (const row of liveAssigned ?? []) {
         if (!row?.driver || !row?.unit) continue;
-        liveIds.add(String(row.id));
-        const scheduleAssignmentId =
-          assignmentIdByInUse.get(String(row.id)) ?? null;
+        const liveId = String(row.id);
+        if (excludedInUseIds.has(liveId)) continue;
+        liveIds.add(liveId);
+        const scheduleAssignmentId = assignmentIdByInUse.get(liveId) ?? null;
         const display = assignmentFromLive(row, scheduleAssignmentId);
         if (display) rows.push(display);
       }
@@ -95,6 +138,12 @@ export function useWeekAssignments(
         ) {
           continue;
         }
+        if (
+          snap.in_use_unit_id != null &&
+          excludedInUseIds.has(String(snap.in_use_unit_id))
+        ) {
+          continue;
+        }
         const hasLabels =
           String(snap.driver_name ?? "").trim() ||
           String(snap.unit_label ?? "").trim();
@@ -103,20 +152,12 @@ export function useWeekAssignments(
         if (display && !display.isArchived) rows.push(display);
       }
     } else {
+      // Past weeks: always use the week snapshot so historical loads/units stay correct.
       for (const snap of snapshots) {
         const hasLabels =
           String(snap.driver_name ?? "").trim() ||
           String(snap.unit_label ?? "").trim();
         if (!hasLabels) continue;
-
-        const liveId =
-          snap.in_use_unit_id != null ? String(snap.in_use_unit_id) : null;
-        const live = liveId ? liveById.get(liveId) : null;
-        if (live?.driver && live?.unit) {
-          const display = assignmentFromLive(live, String(snap.id));
-          if (display) rows.push(display);
-          continue;
-        }
 
         const display = assignmentFromSnapshot(snap);
         if (display) rows.push(display);
@@ -124,7 +165,13 @@ export function useWeekAssignments(
     }
 
     return rows.sort(compareAssignedRows);
-  }, [liveAssigned, snapshots, assignmentIdByInUse, weekStartISO]);
+  }, [
+    liveAssigned,
+    snapshots,
+    assignmentIdByInUse,
+    weekStartISO,
+    excludedInUseIds,
+  ]);
 
-  return [displayRows, refreshSnapshots];
+  return [displayRows, refreshAll];
 }

@@ -93,9 +93,7 @@ export default function ScheduleRow({
             weekRevenuePerKmDisplay={weekRevenuePerKmDisplay}
             onDelete={assignment.isArchived ? undefined : onDelete}
             deleteLabel={deleteLabel}
-            onSecondaryAction={
-              assignment.isArchived ? undefined : onSecondaryAction
-            }
+            onSecondaryAction={onSecondaryAction}
             secondaryLabel={secondaryLabel}
           />
           <div className="min-h-0 min-w-0 flex-1 overflow-x-auto overscroll-x-contain bg-white p-2 lg:rounded-tr-2xl">

@@ -83,10 +83,16 @@ export function deleteDriverConfirmOptions() {
   };
 }
 
-export function changeUnitConfirmOptions(driverName, unitLabel) {
+export function changeUnitConfirmOptions(
+  driverName,
+  unitLabel,
+  { pastWeek = false } = {},
+) {
   return {
     title: "Change unit?",
-    message: `Assign ${driverName} to unit ${unitLabel} on the live board? Load history for past weeks is kept.`,
+    message: pastWeek
+      ? `Assign ${driverName} to unit ${unitLabel} on this past week only? The live board and other weeks are not changed.`
+      : `Assign ${driverName} to unit ${unitLabel} on the live board and this week? Load history for past weeks is kept.`,
     confirmLabel: "Change unit",
     cancelLabel: "Cancel",
   };
