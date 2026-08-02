@@ -79,6 +79,20 @@ function findScheduleRowForCell(
   });
 }
 
+/** A schedule cell already has load content (not an empty placeholder row). */
+function scheduleLoadIsTaken(row) {
+  if (!row) return false;
+  return [
+    row.loadsheet_id,
+    row.load_number,
+    row.origin,
+    row.end_user,
+    row.load_note,
+    row.mt,
+    row.rate,
+  ].some((v) => String(v ?? "").trim() !== "");
+}
+
 /**
  * Pick a saved load sheet and a slot for that day; writes schedule_loads for this unit.
  * All load sheets support assigning to multiple drivers, days, and slots via checkboxes.
@@ -132,20 +146,15 @@ export default function AssignLoadsheetModal({
     if (!open) return;
     queueMicrotask(() => {
       setLoadsheetId("");
-      const first = daySlots[0]?.id ? String(daySlots[0].id) : "";
-      const want =
-        initialSlotId != null && String(initialSlotId).trim() !== ""
-          ? String(initialSlotId)
-          : "";
-      const valid = want && daySlots.some((s) => String(s.id) === want);
-      setSlotId(valid ? want : first);
 
       const defaultUnits =
         inUseUnitId != null && String(inUseUnitId).trim() !== ""
           ? [String(inUseUnitId)]
-          : [];
+          : scheduleAssignmentId != null &&
+              String(scheduleAssignmentId).trim() !== ""
+            ? [`sa:${scheduleAssignmentId}`]
+            : [];
       setSelectedUnitIds(defaultUnits);
-      setSelectedSlotIds(valid ? [want] : first ? [first] : []);
 
       const openDay =
         dayIso != null && String(dayIso).trim() !== "" ? isoDateKey(dayIso) : "";
@@ -153,7 +162,7 @@ export default function AssignLoadsheetModal({
         openDay && weekDays.some((d) => isoDateKey(d.iso) === openDay);
       setSelectedDayIsos(dayValid ? [openDay] : []);
     });
-  }, [open, daySlots, initialSlotId, inUseUnitId, dayIso, weekDays]);
+  }, [open, initialSlotId, inUseUnitId, scheduleAssignmentId, dayIso, weekDays]);
 
   const selectedSheet = useMemo(
     () => loadsheets.find((s) => String(s.id) === String(loadsheetId)),
@@ -183,6 +192,85 @@ export default function AssignLoadsheetModal({
   }, [multiAssignMode, filteredAssignableUnits, loadsheetId]);
 
   const weekLoadsForLookup = allWeekLoads ?? loads;
+
+  const availableSlots = useMemo(() => {
+    const daysForCheck = multiAssignMode
+      ? selectedDayIsos.length > 0
+        ? selectedDayIsos
+        : dayIso
+          ? [isoDateKey(dayIso)]
+          : []
+      : dayIso
+        ? [isoDateKey(dayIso)]
+        : [];
+
+    let unitsForCheck = [];
+    if (multiAssignMode) {
+      unitsForCheck = filteredAssignableUnits.filter((u) =>
+        selectedUnitIds.includes(assignableUnitRowKey(u)),
+      );
+      if (
+        !unitsForCheck.length &&
+        (inUseUnitId != null || scheduleAssignmentId != null)
+      ) {
+        unitsForCheck = [{ inUseUnitId, scheduleAssignmentId }];
+      }
+    } else {
+      unitsForCheck = [{ inUseUnitId, scheduleAssignmentId }];
+    }
+
+    if (!daysForCheck.length || !unitsForCheck.length) {
+      return daySlots;
+    }
+
+    return daySlots.filter((slot) => {
+      for (const dk of daysForCheck) {
+        for (const unit of unitsForCheck) {
+          const row = findScheduleRowForCell(
+            weekLoadsForLookup,
+            dk,
+            slot.id,
+            {
+              inUseUnitId: unit.inUseUnitId ?? null,
+              scheduleAssignmentId: unit.scheduleAssignmentId ?? null,
+            },
+          );
+          if (scheduleLoadIsTaken(row)) return false;
+        }
+      }
+      return true;
+    });
+  }, [
+    daySlots,
+    dayIso,
+    multiAssignMode,
+    selectedDayIsos,
+    selectedUnitIds,
+    filteredAssignableUnits,
+    inUseUnitId,
+    scheduleAssignmentId,
+    weekLoadsForLookup,
+  ]);
+
+  useEffect(() => {
+    if (!open) return;
+    const ids = new Set(availableSlots.map((s) => String(s.id)));
+    const want =
+      initialSlotId != null && String(initialSlotId).trim() !== ""
+        ? String(initialSlotId)
+        : "";
+    const preferred = want && ids.has(want) ? want : "";
+    const first = preferred || (availableSlots[0]?.id
+      ? String(availableSlots[0].id)
+      : "");
+
+    setSlotId((prev) => (prev && ids.has(prev) ? prev : first));
+    setSelectedSlotIds((prev) => {
+      const kept = prev.filter((id) => ids.has(id));
+      if (kept.length) return kept;
+      return first ? [first] : [];
+    });
+  }, [open, availableSlots, initialSlotId]);
 
   const assignTargetCount =
     selectedDayIsos.length * selectedUnitIds.length * selectedSlotIds.length;
@@ -270,6 +358,12 @@ export default function AssignLoadsheetModal({
         alert("No load slots available. Fix load_slots access, then try again.");
         return;
       }
+      if (!availableSlots.length) {
+        alert(
+          "All selected slots are already filled for the chosen day(s) and driver(s). Clear a load or pick different targets.",
+        );
+        return;
+      }
       setSaving(true);
       let applied = 0;
       let lastError = null;
@@ -329,7 +423,11 @@ export default function AssignLoadsheetModal({
     }
 
     if ((!inUseUnitId && !scheduleAssignmentId) || !slotId) {
-      alert("Choose a load sheet and a slot.");
+      alert(
+        availableSlots.length === 0
+          ? "No open slots for this day. Clear a load first or pick another day."
+          : "Choose a load sheet and a slot.",
+      );
       return;
     }
     setSaving(true);
@@ -565,45 +663,60 @@ export default function AssignLoadsheetModal({
               <div className="rounded-lg border border-green-950/20 bg-green-950/3 p-3">
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <span className="text-sm font-semibold">
-                    Slots (1 = top, 3 = bottom)
+                    Slots (open only)
                   </span>
-                  <button
-                    type="button"
-                    className="text-xs font-semibold text-green-900 underline hover:no-underline"
-                    onClick={() => {
-                      const all = daySlots.map((s) => String(s.id));
-                      const allSelected =
-                        all.length > 0 &&
-                        all.every((id) => selectedSlotIds.includes(id));
-                      setSelectedSlotIds(allSelected ? [] : all);
-                    }}
-                  >
-                    {daySlots.length > 0 &&
-                    daySlots.every((s) =>
-                      selectedSlotIds.includes(String(s.id)),
-                    )
-                      ? "Clear all"
-                      : "Select all"}
-                  </button>
+                  {availableSlots.length > 0 ? (
+                    <button
+                      type="button"
+                      className="text-xs font-semibold text-green-900 underline hover:no-underline"
+                      onClick={() => {
+                        const all = availableSlots.map((s) => String(s.id));
+                        const allSelected =
+                          all.length > 0 &&
+                          all.every((id) => selectedSlotIds.includes(id));
+                        setSelectedSlotIds(allSelected ? [] : all);
+                      }}
+                    >
+                      {availableSlots.every((s) =>
+                        selectedSlotIds.includes(String(s.id)),
+                      )
+                        ? "Clear all"
+                        : "Select all"}
+                    </button>
+                  ) : null}
                 </div>
-                <div className="space-y-0.5">
-                  {daySlots.map((s, idx) => {
-                    const id = String(s.id);
-                    return (
-                      <label key={id} className={checkRowClass}>
-                        <input
-                          type="checkbox"
-                          className="size-4 shrink-0 accent-green-950"
-                          checked={selectedSlotIds.includes(id)}
-                          onChange={() =>
-                            setSelectedSlotIds((prev) => toggleId(prev, id))
-                          }
-                        />
-                        <span>{slotSelectLabel(s, idx)}</span>
-                      </label>
-                    );
-                  })}
-                </div>
+                {availableSlots.length === 0 ? (
+                  <p className="text-sm text-green-900/75">
+                    No open slots for the selected day(s) and driver(s).
+                  </p>
+                ) : (
+                  <div className="space-y-0.5">
+                    {availableSlots.map((s) => {
+                      const id = String(s.id);
+                      const originalIndex = daySlots.findIndex(
+                        (slot) => String(slot.id) === id,
+                      );
+                      return (
+                        <label key={id} className={checkRowClass}>
+                          <input
+                            type="checkbox"
+                            className="size-4 shrink-0 accent-green-950"
+                            checked={selectedSlotIds.includes(id)}
+                            onChange={() =>
+                              setSelectedSlotIds((prev) => toggleId(prev, id))
+                            }
+                          />
+                          <span>
+                            {slotSelectLabel(
+                              s,
+                              originalIndex >= 0 ? originalIndex : 0,
+                            )}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               {assignTargetCount > 0 ? (
@@ -622,7 +735,7 @@ export default function AssignLoadsheetModal({
             </>
           ) : (
             <label className="block text-sm font-medium">
-              Slot (1 = top of day, 3 = bottom)
+              Slot (open only)
               <select
                 className={selectClass}
                 value={slotId}
@@ -633,12 +746,22 @@ export default function AssignLoadsheetModal({
                   <option value="">
                     No slots — fix load_slots access (see note above)
                   </option>
+                ) : availableSlots.length === 0 ? (
+                  <option value="">No open slots for this day</option>
                 ) : (
-                  daySlots.map((s, idx) => (
-                    <option key={s.id} value={s.id}>
-                      {slotSelectLabel(s, idx)}
-                    </option>
-                  ))
+                  availableSlots.map((s) => {
+                    const originalIndex = daySlots.findIndex(
+                      (slot) => String(slot.id) === String(s.id),
+                    );
+                    return (
+                      <option key={s.id} value={s.id}>
+                        {slotSelectLabel(
+                          s,
+                          originalIndex >= 0 ? originalIndex : 0,
+                        )}
+                      </option>
+                    );
+                  })
                 )}
               </select>
             </label>

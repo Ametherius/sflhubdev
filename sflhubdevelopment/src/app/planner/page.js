@@ -13,7 +13,7 @@ export default async function Planner() {
 
   const { data: broker } = await supabase
     .from("brokers")
-    .select("id, name")
+    .select("id, name, division")
     .order("name");
   const brokers = broker ?? [];
 
@@ -22,14 +22,17 @@ export default async function Planner() {
     .select("*");
   const slots = plannerSlots ?? [];
 
-  const { columns: slotColumns, schemaReady, missing } =
-    await detectPlannerSlotColumns(supabase);
+  const {
+    columns: slotColumns,
+    schemaReady,
+    missing,
+  } = await detectPlannerSlotColumns(supabase);
 
   return (
     <div className="w-full h-full">
       <Header />
       <div className="flex justify-center text-white text-3xl font-bold m-5">
-        <h1>Grain Load Planner</h1>
+        <h1>Load Planner</h1>
       </div>
       <div className="w-full h-full">
         <PlannerClient

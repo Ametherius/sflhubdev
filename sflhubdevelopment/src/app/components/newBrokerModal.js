@@ -13,11 +13,13 @@ import {
 export default function NewBrokerModal({ open, onClose, onCreated }) {
   const supabase = useMemo(() => createClient(), []);
   const [name, setName] = useState("");
+  const [division, setDivision] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     setName("");
+    setDivision("");
   }, [open]);
 
   async function handleSubmit(e) {
@@ -31,6 +33,7 @@ export default function NewBrokerModal({ open, onClose, onCreated }) {
     try {
       const { data, error } = await insertEntityRow(supabase, "brokers", {
         name: name.trim(),
+        division: division.trim(),
       });
       if (error) {
         alert(error.message);
@@ -85,6 +88,16 @@ export default function NewBrokerModal({ open, onClose, onCreated }) {
               onChange={(e) => setName(e.target.value)}
               required
               autoFocus
+            />
+          </label>
+          <label className="block text-sm font-medium">
+            Division <span className="text-red-700">*</span>
+            <input
+              className={inputClass}
+              type="text"
+              value={division}
+              onChange={(e) => setDivision(e.target.value)}
+              required
             />
           </label>
           <div className="mt-2 flex justify-end gap-2 border-t border-green-950/15 pt-4">

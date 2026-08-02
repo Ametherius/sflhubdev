@@ -19,6 +19,16 @@ export default function NewPlannerSlotModal({
   const [endUser, setEndUser] = useState("");
   const [slotCount, setSlotCount] = useState(2);
 
+  const chinookFeeders = [
+    "Vulcan-Richardson",
+    "Carmangay-G3",
+    "Stirling-Richardson",
+    "Carseland-Richardson",
+    "Wilson-Bunge",
+    "Grassy Lk-Bunge",
+    "Judson-Red Line",
+  ];
+
   useEffect(() => {
     if (!open) return;
     setBrokerId(initialBrokerId ? String(initialBrokerId) : "");
@@ -48,10 +58,15 @@ export default function NewPlannerSlotModal({
     await onSubmit?.({
       brokerId,
       origin: origin.trim(),
-      endUser: endUser.trim(),
+      endUser: isChinookFeeders ? "Chinook Feeders" : endUser.trim(),
       slotCount: count,
     });
   }
+
+  const isChinookFeeders = useMemo(() => {
+    const selected = brokers.find((b) => String(b.id) === String(brokerId));
+    return /chinook\s*feeders/i.test(String(selected?.name ?? ""));
+  }, [brokers, brokerId]);
 
   if (!open) return null;
 
@@ -121,18 +136,34 @@ export default function NewPlannerSlotModal({
           </label>
           <label className="block text-sm font-medium">
             Origin
-            <input
-              className={inputClass}
-              value={origin}
-              onChange={(e) => setOrigin(e.target.value)}
-              placeholder="Origin"
-            />
+            {isChinookFeeders ? (
+              <select
+                className={selectClass}
+                value={origin}
+                onChange={(e) => setOrigin(e.target.value)}
+                required
+              >
+                <option value="">Select Origin...</option>
+                {chinookFeeders.map((o) => (
+                  <option key={o} value={o}>
+                    {o}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                className={inputClass}
+                value={origin}
+                onChange={(e) => setOrigin(e.target.value)}
+                placeholder="Origin"
+              />
+            )}
           </label>
           <label className="block text-sm font-medium">
             End user
             <input
               className={inputClass}
-              value={endUser}
+              value={isChinookFeeders ? "Chinook Feeders" : endUser}
               onChange={(e) => setEndUser(e.target.value)}
               placeholder="End user"
             />
@@ -147,13 +178,7 @@ export default function NewPlannerSlotModal({
             </button>
             <ButtonDark
               type="submit"
-              text={
-                saving
-                  ? "Saving…"
-                  : bulk
-                    ? "Add slots"
-                    : "Add slot"
-              }
+              text={saving ? "Saving…" : bulk ? "Add slots" : "Add slot"}
             />
           </div>
         </form>
