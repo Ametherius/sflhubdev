@@ -5,8 +5,10 @@ import { createClient } from "@/lib/supabase/client";
 import {
   parseISODateLocal,
   resolveDefaultScheduleWeekId,
+  weekDayLabels,
 } from "@/lib/weekDates";
 import {
+  buildMissingPlannerSlotsForWeek,
   buildPlannerSlotInsert,
   buildPlannerSlotUpdate,
   plannerSlotColumns,
@@ -14,7 +16,7 @@ import {
   readSlotBrokerId,
   readSlotWeekId,
 } from "@/lib/plannerSlots";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { FaEye, FaEyeSlash, FaList, FaPlus, FaTimes } from "react-icons/fa";
 import BtnWhite from "./btnWhite";
 import EditPlannerSlotModal from "./editPlannerSlotModal";
@@ -58,6 +60,7 @@ export default function PlannerClient({
   const [canOpen, setCanOpen] = useState(false);
   const [usOpen, setUsOpen] = useState(false);
   const [cattleOpen, setCattleOpen] = useState(false);
+  const ensuringSlotsRef = useRef(false);
 
   const slotCols = useMemo(
     () =>
@@ -124,6 +127,53 @@ export default function PlannerClient({
       cancelled = true;
     };
   }, [supabase, resolveWeekId]);
+
+  useEffect(() => {
+    if (!plannerSchemaReady || !canEdit || !resolveWeekId || !weekStartISO) {
+      return;
+    }
+    if (!brokers.length || ensuringSlotsRef.current) return;
+
+    const dayIsos = weekDayLabels(weekStartISO).map((d) => d.iso);
+    const missing = buildMissingPlannerSlotsForWeek({
+      brokers,
+      weekId: resolveWeekId,
+      dayIsos,
+      existingSlots: slots,
+      slotCols,
+    });
+    if (!missing.length) return;
+
+    let cancelled = false;
+    ensuringSlotsRef.current = true;
+
+    (async () => {
+      try {
+        const { error } = await supabase.from("planner_slots").insert(missing);
+        if (cancelled) return;
+        if (error) {
+          console.error("Failed to prefill planner slots:", error.message);
+          return;
+        }
+        await refreshSlots();
+      } finally {
+        ensuringSlotsRef.current = false;
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    plannerSchemaReady,
+    canEdit,
+    resolveWeekId,
+    weekStartISO,
+    brokers,
+    slots,
+    slotCols,
+    supabase,
+  ]);
 
   async function refreshSlots() {
     const { data, error } = await supabase.from("planner_slots").select("*");
@@ -244,6 +294,7 @@ export default function PlannerClient({
   async function handleUpdateSlot({
     origin,
     endUser,
+    driverName,
     unitNumber,
     dispatched,
     unloaded,
@@ -257,6 +308,7 @@ export default function PlannerClient({
         {
           origin,
           endUser,
+          driverName,
           unitNumber,
           dispatched,
           unloaded,
@@ -277,10 +329,12 @@ export default function PlannerClient({
 
       if (error) {
         if (
-          /schema cache|could not find the|rejected/i.test(error.message ?? "")
+          /schema cache|could not find the|driver_name|rejected/i.test(
+            error.message ?? "",
+          )
         ) {
           alert(
-            "Planner rejected column may be missing. Run supabase/migrations/20260717160000_planner_slots_rejected.sql in the Supabase SQL editor (or npm run db:push), then refresh.",
+            "Planner column may be missing. Run the latest planner_slots migrations (rejected / driver_name), then refresh.",
           );
         } else {
           alert(error.message);
@@ -300,6 +354,43 @@ export default function PlannerClient({
     }
   }
 
+  async function createEmptyPresetSlot(target) {
+    if (!plannerSchemaReady || !canEdit) return;
+    if (!target?.weekId || !target?.planDate || !target?.brokerId) return;
+    setSavingSlot(true);
+    try {
+      const startSort = nextSortOrder(target.existingDaySlots ?? [], slotCols);
+      const row = buildPlannerSlotInsert(
+        {
+          brokerId: target.brokerId,
+          weekId: target.weekId,
+          planDate: target.planDate,
+          sortOrder: startSort,
+          origin: "",
+          endUser: "",
+        },
+        slotCols,
+      );
+      const { data, error } = await supabase
+        .from("planner_slots")
+        .insert(row)
+        .select()
+        .single();
+      if (error) {
+        alert(error.message);
+        return;
+      }
+      if (data) {
+        setSlots((prev) => [...prev, data]);
+        setEditSlotTarget(data);
+      } else {
+        await refreshSlots();
+      }
+    } finally {
+      setSavingSlot(false);
+    }
+  }
+
   async function handleCreateSlot({
     brokerId,
     origin,
@@ -311,6 +402,7 @@ export default function PlannerClient({
       return;
     }
     if (!addSlotTarget?.weekId || !addSlotTarget?.planDate) return;
+
     setSavingSlot(true);
     try {
       const count = Math.max(1, Math.min(50, Number(slotCount) || 1));
@@ -660,7 +752,13 @@ export default function PlannerClient({
                 slots={slotsForBroker}
                 slotCols={slotCols}
                 canEdit={canEdit && plannerSchemaReady}
-                onRequestAddSlot={setAddSlotTarget}
+                onRequestAddSlot={(target) => {
+                  if (target?.emptyPreset) {
+                    void createEmptyPresetSlot(target);
+                    return;
+                  }
+                  setAddSlotTarget(target);
+                }}
                 onRequestAddMultipleSlots={setAddSlotTarget}
                 onSelectSlot={setEditSlotTarget}
                 onDeleteSlot={

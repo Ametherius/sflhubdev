@@ -1,11 +1,15 @@
 "use client";
 
-import { readSlotPlanDate, readSlotSortOrder } from "@/lib/plannerSlots";
+import {
+  PLANNER_SLOTS_PER_DAY,
+  readSlotPlanDate,
+  readSlotSortOrder,
+} from "@/lib/plannerSlots";
 import { weekDayLabels } from "@/lib/weekDates";
 import { useMemo } from "react";
 import PlannerDayCell, {
   PlannerAddMultipleSlotCell,
-  PlannerAddSlotCell,
+  PlannerEmptyPresetCell,
   plannerDayColumnClass,
 } from "./plannerDayCell";
 
@@ -52,7 +56,12 @@ export default function PlannerDayGrid({
     <div className="min-w-0 shrink-0 bg-white">
       <div className="flex min-w-max gap-2 p-1">
         {days.map((d) => {
+          // Keep every existing slot; never drop extras above 4.
           const daySlots = slotsByDay.get(d.iso) ?? [];
+          const emptyPresets = Math.max(
+            0,
+            PLANNER_SLOTS_PER_DAY - daySlots.length,
+          );
 
           return (
             <div key={d.iso} className={plannerDayColumnClass}>
@@ -73,35 +82,37 @@ export default function PlannerDayGrid({
                     }
                   />
                 ))}
+                {Array.from({ length: emptyPresets }, (_, index) => (
+                  <PlannerEmptyPresetCell
+                    key={`empty-${d.iso}-${index}`}
+                    disabled={!canEdit || !weekId || !brokerId}
+                    onClick={() =>
+                      onRequestAddSlot?.({
+                        brokerId,
+                        weekId,
+                        planDate: d.iso,
+                        dayTitle: d.columnTitle ?? d.label,
+                        existingDaySlots: daySlots,
+                        bulk: false,
+                        emptyPreset: true,
+                      })
+                    }
+                  />
+                ))}
                 {canEdit ? (
-                  <>
-                    {/* <PlannerAddSlotCell
-                      disabled={!weekId || !brokerId}
-                      onClick={() =>
-                        onRequestAddSlot?.({
-                          brokerId,
-                          weekId,
-                          planDate: d.iso,
-                          dayTitle: d.columnTitle ?? d.label,
-                          existingDaySlots: daySlots,
-                          bulk: false,
-                        })
-                      }
-                    /> */}
-                    <PlannerAddMultipleSlotCell
-                      disabled={!weekId || !brokerId}
-                      onClick={() =>
-                        onRequestAddMultipleSlots?.({
-                          brokerId,
-                          weekId,
-                          planDate: d.iso,
-                          dayTitle: d.columnTitle ?? d.label,
-                          existingDaySlots: daySlots,
-                          bulk: true,
-                        })
-                      }
-                    />
-                  </>
+                  <PlannerAddMultipleSlotCell
+                    disabled={!weekId || !brokerId}
+                    onClick={() =>
+                      onRequestAddMultipleSlots?.({
+                        brokerId,
+                        weekId,
+                        planDate: d.iso,
+                        dayTitle: d.columnTitle ?? d.label,
+                        existingDaySlots: daySlots,
+                        bulk: true,
+                      })
+                    }
+                  />
                 ) : null}
               </div>
             </div>

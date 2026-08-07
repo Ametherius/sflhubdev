@@ -4,6 +4,7 @@ import {
   plannerSlotColumns,
   readSlotCompleted,
   readSlotDispatched,
+  readSlotDriverName,
   readSlotRejected,
   readSlotUnitNumber,
   readSlotUnloaded,
@@ -28,6 +29,7 @@ export default function EditPlannerSlotModal({
 
   const [origin, setOrigin] = useState("");
   const [endUser, setEndUser] = useState("");
+  const [driverName, setDriverName] = useState("");
   const [unitNumber, setUnitNumber] = useState("");
   const [dispatched, setDispatched] = useState(false);
   const [unloaded, setUnloaded] = useState(false);
@@ -38,6 +40,7 @@ export default function EditPlannerSlotModal({
     if (!open || !slot) return;
     setOrigin(String(slot[slotCols.origin] ?? "").trim());
     setEndUser(String(slot[slotCols.endUser] ?? "").trim());
+    setDriverName(readSlotDriverName(slot, slotCols));
     setUnitNumber(readSlotUnitNumber(slot, slotCols));
     setDispatched(readSlotDispatched(slot, slotCols));
     setUnloaded(readSlotUnloaded(slot, slotCols));
@@ -51,6 +54,7 @@ export default function EditPlannerSlotModal({
     await onSubmit?.({
       origin: origin.trim(),
       endUser: endUser.trim(),
+      driverName: driverName.trim(),
       unitNumber: unitNumber.trim(),
       dispatched,
       unloaded,
@@ -108,6 +112,16 @@ export default function EditPlannerSlotModal({
               value={endUser}
               onChange={(e) => setEndUser(e.target.value)}
               placeholder="End user"
+              disabled={!canEdit || saving}
+            />
+          </label>
+          <label className="block text-sm font-medium">
+            Driver name
+            <input
+              className={inputClass}
+              value={driverName}
+              onChange={(e) => setDriverName(e.target.value)}
+              placeholder="Driver"
               disabled={!canEdit || saving}
             />
           </label>

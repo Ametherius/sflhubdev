@@ -7,6 +7,7 @@ export const PLANNER_SLOT_FIELD_ALIASES = {
   origin: ["origin"],
   endUser: ["end_user", "enduser"],
   unitNumber: ["unit_number", "unit"],
+  driverName: ["driver_name", "driver"],
   dispatched: ["dispatched"],
   unloaded: ["unloaded"],
   completed: ["completed"],
@@ -21,11 +22,14 @@ const CANONICAL_DEFAULTS = {
   origin: "origin",
   endUser: "end_user",
   unitNumber: "unit_number",
+  driverName: "driver_name",
   dispatched: "dispatched",
   unloaded: "unloaded",
   completed: "completed",
   rejected: "rejected",
 };
+
+export const PLANNER_SLOTS_PER_DAY = 4;
 
 function pickColumn(sample, aliases, fallback) {
   if (sample && typeof sample === "object") {
@@ -75,6 +79,11 @@ export function plannerSlotColumns(sampleSlot = null, overrides = null) {
       sampleSlot,
       PLANNER_SLOT_FIELD_ALIASES.unitNumber,
       CANONICAL_DEFAULTS.unitNumber,
+    ),
+    driverName: pickColumn(
+      sampleSlot,
+      PLANNER_SLOT_FIELD_ALIASES.driverName,
+      CANONICAL_DEFAULTS.driverName,
     ),
     dispatched: pickColumn(
       sampleSlot,
@@ -193,6 +202,11 @@ export function readSlotUnitNumber(slot, cols = plannerSlotColumns(slot)) {
   return raw == null ? "" : String(raw).trim();
 }
 
+export function readSlotDriverName(slot, cols = plannerSlotColumns(slot)) {
+  const raw = slot?.[cols.driverName];
+  return raw == null ? "" : String(raw).trim();
+}
+
 export function readSlotDispatched(slot, cols = plannerSlotColumns(slot)) {
   return Boolean(slot?.[cols.dispatched]);
 }
@@ -230,10 +244,10 @@ export function plannerSlotStatusClass(slot, cols = plannerSlotColumns(slot)) {
 }
 
 export function buildPlannerSlotInsert(
-  { brokerId, weekId, planDate, sortOrder, origin, endUser },
+  { brokerId, weekId, planDate, sortOrder, origin, endUser, unitNumber, driverName },
   cols = plannerSlotColumns(),
 ) {
-  return {
+  const row = {
     [cols.broker]: brokerId,
     [cols.week]: weekId,
     [cols.planDate]: planDate,
@@ -241,14 +255,22 @@ export function buildPlannerSlotInsert(
     [cols.origin]: origin?.length ? origin : null,
     [cols.endUser]: endUser?.length ? endUser : null,
   };
+  if (cols.unitNumber) {
+    row[cols.unitNumber] = unitNumber?.length ? unitNumber : null;
+  }
+  if (cols.driverName) {
+    row[cols.driverName] = driverName?.length ? driverName : null;
+  }
+  return row;
 }
 
 export function buildPlannerSlotStatusUpdate(
-  { unitNumber, dispatched, unloaded, completed, rejected },
+  { unitNumber, driverName, dispatched, unloaded, completed, rejected },
   cols = plannerSlotColumns(),
 ) {
   return {
     [cols.unitNumber]: unitNumber?.length ? unitNumber : null,
+    [cols.driverName]: driverName?.length ? driverName : null,
     [cols.dispatched]: Boolean(dispatched),
     [cols.unloaded]: Boolean(unloaded),
     [cols.completed]: Boolean(completed),
@@ -257,16 +279,83 @@ export function buildPlannerSlotStatusUpdate(
 }
 
 export function buildPlannerSlotUpdate(
-  { origin, endUser, unitNumber, dispatched, unloaded, completed, rejected },
+  {
+    origin,
+    endUser,
+    unitNumber,
+    driverName,
+    dispatched,
+    unloaded,
+    completed,
+    rejected,
+  },
   cols = plannerSlotColumns(),
 ) {
   return {
     [cols.origin]: origin?.length ? origin : null,
     [cols.endUser]: endUser?.length ? endUser : null,
     [cols.unitNumber]: unitNumber?.length ? unitNumber : null,
+    [cols.driverName]: driverName?.length ? driverName : null,
     [cols.dispatched]: Boolean(dispatched),
     [cols.unloaded]: Boolean(unloaded),
     [cols.completed]: Boolean(completed),
     [cols.rejected]: Boolean(rejected),
   };
+}
+
+/**
+ * Insert-only: build empty planner_slots so each broker/day has at least
+ * slotsPerDay rows. Never deletes or updates existing slots (extras above
+ * slotsPerDay are left alone).
+ */
+export function buildMissingPlannerSlotsForWeek({
+  brokers = [],
+  weekId,
+  dayIsos = [],
+  existingSlots = [],
+  slotCols = plannerSlotColumns(),
+  slotsPerDay = PLANNER_SLOTS_PER_DAY,
+}) {
+  if (!weekId || !brokers.length || !dayIsos.length) return [];
+
+  const rows = [];
+  for (const broker of brokers) {
+    if (!broker?.id) continue;
+    for (const planDate of dayIsos) {
+      const dayKey = String(planDate).slice(0, 10);
+      const daySlots = existingSlots.filter(
+        (s) =>
+          String(readSlotBrokerId(s, slotCols)) === String(broker.id) &&
+          String(readSlotWeekId(s, slotCols)) === String(weekId) &&
+          readSlotPlanDate(s, slotCols) === dayKey,
+      );
+      // Only fill the gap up to slotsPerDay — never remove extras.
+      const need = Math.max(0, slotsPerDay - daySlots.length);
+      if (need === 0) continue;
+
+      const usedOrders = new Set(
+        daySlots.map((s) => readSlotSortOrder(s, slotCols)),
+      );
+      let next = 1;
+      for (let i = 0; i < need; i++) {
+        while (usedOrders.has(next)) next += 1;
+        rows.push(
+          buildPlannerSlotInsert(
+            {
+              brokerId: broker.id,
+              weekId,
+              planDate: dayKey,
+              sortOrder: next,
+              origin: "",
+              endUser: "",
+            },
+            slotCols,
+          ),
+        );
+        usedOrders.add(next);
+        next += 1;
+      }
+    }
+  }
+  return rows;
 }
