@@ -9,6 +9,7 @@ import { weekDayLabels } from "@/lib/weekDates";
 import { useMemo } from "react";
 import PlannerDayCell, {
   PlannerAddMultipleSlotCell,
+  PlannerAddSlotCell,
   PlannerEmptyPresetCell,
   plannerDayColumnClass,
 } from "./plannerDayCell";
@@ -69,6 +70,22 @@ export default function PlannerDayGrid({
                 {d.columnTitle ?? d.label}
               </div>
               <div className="flex flex-col gap-1 bg-white">
+                {canEdit ? (
+                  <PlannerAddSlotCell
+                    disabled={!weekId || !brokerId}
+                    onClick={() =>
+                      onRequestAddSlot?.({
+                        brokerId,
+                        weekId,
+                        planDate: d.iso,
+                        dayTitle: d.columnTitle ?? d.label,
+                        existingDaySlots: daySlots,
+                        bulk: false,
+                        insertAt: "start",
+                      })
+                    }
+                  />
+                ) : null}
                 {daySlots.map((ds) => (
                   <PlannerDayCell
                     key={ds.id ?? `${d.iso}-${readSlotSortOrder(ds, slotCols)}`}

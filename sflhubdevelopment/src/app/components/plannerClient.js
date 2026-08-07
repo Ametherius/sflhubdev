@@ -34,6 +34,16 @@ function nextSortOrder(existingDaySlots, cols) {
   );
 }
 
+/** Sort order that places a new slot above existing ones for that day. */
+function prependSortOrder(existingDaySlots, cols) {
+  if (!existingDaySlots?.length) return 1;
+  const min = existingDaySlots.reduce(
+    (m, slot) => Math.min(m, Number(slot[cols.sortOrder]) || 0),
+    Number.POSITIVE_INFINITY,
+  );
+  return Number.isFinite(min) ? min - 1 : 1;
+}
+
 export default function PlannerClient({
   slots: initialSlots,
   brokers: initialBrokers,
@@ -406,17 +416,20 @@ export default function PlannerClient({
     setSavingSlot(true);
     try {
       const count = Math.max(1, Math.min(50, Number(slotCount) || 1));
-      const startSort = nextSortOrder(
-        addSlotTarget.existingDaySlots ?? [],
-        slotCols,
-      );
+      const startSort =
+        addSlotTarget.insertAt === "start"
+          ? prependSortOrder(addSlotTarget.existingDaySlots ?? [], slotCols)
+          : nextSortOrder(addSlotTarget.existingDaySlots ?? [], slotCols);
       const rows = Array.from({ length: count }, (_, index) =>
         buildPlannerSlotInsert(
           {
             brokerId,
             weekId: addSlotTarget.weekId,
             planDate: addSlotTarget.planDate,
-            sortOrder: startSort + index,
+            sortOrder:
+              addSlotTarget.insertAt === "start"
+                ? startSort - index
+                : startSort + index,
             origin,
             endUser,
           },

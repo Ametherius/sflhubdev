@@ -31,6 +31,23 @@ export function PlannerAddMultipleSlotCell({ onClick, disabled = false }) {
   );
 }
 
+export function PlannerAddSlotCell({ onClick, disabled = false }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={`${plannerCellShellClass} !items-center justify-center gap-1 border-dashed bg-green-950/5 text-green-950 transition hover:bg-green-950/10 disabled:cursor-not-allowed disabled:opacity-50`}
+      aria-label="Add planner slot"
+    >
+      <span className="text-base font-bold leading-none">+</span>
+      <span className="text-[10px] font-semibold uppercase tracking-wide">
+        Add slot
+      </span>
+    </button>
+  );
+}
+
 export function PlannerEmptyPresetCell({ onClick, disabled = false }) {
   return (
     <button
