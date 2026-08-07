@@ -99,15 +99,51 @@ export function plannerSlotColumns(sampleSlot = null, overrides = null) {
   };
 }
 
-/** Probe Supabase for which columns exist on planner_slots (server-side). */
-export async function detectPlannerSlotColumns(supabase) {
+/**
+ * Resolve planner_slots column names with as few round-trips as possible.
+ * Prefer an existing row sample; otherwise one select of canonical columns.
+ */
+export async function detectPlannerSlotColumns(
+  supabase,
+  { sampleSlot = null } = {},
+) {
+  if (sampleSlot && typeof sampleSlot === "object") {
+    const columns = plannerSlotColumns(sampleSlot);
+    const missing = ["broker", "week", "planDate"]
+      .filter((logical) => !(columns[logical] in sampleSlot))
+      .map((logical) => CANONICAL_DEFAULTS[logical]);
+    return {
+      columns,
+      schemaReady: missing.length === 0,
+      missing,
+    };
+  }
+
+  const canonicalCols = [...new Set(Object.values(CANONICAL_DEFAULTS))];
+  const { error: canonicalError } = await supabase
+    .from("planner_slots")
+    .select(canonicalCols.join(", "))
+    .limit(1);
+
+  if (!canonicalError) {
+    return {
+      columns: plannerSlotColumns(),
+      schemaReady: true,
+      missing: [],
+    };
+  }
+
+  // Fallback: probe aliases only when the canonical set is incomplete.
   const resolved = {};
   const missing = [];
 
   for (const [logical, aliases] of Object.entries(PLANNER_SLOT_FIELD_ALIASES)) {
     let found = null;
     for (const col of aliases) {
-      const { error } = await supabase.from("planner_slots").select(col).limit(1);
+      const { error } = await supabase
+        .from("planner_slots")
+        .select(col)
+        .limit(1);
       if (!error) {
         found = col;
         break;

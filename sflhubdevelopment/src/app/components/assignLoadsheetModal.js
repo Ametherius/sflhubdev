@@ -19,6 +19,7 @@ import {
   scheduleLoadErrorMessage,
 } from "@/lib/scheduleLoadsPersist";
 import { assignableUnitRowKey } from "@/lib/scheduleWeekAssign";
+import SearchableSelect from "./searchableSelect";
 const LOADS_PER_DAY = 3;
 
 function isoDateKey(raw) {
@@ -533,22 +534,25 @@ export default function AssignLoadsheetModal({
         ) : null}
 
         <form onSubmit={handleApply} className="flex flex-col gap-3">
-          <label className="block text-sm font-medium">
-            Load sheet
-            <select
-              className={selectClass}
-              value={loadsheetId}
-              onChange={(e) => setLoadsheetId(e.target.value)}
-              required
-            >
-              <option value="">Select a load sheet…</option>
-              {loadsheets.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {strTrim(s.load_number) || s.id}
-                </option>
-              ))}
-            </select>
-          </label>
+          <SearchableSelect
+            open={open}
+            label="Load sheet"
+            placeholder="Search load sheets…"
+            emptyMessage="No load sheets match."
+            options={loadsheets}
+            value={loadsheetId}
+            onChange={setLoadsheetId}
+            getOptionValue={(s) => String(s.id)}
+            getOptionLabel={(s) => {
+              const num = strTrim(s.load_number) || String(s.id);
+              const origin = strTrim(s.origin);
+              const endUser = strTrim(s.end_user);
+              const parts = [num];
+              if (origin) parts.push(origin);
+              if (endUser) parts.push(endUser);
+              return parts.join(" · ");
+            }}
+          />
 
           {multiAssignMode ? (
             <>

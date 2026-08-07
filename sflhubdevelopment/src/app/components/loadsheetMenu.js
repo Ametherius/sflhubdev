@@ -3,6 +3,7 @@ import { FaCopy, FaEdit, FaTimes } from "react-icons/fa";
 import BtnRed from "./btnRed";
 import ButtonDark from "./buttonDark";
 import BtnWhiteRounded from "./btnWhiteRound";
+import { useState } from "react";
 
 export default function LoadsheetMenu({
   loadsheets,
@@ -11,6 +12,13 @@ export default function LoadsheetMenu({
   onDelete,
   onCopy,
 }) {
+  const [query, setQuery] = useState("");
+  const searchLoadsheets = loadsheets.filter((l) => {
+    return String(l.load_number)
+      .toLowerCase()
+      .includes(String(query.toLowerCase()));
+  });
+
   const showActions =
     !readOnly &&
     (typeof onEdit === "function" ||
@@ -18,8 +26,15 @@ export default function LoadsheetMenu({
       typeof onCopy === "function");
 
   return (
-    <div className="mt-10 w-full">
-      {loadsheets.map((loadsheet) => (
+    <div className="mt-10 w-full flex flex-col">
+      <input
+        type="search"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        className="border-2 border-green-950 p-2 text-green-950 rounded-md mb-3"
+        placeholder="Search Loadsheets..."
+      />
+      {searchLoadsheets.map((loadsheet) => (
         <div
           key={loadsheet.id}
           className="flex bg-gray-900 rounded-lg w-full p-1 py-auto mb-2 h-20"

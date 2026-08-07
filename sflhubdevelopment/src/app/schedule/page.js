@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Header from "../components/header";
 import { useUnits } from "@/hooks/useUnits";
 import BtnWhite from "../components/btnWhite";
 import {
@@ -175,10 +174,7 @@ export default function Schedule() {
   const assignableUnits = useMemo(
     () =>
       (weekDisplayRows ?? [])
-        .filter(
-          (r) =>
-            !r.isArchived && (r.inUseUnitId != null || r.isWeekOnly),
-        )
+        .filter((r) => !r.isArchived && (r.inUseUnitId != null || r.isWeekOnly))
         .map((r) => ({
           rowKey: r.inUseUnitId
             ? String(r.inUseUnitId)
@@ -212,9 +208,7 @@ export default function Schedule() {
     if (!assignModal || !resolvedWeekId) return;
     queueMicrotask(() => {
       setAssignWeekIds([resolvedWeekId]);
-      setAddToLiveBoard(
-        !weekIsComplete(selectedWeek?.week_start_date ?? null),
-      );
+      setAddToLiveBoard(!weekIsComplete(selectedWeek?.week_start_date ?? null));
       setDriverValue("");
       setUnitValue("");
     });
@@ -232,9 +226,7 @@ export default function Schedule() {
 
   useEffect(() => {
     if (!resolvedWeekId || !assignmentIdsKey) return;
-    if (
-      !weekAcceptsNewAssignments(selectedWeek?.week_start_date ?? null)
-    ) {
+    if (!weekAcceptsNewAssignments(selectedWeek?.week_start_date ?? null)) {
       return;
     }
     void (async () => {
@@ -275,9 +267,12 @@ export default function Schedule() {
       return;
     }
     void (async () => {
-      const { error } = await supabase.rpc("link_schedule_assignments_for_week", {
-        p_week_id: resolvedWeekId,
-      });
+      const { error } = await supabase.rpc(
+        "link_schedule_assignments_for_week",
+        {
+          p_week_id: resolvedWeekId,
+        },
+      );
       if (error) {
         if (/function .* does not exist/i.test(error.message ?? "")) {
           return;
@@ -414,16 +409,16 @@ export default function Schedule() {
 
   async function handleRemoveWeekAssignment(
     scheduleAssignmentId,
-    {
-      pastWeek = false,
-      weekId = null,
-      inUseUnitId = null,
-    } = {},
+    { pastWeek = false, weekId = null, inUseUnitId = null } = {},
   ) {
-    if (scheduleAssignmentId == null && (weekId == null || inUseUnitId == null)) {
+    if (
+      scheduleAssignmentId == null &&
+      (weekId == null || inUseUnitId == null)
+    ) {
       return;
     }
-    if (!(await confirm(removeWeekAssignmentConfirmOptions({ pastWeek })))) return;
+    if (!(await confirm(removeWeekAssignmentConfirmOptions({ pastWeek }))))
+      return;
 
     const targetWeekId = weekId ?? resolvedWeekId;
     if (!targetWeekId) {
@@ -488,7 +483,9 @@ export default function Schedule() {
         );
       if (
         exErr &&
-        !/schedule_week_unit_exclusions|does not exist/i.test(exErr.message ?? "")
+        !/schedule_week_unit_exclusions|does not exist/i.test(
+          exErr.message ?? "",
+        )
       ) {
         alert(exErr.message);
         return;
@@ -695,7 +692,11 @@ export default function Schedule() {
 
     if (error) {
       const msg = error.message ?? "";
-      if (/week_only|create_schedule_week_assignment|function .* does not exist/i.test(msg)) {
+      if (
+        /week_only|create_schedule_week_assignment|function .* does not exist/i.test(
+          msg,
+        )
+      ) {
         alert(
           "Apply the latest Supabase migration (week-only schedule assignments), then try again.",
         );
@@ -717,10 +718,7 @@ export default function Schedule() {
   }
 
   return (
-    <div className="flex h-dvh min-h-0 w-full max-w-full flex-col overflow-hidden">
-      <div className="shrink-0">
-        <Header />
-      </div>
+    <div className="flex h-full min-h-0 w-full max-w-full flex-col overflow-hidden">
       <div className="shrink-0 py-6 text-center text-3xl font-bold text-white">
         <h2>Weekly Schedule</h2>
         {readOnly ? (
@@ -858,7 +856,9 @@ export default function Schedule() {
                 onChange={(e) => setAddToLiveBoard(e.target.checked)}
               />
               <span>
-                <span className="font-semibold">Add to live assigned board</span>
+                <span className="font-semibold">
+                  Add to live assigned board
+                </span>
                 <span className="block text-xs text-green-900/75">
                   {addToLiveBoard
                     ? "Unit appears on the assigned board and the selected open week(s)."
@@ -1006,7 +1006,7 @@ export default function Schedule() {
           />
         ))}
       </div>
-      <div className="fixed z-10 bottom-0 left-1/2 transform -translate-x-1/2 flex w-full justify-center">
+      <div className="fixed bottom-0 left-1/2 z-40 flex w-full max-w-full -translate-x-1/2 flex-wrap justify-center bg-none">
         <BtnWhite text="Loadsheets" Icon={FaList} onClick={toggleLoadsheets} />
         <BtnWhite text="Units" Icon={FaTruck} onClick={toggleUnitMenu} />
         <BtnWhite text="Drivers" Icon={FaUser} onClick={toggleDriverMenu} />
@@ -1039,7 +1039,7 @@ export default function Schedule() {
         />
       </div>
       <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        <div className="flex h-full min-h-0 flex-1 flex-col px-4 pb-28">
+        <div className="flex h-full min-h-0 flex-1 flex-col px-4 pb-24">
           <div className="flex shrink-0 flex-row flex-wrap gap-2 pt-2">
             <input
               type="search"
@@ -1056,7 +1056,7 @@ export default function Schedule() {
               className="max-w-md rounded-xl bg-white p-2 text-green-950 placeholder:text-green-950"
             />
           </div>
-          <div className="mt-3 h-[calc(100dvh-14rem)] min-h-[calc(100dvh-14rem)] overflow-y-auto overflow-x-hidden">
+          <div className="mt-3 min-h-0 flex-1 overflow-y-auto overflow-x-hidden pb-4">
             {scheduleRowsForDisplay.map((row) => (
               <ScheduleRow
                 key={row.scheduleAssignmentId ?? row.id}

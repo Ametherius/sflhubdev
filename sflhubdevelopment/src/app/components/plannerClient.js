@@ -182,10 +182,12 @@ export default function PlannerClient({
     if (!broker?.id || !canEdit || !resolveWeekId) return;
     setTogglingHideBrokerId(broker.id);
     try {
-      const { error } = await supabase.from("planner_week_broker_hides").insert({
-        week_id: resolveWeekId,
-        broker_id: broker.id,
-      });
+      const { error } = await supabase
+        .from("planner_week_broker_hides")
+        .insert({
+          week_id: resolveWeekId,
+          broker_id: broker.id,
+        });
       if (error) {
         alert(error.message);
         return;
@@ -359,8 +361,7 @@ export default function PlannerClient({
   );
 
   const visibleBrokers = useMemo(
-    () =>
-      filteredBrokers.filter((b) => !hiddenBrokerIds.has(String(b.id))),
+    () => filteredBrokers.filter((b) => !hiddenBrokerIds.has(String(b.id))),
     [filteredBrokers, hiddenBrokerIds],
   );
 
@@ -440,13 +441,9 @@ export default function PlannerClient({
                   ? `Show ${b.name} on planner this week`
                   : `Hide ${b.name} on planner this week`
               }
-              disabled={
-                !resolveWeekId || togglingHideBrokerId === b.id
-              }
+              disabled={!resolveWeekId || togglingHideBrokerId === b.id}
               onClick={() =>
-                void (isHidden
-                  ? handleUnhideBroker(b)
-                  : handleHideBroker(b))
+                void (isHidden ? handleUnhideBroker(b) : handleHideBroker(b))
               }
             >
               {isHidden ? <FaEye /> : <FaEyeSlash />}
@@ -468,7 +465,7 @@ export default function PlannerClient({
 
   return (
     <div className="h-full w-full p-5">
-      <div className="flex fixed bottom-0 left-1/2 transform -translate-x-1/2">
+      <div className="fixed bottom-0 left-1/2 z-40 flex -translate-x-1/2 px-3 py-3">
         <BtnWhite
           Icon={FaList}
           text="Canadian Grain Brokers"
@@ -634,7 +631,7 @@ export default function PlannerClient({
           />
         ) : null}
       </div>
-      <div className="mx-2 max-h-[calc(100dvh-14rem)] overflow-auto rounded-md border border-green-950/25 bg-white">
+      <div className="mx-2 mb-20 max-h-[calc(100dvh-18rem)] overflow-auto rounded-md border border-green-950/25 bg-white pb-4">
         {visibleBrokers.map((b) => {
           const slotsForBroker = slotsForWeek.filter(
             (s) => String(readSlotBrokerId(s, slotCols)) === String(b.id),
@@ -649,9 +646,7 @@ export default function PlannerClient({
                     className="shrink-0 p-1 text-base text-green-950/70 hover:text-green-950 disabled:opacity-50"
                     aria-label={`Hide ${b.name} on planner this week`}
                     title="Hide for this week"
-                    disabled={
-                      !resolveWeekId || togglingHideBrokerId === b.id
-                    }
+                    disabled={!resolveWeekId || togglingHideBrokerId === b.id}
                     onClick={() => void handleHideBroker(b)}
                   >
                     <FaEyeSlash />

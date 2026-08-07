@@ -1,10 +1,9 @@
 "use client";
 import { createClient } from "@/lib/supabase/client";
-import Header from "../components/header";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 export default function Dashboard() {
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const [name, setName] = useState(null);
   const time = new Date();
   const hour = time.getHours();
@@ -32,10 +31,9 @@ export default function Dashboard() {
       setName(data.first_name);
     }
     getProfile();
-  }, []);
+  }, [supabase]);
   return (
     <div className="w-full">
-      <Header />
       <div className="w-full p-2 text-center my-4">
         <h2 className="text-3xl font-bold">
           {hour < 12 ? "Good Morning" : "Good Afternoon"}, {name}

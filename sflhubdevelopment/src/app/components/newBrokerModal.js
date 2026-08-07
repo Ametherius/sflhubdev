@@ -16,6 +16,8 @@ export default function NewBrokerModal({ open, onClose, onCreated }) {
   const [division, setDivision] = useState("");
   const [saving, setSaving] = useState(false);
 
+  const divisions = ["Canadian Grain", "Cattle", "US Grain"];
+
   useEffect(() => {
     if (!open) return;
     setName("");
@@ -92,13 +94,17 @@ export default function NewBrokerModal({ open, onClose, onCreated }) {
           </label>
           <label className="block text-sm font-medium">
             Division <span className="text-red-700">*</span>
-            <input
+            <select
               className={inputClass}
-              type="text"
               value={division}
               onChange={(e) => setDivision(e.target.value)}
-              required
-            />
+            >
+              {divisions.map((div) => (
+                <option key={div} value={div}>
+                  {div}
+                </option>
+              ))}
+            </select>
           </label>
           <div className="mt-2 flex justify-end gap-2 border-t border-green-950/15 pt-4">
             <button
