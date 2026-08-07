@@ -20,6 +20,10 @@ import { resolveLoadInvoiced } from "@/lib/weekUnitRevenue";
 import { createClient } from "@/lib/supabase/client";
 import AssignLoadsheetModal from "./assignLoadsheetModal";
 import EditLoadsheetModal from "./editLoadsheetModal";
+import {
+  parseFieldTextColors,
+  scheduleFieldTextColor,
+} from "./fieldWithTextColor";
 
 const LOADS_PER_DAY = 3; // fixed; matches DB ensure_schedule_loads_for_week (limit 3) + canonical load_slots
 
@@ -340,6 +344,7 @@ function LoadSplitCard({
     : "flex w-full min-w-0 flex-row";
 
   const locationFieldClass = slotInvoiced ? fieldStackInvoiced : fieldStack;
+  const textColors = parseFieldTextColors(row?.field_text_colors);
 
   return (
     <div
@@ -356,6 +361,7 @@ function LoadSplitCard({
             placeholder="Origin"
             readOnly={readOnly}
             aria-label={`${slotTitle} origin`}
+            style={{ color: scheduleFieldTextColor(textColors, "origin") }}
           />
           <input
             type="text"
@@ -366,6 +372,7 @@ function LoadSplitCard({
             placeholder="End user"
             readOnly={readOnly}
             aria-label={`${slotTitle} end user`}
+            style={{ color: scheduleFieldTextColor(textColors, "end_user") }}
           />
           <div className="grid min-h-9 min-w-0 grid-cols-[minmax(2.5rem,1fr)_minmax(2.75rem,1fr)_minmax(2.75rem,1fr)_minmax(3.75rem,1.1fr)] border-t border-neutral-300">
             <input
@@ -378,6 +385,7 @@ function LoadSplitCard({
               disabled={readOnly || !fieldRules.showMt}
               readOnly={readOnly}
               aria-label={`${slotTitle} MT`}
+              style={{ color: scheduleFieldTextColor(textColors, "mt") }}
             />
             <input
               type="text"
@@ -388,6 +396,7 @@ function LoadSplitCard({
               placeholder="Rate"
               readOnly={readOnly}
               aria-label={`${slotTitle} rate`}
+              style={{ color: scheduleFieldTextColor(textColors, "rate") }}
             />
             <input
               type="text"
@@ -399,6 +408,7 @@ function LoadSplitCard({
               disabled={readOnly || !fieldRules.showFsc}
               readOnly={readOnly}
               aria-label={`${slotTitle} FSC`}
+              style={{ color: scheduleFieldTextColor(textColors, "fsc") }}
             />
             <div
               title={totalHint}
@@ -415,13 +425,20 @@ function LoadSplitCard({
         </div>
         <div className="flex w-[10rem] max-w-[12rem] min-h-0 shrink-0 flex-col bg-green-950 p-2">
           <textarea
-            className="min-h-[60px] flex-1 resize-y rounded-sm border border-white/90 bg-[#40916c]/35 p-2 text-sm leading-snug text-white outline-none placeholder:text-white/60 focus:bg-[#40916c]/55"
+            className="min-h-[60px] flex-1 resize-y rounded-sm border border-white/90 bg-[#40916c]/35 p-2 text-sm leading-snug outline-none placeholder:text-white/60 focus:bg-[#40916c]/55"
             value={loadNote}
             onChange={(e) => setLoadNote(e.target.value)}
             onBlur={() => void save()}
             placeholder="Load notes (load # and broker fill when you assign from a sheet)"
             readOnly={readOnly}
             aria-label={`${slotTitle} load notes`}
+            style={{
+              color:
+                scheduleFieldTextColor(textColors, "load_note") ||
+                scheduleFieldTextColor(textColors, "load_number") ||
+                scheduleFieldTextColor(textColors, "broker") ||
+                "#ffffff",
+            }}
           />
         </div>
       </div>

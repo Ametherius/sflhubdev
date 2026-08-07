@@ -35,6 +35,10 @@ import {
 } from "@/lib/scheduleLoadsPersist";
 import { useConfirm } from "@/context/confirmContext";
 import { saveChangesConfirmOptions } from "@/lib/confirmEdit";
+import {
+  FieldWithTextColor,
+  parseFieldTextColors,
+} from "./fieldWithTextColor";
 
 function nullIfEmpty(s) {
   const t = String(s ?? "").trim();
@@ -83,6 +87,7 @@ export default function EditLoadsheetModal({
   const [usdCadRate, setUsdCadRate] = useState("");
   const [fetchingFx, setFetchingFx] = useState(false);
   const [invoiced, setInvoiced] = useState(false);
+  const [fieldTextColors, setFieldTextColors] = useState({});
   const [saving, setSaving] = useState(false);
   const [copying, setCopying] = useState(false);
   const [unlinking, setUnlinking] = useState(false);
@@ -209,6 +214,7 @@ export default function EditLoadsheetModal({
       setLoadCategory(DEFAULT_LOAD_CATEGORY);
       setUsdCadRate("");
       setInvoiced(false);
+      setFieldTextColors({});
       return;
     }
 
@@ -259,6 +265,7 @@ export default function EditLoadsheetModal({
               ? String(selected.usd_cad_rate)
               : "",
       );
+      setFieldTextColors(parseFieldTextColors(slot.field_text_colors));
     } else if (!scheduleLoadId) {
       setLoadNumber(
         selected.load_number != null ? String(selected.load_number) : "",
@@ -278,6 +285,7 @@ export default function EditLoadsheetModal({
       );
       setKms(selected.kms != null ? String(selected.kms) : "");
       setInvoiced(Boolean(selected.invoiced));
+      setFieldTextColors({});
     }
 
     queueMicrotask(() => {
@@ -334,6 +342,7 @@ export default function EditLoadsheetModal({
           usdCadRate: values.usdCadRate,
           kms: values.kms,
           categoryStored,
+          fieldTextColors,
           ...(overrides.includeInvoicedOnSchedule === true
             ? { invoiced: values.invoiced }
             : {}),
@@ -396,6 +405,7 @@ export default function EditLoadsheetModal({
       loadCategory,
       usdCadRate,
       invoiced,
+      fieldTextColors,
       scheduleLoadId,
       supabase,
       onSaved,
@@ -468,8 +478,24 @@ export default function EditLoadsheetModal({
     kms,
     loadCategory,
     usdCadRate,
+    fieldTextColors,
     persistLive,
   ]);
+
+  function setFieldColor(fieldKey, value) {
+    setFieldTextColors((prev) => {
+      const next = { ...prev };
+      const hex = String(value ?? "").trim();
+      if (!hex) {
+        delete next[fieldKey];
+      } else {
+        next[fieldKey] = hex;
+      }
+      return next;
+    });
+  }
+
+  const showFieldColors = Boolean(scheduleLoadId);
 
   function handleLoadCategoryChange(next) {
     setLoadCategory(next);
@@ -635,6 +661,7 @@ export default function EditLoadsheetModal({
         invoiced: false,
         load_category: null,
         usd_cad_rate: null,
+        field_text_colors: {},
       })
       .eq("id", scheduleLoadId);
     setUnlinking(false);
@@ -727,8 +754,21 @@ export default function EditLoadsheetModal({
         )}
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-          <label className="block text-sm font-medium">
-            Load number <span className="text-red-700">*</span>
+          {showFieldColors ? (
+            <p className="rounded-md border border-green-950/15 bg-green-950/5 px-3 py-2 text-xs text-green-900/80">
+              Use the color swatches to set text color on the schedule for this
+              slot.
+            </p>
+          ) : null}
+          <FieldWithTextColor
+            label="Load number"
+            required
+            fieldKey="load_number"
+            colors={fieldTextColors}
+            onColorChange={setFieldColor}
+            showColor={showFieldColors}
+            disabled={fieldLocked()}
+          >
             <input
               className={inputClass}
               value={loadNumber}
@@ -736,28 +776,55 @@ export default function EditLoadsheetModal({
               placeholder="e.g. 1042"
               required
               disabled={fieldLocked()}
+              style={
+                showFieldColors && fieldTextColors.load_number
+                  ? { color: fieldTextColors.load_number }
+                  : undefined
+              }
             />
-          </label>
-          <label className="block text-sm font-medium">
-            Origin
+          </FieldWithTextColor>
+          <FieldWithTextColor
+            label="Origin"
+            fieldKey="origin"
+            colors={fieldTextColors}
+            onColorChange={setFieldColor}
+            showColor={showFieldColors}
+            disabled={fieldLocked()}
+          >
             <input
               className={inputClass}
               value={origin}
               onChange={(e) => setOrigin(e.target.value)}
               placeholder="Origin"
               disabled={fieldLocked()}
+              style={
+                showFieldColors && fieldTextColors.origin
+                  ? { color: fieldTextColors.origin }
+                  : undefined
+              }
             />
-          </label>
-          <label className="block text-sm font-medium">
-            End user
+          </FieldWithTextColor>
+          <FieldWithTextColor
+            label="End user"
+            fieldKey="end_user"
+            colors={fieldTextColors}
+            onColorChange={setFieldColor}
+            showColor={showFieldColors}
+            disabled={fieldLocked()}
+          >
             <input
               className={inputClass}
               value={endUser}
               onChange={(e) => setEndUser(e.target.value)}
               placeholder="End user"
               disabled={fieldLocked()}
+              style={
+                showFieldColors && fieldTextColors.end_user
+                  ? { color: fieldTextColors.end_user }
+                  : undefined
+              }
             />
-          </label>
+          </FieldWithTextColor>
           <label className="block text-sm font-medium">
             Load type
             <select
@@ -780,19 +847,36 @@ export default function EditLoadsheetModal({
             className={`grid gap-3 ${fieldRules.showMt ? "grid-cols-2" : "grid-cols-1"}`}
           >
             {fieldRules.showMt ? (
-              <label className="block text-sm font-medium">
-                MT
+              <FieldWithTextColor
+                label="MT"
+                fieldKey="mt"
+                colors={fieldTextColors}
+                onColorChange={setFieldColor}
+                showColor={showFieldColors}
+                disabled={fieldLocked()}
+              >
                 <input
                   className={inputClass}
                   value={mt}
                   onChange={(e) => setMt(e.target.value)}
                   placeholder="MT"
                   disabled={fieldLocked()}
+                  style={
+                    showFieldColors && fieldTextColors.mt
+                      ? { color: fieldTextColors.mt }
+                      : undefined
+                  }
                 />
-              </label>
+              </FieldWithTextColor>
             ) : null}
-            <label className="block text-sm font-medium">
-              Rate
+            <FieldWithTextColor
+              label="Rate"
+              fieldKey="rate"
+              colors={fieldTextColors}
+              onColorChange={setFieldColor}
+              showColor={showFieldColors}
+              disabled={fieldLocked()}
+            >
               <input
                 className={inputClass}
                 value={rate}
@@ -801,29 +885,45 @@ export default function EditLoadsheetModal({
                   fieldRules.rateIsFlatTotal ? "Total amount (CAD)" : "Rate"
                 }
                 disabled={fieldLocked()}
+                style={
+                  showFieldColors && fieldTextColors.rate
+                    ? { color: fieldTextColors.rate }
+                    : undefined
+                }
               />
-            </label>
+            </FieldWithTextColor>
           </div>
           {fieldRules.showFsc ? (
-            <label className="block text-sm font-medium">
-              FSC{" "}
-              <span className="font-normal text-green-900/60">
-                {loadCategory === "chicken"
+            <FieldWithTextColor
+              label="FSC"
+              hint={
+                loadCategory === "chicken"
                   ? "(556 × FSC + rate)"
                   : loadCategory === "cargill"
                     ? "(KMs × FSC + rate × MT)"
                     : loadCategory === "irm"
                       ? "(FSC is % — added onto rate × MT)"
-                      : "(legacy flat: rate × FSC)"}
-              </span>
+                      : "(legacy flat: rate × FSC)"
+              }
+              fieldKey="fsc"
+              colors={fieldTextColors}
+              onColorChange={setFieldColor}
+              showColor={showFieldColors}
+              disabled={fieldLocked()}
+            >
               <input
                 className={inputClass}
                 value={fsc}
                 onChange={(e) => setFsc(e.target.value)}
                 placeholder="e.g. 150"
                 disabled={fieldLocked()}
+                style={
+                  showFieldColors && fieldTextColors.fsc
+                    ? { color: fieldTextColors.fsc }
+                    : undefined
+                }
               />
-            </label>
+            </FieldWithTextColor>
           ) : null}
           {fieldRules.showUsdCad ? (
             <div className="space-y-2">
@@ -869,17 +969,28 @@ export default function EditLoadsheetModal({
               title={`${totalHint} — saved to the schedule as CAD.`}
             />
           </label>
-          <label className="block text-sm font-medium">
-            KMs{" "}
-            <span className="font-normal text-green-900/60">(for revenue/km)</span>
+          <FieldWithTextColor
+            label="KMs"
+            hint="(for revenue/km)"
+            fieldKey="kms"
+            colors={fieldTextColors}
+            onColorChange={setFieldColor}
+            showColor={showFieldColors}
+            disabled={fieldLocked()}
+          >
             <input
               className={inputClass}
               value={kms}
               onChange={(e) => setKms(e.target.value)}
               placeholder="e.g. 450"
               disabled={fieldLocked()}
+              style={
+                showFieldColors && fieldTextColors.kms
+                  ? { color: fieldTextColors.kms }
+                  : undefined
+              }
             />
-          </label>
+          </FieldWithTextColor>
           <label className="block text-sm font-medium">
             Revenue/km{" "}
             <span className="font-normal text-green-900/60">(total ÷ KMs)</span>
@@ -890,17 +1001,44 @@ export default function EditLoadsheetModal({
               placeholder="—"
             />
           </label>
-          <label className="block text-sm font-medium">
-            Broker{" "}
-            <span className="font-normal text-green-900/60">(optional)</span>
+          <FieldWithTextColor
+            label="Broker"
+            hint="(optional)"
+            fieldKey="broker"
+            colors={fieldTextColors}
+            onColorChange={setFieldColor}
+            showColor={showFieldColors}
+            disabled={fieldLocked()}
+          >
             <input
               className={inputClass}
               value={broker}
               onChange={(e) => setBroker(e.target.value)}
               placeholder="Broker"
               disabled={fieldLocked()}
+              style={
+                showFieldColors && fieldTextColors.broker
+                  ? { color: fieldTextColors.broker }
+                  : undefined
+              }
             />
-          </label>
+          </FieldWithTextColor>
+          {showFieldColors ? (
+            <FieldWithTextColor
+              label="Load notes"
+              hint="(schedule notes column)"
+              fieldKey="load_note"
+              colors={fieldTextColors}
+              onColorChange={setFieldColor}
+              showColor
+              disabled={fieldLocked()}
+            >
+              <p className="mt-1 text-xs font-normal text-green-900/70">
+                Colors the load # / broker text in the green notes column on the
+                schedule.
+              </p>
+            </FieldWithTextColor>
+          ) : null}
 
           <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
             <input

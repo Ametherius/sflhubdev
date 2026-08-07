@@ -51,6 +51,7 @@ export function buildScheduleLoadPayload({
   kms = undefined,
   invoiced = undefined,
   categoryStored = null,
+  fieldTextColors = undefined,
 }) {
   const num = strTrim(loadNumber);
   const loadTotalDisplay = computeLoadTotalDisplay(mt, rate, fsc, {
@@ -77,6 +78,12 @@ export function buildScheduleLoadPayload({
   }
   if (invoiced !== undefined) {
     payload.invoiced = Boolean(invoiced);
+  }
+  if (fieldTextColors !== undefined) {
+    payload.field_text_colors =
+      fieldTextColors && typeof fieldTextColors === "object"
+        ? fieldTextColors
+        : {};
   }
   return payload;
 }
