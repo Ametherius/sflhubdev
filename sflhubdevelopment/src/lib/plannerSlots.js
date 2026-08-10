@@ -207,6 +207,45 @@ export function readSlotDriverName(slot, cols = plannerSlotColumns(slot)) {
   return raw == null ? "" : String(raw).trim();
 }
 
+/**
+ * Load planner slots for one week, skipping blank junk rows.
+ * Needed while empty auto-prefill rows exist: PostgREST caps results (~1000),
+ * so unfiltered week queries can hide all real data under empties.
+ */
+export async function fetchPlannerSlotsForWeek(
+  supabase,
+  weekId,
+  cols = plannerSlotColumns(),
+) {
+  if (!weekId) return { data: [], error: null };
+
+  const weekCol = cols.week ?? "week_id";
+  const origin = cols.origin ?? "origin";
+  const endUser = cols.endUser ?? "end_user";
+  const unit = cols.unitNumber ?? "unit_number";
+  const driver = cols.driverName ?? "driver_name";
+
+  const { data, error } = await supabase
+    .from("planner_slots")
+    .select("*")
+    .eq(weekCol, weekId)
+    .or(
+      [
+        `and(${origin}.not.is.null,${origin}.neq.)`,
+        `and(${endUser}.not.is.null,${endUser}.neq.)`,
+        `and(${unit}.not.is.null,${unit}.neq.)`,
+        `and(${driver}.not.is.null,${driver}.neq.)`,
+        "dispatched.eq.true",
+        "unloaded.eq.true",
+        "completed.eq.true",
+        "rejected.eq.true",
+      ].join(","),
+    )
+    .limit(5000);
+
+  return { data: data ?? [], error };
+}
+
 export function readSlotDispatched(slot, cols = plannerSlotColumns(slot)) {
   return Boolean(slot?.[cols.dispatched]);
 }

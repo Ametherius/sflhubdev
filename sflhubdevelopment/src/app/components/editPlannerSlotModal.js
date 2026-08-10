@@ -73,14 +73,17 @@ export default function EditPlannerSlotModal({
     <div
       className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-4"
       role="presentation"
-      onClick={onClose}
+      onMouseDown={(ev) => {
+        // mouseDown (not click): opening click's mouseup must not close the dialog.
+        if (ev.target === ev.currentTarget) onClose?.();
+      }}
     >
       <div
         className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6 text-green-950 shadow-xl"
         role="dialog"
         aria-modal="true"
         aria-labelledby="edit-planner-slot-title"
-        onClick={(ev) => ev.stopPropagation()}
+        onMouseDown={(ev) => ev.stopPropagation()}
       >
         <button
           type="button"

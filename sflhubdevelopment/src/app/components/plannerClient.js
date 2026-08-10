@@ -5,18 +5,17 @@ import { createClient } from "@/lib/supabase/client";
 import {
   parseISODateLocal,
   resolveDefaultScheduleWeekId,
-  weekDayLabels,
 } from "@/lib/weekDates";
 import {
-  buildMissingPlannerSlotsForWeek,
   buildPlannerSlotInsert,
   buildPlannerSlotUpdate,
+  fetchPlannerSlotsForWeek,
   plannerSlotColumns,
   plannerSlotSchemaErrorMessage,
   readSlotBrokerId,
   readSlotWeekId,
 } from "@/lib/plannerSlots";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { FaEye, FaEyeSlash, FaList, FaPlus, FaTimes } from "react-icons/fa";
 import BtnWhite from "./btnWhite";
 import EditPlannerSlotModal from "./editPlannerSlotModal";
@@ -70,13 +69,11 @@ export default function PlannerClient({
   const [canOpen, setCanOpen] = useState(false);
   const [usOpen, setUsOpen] = useState(false);
   const [cattleOpen, setCattleOpen] = useState(false);
-  const ensuringSlotsRef = useRef(false);
 
   const slotCols = useMemo(
     () =>
-      slotColumnsProp ??
-      plannerSlotColumns(slots[0] ?? initialSlots?.[0] ?? null),
-    [slotColumnsProp, slots, initialSlots],
+      slotColumnsProp ?? plannerSlotColumns(initialSlots?.[0] ?? null),
+    [slotColumnsProp, initialSlots],
   );
 
   const resolveWeekId = useMemo(
@@ -138,55 +135,39 @@ export default function PlannerClient({
     };
   }, [supabase, resolveWeekId]);
 
+  // Load only the active week's real slots (skip blank junk; UI pads empties).
   useEffect(() => {
-    if (!plannerSchemaReady || !canEdit || !resolveWeekId || !weekStartISO) {
-      return;
-    }
-    if (!brokers.length || ensuringSlotsRef.current) return;
-
-    const dayIsos = weekDayLabels(weekStartISO).map((d) => d.iso);
-    const missing = buildMissingPlannerSlotsForWeek({
-      brokers,
-      weekId: resolveWeekId,
-      dayIsos,
-      existingSlots: slots,
-      slotCols,
-    });
-    if (!missing.length) return;
+    if (!resolveWeekId || !plannerSchemaReady) return;
 
     let cancelled = false;
-    ensuringSlotsRef.current = true;
 
     (async () => {
-      try {
-        const { error } = await supabase.from("planner_slots").insert(missing);
-        if (cancelled) return;
-        if (error) {
-          console.error("Failed to prefill planner slots:", error.message);
-          return;
-        }
-        await refreshSlots();
-      } finally {
-        ensuringSlotsRef.current = false;
+      const { data, error } = await fetchPlannerSlotsForWeek(
+        supabase,
+        resolveWeekId,
+        slotCols,
+      );
+      if (cancelled) return;
+      if (error) {
+        console.error("Failed to load planner slots:", error.message);
+        return;
       }
+      setSlots(data ?? []);
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [
-    plannerSchemaReady,
-    canEdit,
-    resolveWeekId,
-    weekStartISO,
-    brokers,
-    slots,
-    slotCols,
-    supabase,
-  ]);
+    // Intentionally depend on weekCol string, not slotCols object identity.
+  }, [supabase, resolveWeekId, plannerSchemaReady, slotCols?.week]);
 
   async function refreshSlots() {
-    const { data, error } = await supabase.from("planner_slots").select("*");
+    if (!resolveWeekId) return;
+    const { data, error } = await fetchPlannerSlotsForWeek(
+      supabase,
+      resolveWeekId,
+      slotCols,
+    );
     if (!error && data) {
       setSlots(data);
     }
@@ -392,7 +373,8 @@ export default function PlannerClient({
       }
       if (data) {
         setSlots((prev) => [...prev, data]);
-        setEditSlotTarget(data);
+        // Defer open until after the triggering click finishes.
+        queueMicrotask(() => setEditSlotTarget(data));
       } else {
         await refreshSlots();
       }
@@ -773,7 +755,10 @@ export default function PlannerClient({
                   setAddSlotTarget(target);
                 }}
                 onRequestAddMultipleSlots={setAddSlotTarget}
-                onSelectSlot={setEditSlotTarget}
+                onSelectSlot={(slot) => {
+                  // Defer so the cell click cannot hit the modal backdrop.
+                  queueMicrotask(() => setEditSlotTarget(slot));
+                }}
                 onDeleteSlot={
                   canEdit && plannerSchemaReady ? handleDeleteSlot : undefined
                 }

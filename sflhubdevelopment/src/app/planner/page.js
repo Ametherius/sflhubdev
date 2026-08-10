@@ -1,28 +1,42 @@
-import { detectPlannerSlotColumns } from "@/lib/plannerSlots";
+import {
+  detectPlannerSlotColumns,
+  fetchPlannerSlotsForWeek,
+  plannerSlotColumns,
+} from "@/lib/plannerSlots";
+import { resolveDefaultScheduleWeekId } from "@/lib/weekDates";
 import { createClient } from "@/lib/supabase/server";
 import PlannerClient from "../components/plannerClient";
 
 export default async function Planner() {
   const supabase = await createClient();
 
-  const [weeksRes, brokersRes, slotsRes] = await Promise.all([
+  const [weeksRes, brokersRes, sampleRes] = await Promise.all([
     supabase
       .from("schedule_weeks")
       .select("id, week_start_date")
       .order("week_start_date"),
     supabase.from("brokers").select("id, name, division").order("name"),
-    supabase.from("planner_slots").select("*"),
+    // Schema probe only — never select the full planner_slots table.
+    supabase.from("planner_slots").select("*").limit(1),
   ]);
 
   const weeks = weeksRes.data ?? [];
   const brokers = brokersRes.data ?? [];
+  const defaultWeekId = resolveDefaultScheduleWeekId(weeks, null);
+  const slotColumns = plannerSlotColumns(sampleRes.data?.[0] ?? null);
+
+  const slotsRes = defaultWeekId
+    ? await fetchPlannerSlotsForWeek(supabase, defaultWeekId, slotColumns)
+    : { data: [] };
+
   const slots = slotsRes.data ?? [];
+  const sampleSlot = slots[0] ?? sampleRes.data?.[0] ?? null;
 
   const {
-    columns: slotColumns,
+    columns,
     schemaReady,
     missing,
-  } = await detectPlannerSlotColumns(supabase, { sampleSlot: slots[0] ?? null });
+  } = await detectPlannerSlotColumns(supabase, { sampleSlot });
 
   return (
     <div className="w-full h-full">
@@ -34,7 +48,7 @@ export default async function Planner() {
           brokers={brokers}
           weeks={weeks}
           slots={slots}
-          slotColumns={slotColumns}
+          slotColumns={columns}
           plannerSchemaReady={schemaReady}
           plannerSchemaMissing={missing}
         />
