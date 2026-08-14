@@ -19,8 +19,30 @@ import {
   scheduleLoadErrorMessage,
 } from "@/lib/scheduleLoadsPersist";
 import { assignableUnitRowKey } from "@/lib/scheduleWeekAssign";
+import {
+  computeLoadTotalDisplay,
+  formatLoadTotalCad,
+} from "@/lib/loadTotal";
 import SearchableSelect from "./searchableSelect";
 const LOADS_PER_DAY = 3;
+
+function PreviewRow({ label, value }) {
+  const text = strTrim(value);
+  return (
+    <div className="grid grid-cols-[6.5rem_minmax(0,1fr)] items-baseline gap-x-3 gap-y-0.5">
+      <dt className="text-[11px] font-semibold uppercase tracking-wide text-green-900/60">
+        {label}
+      </dt>
+      <dd
+        className={`min-w-0 text-sm ${
+          text ? "font-medium text-green-950" : "text-green-900/40"
+        }`}
+      >
+        {text || "—"}
+      </dd>
+    </div>
+  );
+}
 
 function isoDateKey(raw) {
   if (raw == null) return "";
@@ -94,6 +116,19 @@ function scheduleLoadIsTaken(row) {
   ].some((v) => String(v ?? "").trim() !== "");
 }
 
+function scheduleCellIsOpen(
+  weekLoads,
+  dayIso,
+  slotId,
+  { inUseUnitId = null, scheduleAssignmentId = null } = {},
+) {
+  const row = findScheduleRowForCell(weekLoads, dayIso, slotId, {
+    inUseUnitId,
+    scheduleAssignmentId,
+  });
+  return !scheduleLoadIsTaken(row);
+}
+
 /**
  * Pick a saved load sheet and a slot for that day; writes schedule_loads for this unit.
  * All load sheets support assigning to multiple drivers, days, and slots via checkboxes.
@@ -125,7 +160,8 @@ export default function AssignLoadsheetModal({
   const [loadsheetId, setLoadsheetId] = useState("");
   const [slotId, setSlotId] = useState("");
   const [selectedUnitIds, setSelectedUnitIds] = useState([]);
-  const [selectedSlotIds, setSelectedSlotIds] = useState([]);
+  /** Multi-assign: open slot ids keyed by day ISO (taken slots excluded per day). */
+  const [selectedDaySlots, setSelectedDaySlots] = useState({});
   const [selectedDayIsos, setSelectedDayIsos] = useState([]);
   const [saving, setSaving] = useState(false);
 
@@ -146,7 +182,7 @@ export default function AssignLoadsheetModal({
   useEffect(() => {
     if (!open) return;
     queueMicrotask(() => {
-      setLoadsheetId("");
+      setLoadsheetId(loadsheets[0] ? String(loadsheets[0].id) : "");
 
       const defaultUnits =
         inUseUnitId != null && String(inUseUnitId).trim() !== ""
@@ -156,6 +192,7 @@ export default function AssignLoadsheetModal({
             ? [`sa:${scheduleAssignmentId}`]
             : [];
       setSelectedUnitIds(defaultUnits);
+      setSelectedDaySlots({});
 
       const openDay =
         dayIso != null && String(dayIso).trim() !== "" ? isoDateKey(dayIso) : "";
@@ -194,67 +231,66 @@ export default function AssignLoadsheetModal({
 
   const weekLoadsForLookup = allWeekLoads ?? loads;
 
-  const availableSlots = useMemo(() => {
-    const daysForCheck = multiAssignMode
-      ? selectedDayIsos.length > 0
-        ? selectedDayIsos
-        : dayIso
-          ? [isoDateKey(dayIso)]
-          : []
+  const unitsForSlotCheck = useMemo(() => {
+    if (multiAssignMode) {
+      const selected = filteredAssignableUnits.filter((u) =>
+        selectedUnitIds.includes(assignableUnitRowKey(u)),
+      );
+      if (selected.length) return selected;
+      if (inUseUnitId != null || scheduleAssignmentId != null) {
+        return [{ inUseUnitId, scheduleAssignmentId }];
+      }
+      return [];
+    }
+    return [{ inUseUnitId, scheduleAssignmentId }];
+  }, [
+    multiAssignMode,
+    filteredAssignableUnits,
+    selectedUnitIds,
+    inUseUnitId,
+    scheduleAssignmentId,
+  ]);
+
+  /** Open slots per day — a taken slot on Monday does not hide Tuesday's same slot. */
+  const openSlotsByDay = useMemo(() => {
+    const map = new Map();
+    const days = multiAssignMode
+      ? selectedDayIsos.map(isoDateKey).filter(Boolean)
       : dayIso
         ? [isoDateKey(dayIso)]
         : [];
 
-    let unitsForCheck = [];
-    if (multiAssignMode) {
-      unitsForCheck = filteredAssignableUnits.filter((u) =>
-        selectedUnitIds.includes(assignableUnitRowKey(u)),
-      );
-      if (
-        !unitsForCheck.length &&
-        (inUseUnitId != null || scheduleAssignmentId != null)
-      ) {
-        unitsForCheck = [{ inUseUnitId, scheduleAssignmentId }];
-      }
-    } else {
-      unitsForCheck = [{ inUseUnitId, scheduleAssignmentId }];
+    for (const dk of days) {
+      const open = daySlots.filter((slot) => {
+        if (!unitsForSlotCheck.length) return true;
+        return unitsForSlotCheck.some((unit) =>
+          scheduleCellIsOpen(weekLoadsForLookup, dk, slot.id, {
+            inUseUnitId: unit.inUseUnitId ?? null,
+            scheduleAssignmentId: unit.scheduleAssignmentId ?? null,
+          }),
+        );
+      });
+      map.set(dk, open);
     }
-
-    if (!daysForCheck.length || !unitsForCheck.length) {
-      return daySlots;
-    }
-
-    return daySlots.filter((slot) => {
-      for (const dk of daysForCheck) {
-        for (const unit of unitsForCheck) {
-          const row = findScheduleRowForCell(
-            weekLoadsForLookup,
-            dk,
-            slot.id,
-            {
-              inUseUnitId: unit.inUseUnitId ?? null,
-              scheduleAssignmentId: unit.scheduleAssignmentId ?? null,
-            },
-          );
-          if (scheduleLoadIsTaken(row)) return false;
-        }
-      }
-      return true;
-    });
+    return map;
   }, [
-    daySlots,
-    dayIso,
     multiAssignMode,
     selectedDayIsos,
-    selectedUnitIds,
-    filteredAssignableUnits,
-    inUseUnitId,
-    scheduleAssignmentId,
+    dayIso,
+    daySlots,
+    unitsForSlotCheck,
     weekLoadsForLookup,
   ]);
 
+  /** Single-day (non-multi) dropdown: open slots for the opened day only. */
+  const availableSlots = useMemo(() => {
+    if (multiAssignMode) return [];
+    const dk = dayIso ? isoDateKey(dayIso) : "";
+    return openSlotsByDay.get(dk) ?? [];
+  }, [multiAssignMode, dayIso, openSlotsByDay]);
+
   useEffect(() => {
-    if (!open) return;
+    if (!open || multiAssignMode) return;
     const ids = new Set(availableSlots.map((s) => String(s.id)));
     const want =
       initialSlotId != null && String(initialSlotId).trim() !== ""
@@ -264,34 +300,108 @@ export default function AssignLoadsheetModal({
     const first = preferred || (availableSlots[0]?.id
       ? String(availableSlots[0].id)
       : "");
-
     setSlotId((prev) => (prev && ids.has(prev) ? prev : first));
-    setSelectedSlotIds((prev) => {
-      const kept = prev.filter((id) => ids.has(id));
-      if (kept.length) return kept;
-      return first ? [first] : [];
-    });
-  }, [open, availableSlots, initialSlotId]);
+  }, [open, multiAssignMode, availableSlots, initialSlotId]);
 
-  const assignTargetCount =
-    selectedDayIsos.length * selectedUnitIds.length * selectedSlotIds.length;
+  useEffect(() => {
+    if (!open || !multiAssignMode) return;
+    setSelectedDaySlots((prev) => {
+      const next = {};
+      for (const rawDay of selectedDayIsos) {
+        const dk = isoDateKey(rawDay);
+        if (!dk) continue;
+        const openList = openSlotsByDay.get(dk) ?? [];
+        const openIds = new Set(openList.map((s) => String(s.id)));
+        const kept = (prev[dk] ?? []).filter((id) => openIds.has(id));
+        if (kept.length) {
+          next[dk] = kept;
+          continue;
+        }
+        const want =
+          initialSlotId != null && String(initialSlotId).trim() !== ""
+            ? String(initialSlotId)
+            : "";
+        const preferred = want && openIds.has(want) ? want : "";
+        const first = preferred || (openList[0]?.id ? String(openList[0].id) : "");
+        next[dk] = first ? [first] : [];
+      }
+      return next;
+    });
+  }, [open, multiAssignMode, selectedDayIsos, openSlotsByDay, initialSlotId]);
+
+  const assignTargetCount = useMemo(() => {
+    if (!multiAssignMode) return 0;
+    let count = 0;
+    for (const rawDay of selectedDayIsos) {
+      const dk = isoDateKey(rawDay);
+      const slotIds = selectedDaySlots[dk] ?? [];
+      if (!dk || !slotIds.length) continue;
+      for (const rowKey of selectedUnitIds) {
+        const unitRow = filteredAssignableUnits.find(
+          (u) => assignableUnitRowKey(u) === rowKey,
+        );
+        for (const sid of slotIds) {
+          if (
+            scheduleCellIsOpen(weekLoadsForLookup, dk, sid, {
+              inUseUnitId: unitRow?.inUseUnitId ?? null,
+              scheduleAssignmentId: unitRow?.scheduleAssignmentId ?? null,
+            })
+          ) {
+            count += 1;
+          }
+        }
+      }
+    }
+    return count;
+  }, [
+    multiAssignMode,
+    selectedDayIsos,
+    selectedDaySlots,
+    selectedUnitIds,
+    filteredAssignableUnits,
+    weekLoadsForLookup,
+  ]);
+
+  const dayTitleByIso = useMemo(() => {
+    const map = new Map();
+    for (const d of weekDays) {
+      map.set(isoDateKey(d.iso), d.columnTitle ?? d.label ?? isoDateKey(d.iso));
+    }
+    return map;
+  }, [weekDays]);
 
   const preview = selectedSheet
-    ? {
-        load_number: strTrim(selectedSheet.load_number),
-        origin: selectedSheet.origin ?? "",
-        end_user: selectedSheet.end_user ?? "",
-        mt: selectedSheet.mt ?? "",
-        rate: selectedSheet.rate ?? "",
-        fsc: selectedSheet.fsc ?? "",
-        notesAuto: (() => {
-          const n = buildScheduleLoadNote(
-            selectedSheet.load_number,
-            selectedSheet.broker,
-          );
-          return n ?? "—";
-        })(),
-      }
+    ? (() => {
+        const calc = calcOptionsFromSheet(selectedSheet);
+        const totalRaw = computeLoadTotalDisplay(
+          selectedSheet.mt,
+          selectedSheet.rate,
+          selectedSheet.fsc,
+          {
+            loadCategory: calc.loadCategory,
+            usdCadRate: calc.usdCadRate,
+            kms: selectedSheet.kms,
+            flatRate: calc.flatRate,
+          },
+        );
+        const notesAuto = buildScheduleLoadNote(
+          selectedSheet.load_number,
+          selectedSheet.broker,
+        );
+        return {
+          load_number: strTrim(selectedSheet.load_number),
+          broker: strTrim(selectedSheet.broker),
+          origin: strTrim(selectedSheet.origin),
+          end_user: strTrim(selectedSheet.end_user),
+          mt: strTrim(selectedSheet.mt),
+          rate: strTrim(selectedSheet.rate),
+          fsc: strTrim(selectedSheet.fsc),
+          kms: strTrim(selectedSheet.kms),
+          category: loadCategoryLabel(calc.loadCategory),
+          total: formatLoadTotalCad(totalRaw),
+          notesAuto: strTrim(notesAuto),
+        };
+      })()
     : null;
 
   async function persistToCell(
@@ -347,10 +457,13 @@ export default function AssignLoadsheetModal({
     }
 
     if (multiAssignMode) {
+      const hasSlotSelection = selectedDayIsos.some(
+        (d) => (selectedDaySlots[isoDateKey(d)] ?? []).length > 0,
+      );
       if (
         !selectedDayIsos.length ||
         !selectedUnitIds.length ||
-        !selectedSlotIds.length
+        !hasSlotSelection
       ) {
         alert("Select at least one day, one driver, and one slot.");
         return;
@@ -359,9 +472,9 @@ export default function AssignLoadsheetModal({
         alert("No load slots available. Fix load_slots access, then try again.");
         return;
       }
-      if (!availableSlots.length) {
+      if (assignTargetCount === 0) {
         alert(
-          "All selected slots are already filled for the chosen day(s) and driver(s). Clear a load or pick different targets.",
+          "No open cells for the selected days, drivers, and slots. Clear a load or pick different targets.",
         );
         return;
       }
@@ -370,13 +483,23 @@ export default function AssignLoadsheetModal({
       let lastError = null;
 
       for (const dayKey of selectedDayIsos) {
+        const dk = isoDateKey(dayKey);
+        const slotsForDay = selectedDaySlots[dk] ?? [];
         for (const rowKey of selectedUnitIds) {
           const unitRow = filteredAssignableUnits.find(
             (u) => assignableUnitRowKey(u) === rowKey,
           );
-          for (const sid of selectedSlotIds) {
+          for (const sid of slotsForDay) {
+            if (
+              !scheduleCellIsOpen(weekLoadsForLookup, dk, sid, {
+                inUseUnitId: unitRow?.inUseUnitId ?? null,
+                scheduleAssignmentId: unitRow?.scheduleAssignmentId ?? null,
+              })
+            ) {
+              continue;
+            }
             const { data, error } = await persistToCell(
-              dayKey,
+              dk,
               unitRow?.inUseUnitId ?? null,
               sid,
               unitRow?.scheduleAssignmentId ?? null,
@@ -475,7 +598,7 @@ export default function AssignLoadsheetModal({
       onClick={onClose}
     >
       <div
-        className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6 text-green-950 shadow-xl"
+        className="relative max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-xl bg-white p-6 text-green-950 shadow-xl"
         role="dialog"
         aria-modal="true"
         aria-labelledby="assign-loadsheet-title"
@@ -534,25 +657,71 @@ export default function AssignLoadsheetModal({
         ) : null}
 
         <form onSubmit={handleApply} className="flex flex-col gap-3">
-          <SearchableSelect
-            open={open}
-            label="Load sheet"
-            placeholder="Search load sheets…"
-            emptyMessage="No load sheets match."
-            options={loadsheets}
-            value={loadsheetId}
-            onChange={setLoadsheetId}
-            getOptionValue={(s) => String(s.id)}
-            getOptionLabel={(s) => {
-              const num = strTrim(s.load_number) || String(s.id);
-              const origin = strTrim(s.origin);
-              const endUser = strTrim(s.end_user);
-              const parts = [num];
-              if (origin) parts.push(origin);
-              if (endUser) parts.push(endUser);
-              return parts.join(" · ");
-            }}
-          />
+          <div className="grid min-w-0 gap-3 md:grid-cols-2">
+            <SearchableSelect
+              open={open}
+              label="Load sheet"
+              placeholder="Search load sheets…"
+              emptyMessage="No load sheets match."
+              options={loadsheets}
+              value={loadsheetId}
+              onChange={setLoadsheetId}
+              autoSelectFirst
+              selectOnNavigate
+              autoFocus
+              className="min-w-0 p-0"
+              listClassName="max-h-64"
+              getOptionValue={(s) => String(s.id)}
+              getOptionLabel={(s) => {
+                const num = strTrim(s.load_number) || String(s.id);
+                const origin = strTrim(s.origin);
+                const endUser = strTrim(s.end_user);
+                const parts = [num];
+                if (origin) parts.push(origin);
+                if (endUser) parts.push(endUser);
+                return parts.join(" · ");
+              }}
+            />
+            <div className="flex min-h-64 max-h-80 flex-col overflow-y-auto rounded-lg border border-green-950/20 bg-green-950/5 p-3 text-green-900">
+              <div className="mb-1 text-sm font-semibold text-green-950">
+                Load sheet preview
+              </div>
+              <p className="mb-3 text-[11px] leading-snug text-green-900/70">
+                This is what will be copied onto the schedule when you apply.
+              </p>
+              {preview ? (
+                <dl className="flex min-w-0 flex-col gap-2">
+                  <PreviewRow label="Load #" value={preview.load_number} />
+                  <PreviewRow label="Broker" value={preview.broker} />
+                  <PreviewRow label="Type" value={preview.category} />
+                  <div className="my-1 border-t border-green-950/10" />
+                  <PreviewRow label="Origin" value={preview.origin} />
+                  <PreviewRow label="End user" value={preview.end_user} />
+                  <div className="my-1 border-t border-green-950/10" />
+                  <PreviewRow label="MT" value={preview.mt} />
+                  <PreviewRow label="Rate" value={preview.rate} />
+                  <PreviewRow label="FSC" value={preview.fsc} />
+                  {preview.kms ? (
+                    <PreviewRow label="KMs" value={preview.kms} />
+                  ) : null}
+                  <PreviewRow label="Total" value={preview.total} />
+                  <div className="my-1 border-t border-green-950/10" />
+                  <div>
+                    <dt className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-green-900/60">
+                      Load notes
+                    </dt>
+                    <dd className="whitespace-pre-wrap rounded-md border border-green-950/10 bg-white/70 px-2 py-1.5 text-sm font-medium text-green-950">
+                      {preview.notesAuto || "—"}
+                    </dd>
+                  </div>
+                </dl>
+              ) : (
+                <p className="text-sm text-green-900/70">
+                  Highlight a load sheet to preview it.
+                </p>
+              )}
+            </div>
+          </div>
 
           {multiAssignMode ? (
             <>
@@ -667,56 +836,93 @@ export default function AssignLoadsheetModal({
               <div className="rounded-lg border border-green-950/20 bg-green-950/3 p-3">
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <span className="text-sm font-semibold">
-                    Slots (open only)
+                    Slots (open per day)
                   </span>
-                  {availableSlots.length > 0 ? (
-                    <button
-                      type="button"
-                      className="text-xs font-semibold text-green-900 underline hover:no-underline"
-                      onClick={() => {
-                        const all = availableSlots.map((s) => String(s.id));
-                        const allSelected =
-                          all.length > 0 &&
-                          all.every((id) => selectedSlotIds.includes(id));
-                        setSelectedSlotIds(allSelected ? [] : all);
-                      }}
-                    >
-                      {availableSlots.every((s) =>
-                        selectedSlotIds.includes(String(s.id)),
-                      )
-                        ? "Clear all"
-                        : "Select all"}
-                    </button>
-                  ) : null}
                 </div>
-                {availableSlots.length === 0 ? (
+                {selectedDayIsos.length === 0 ? (
                   <p className="text-sm text-green-900/75">
-                    No open slots for the selected day(s) and driver(s).
+                    Select at least one day to choose slots.
                   </p>
                 ) : (
-                  <div className="space-y-0.5">
-                    {availableSlots.map((s) => {
-                      const id = String(s.id);
-                      const originalIndex = daySlots.findIndex(
-                        (slot) => String(slot.id) === id,
-                      );
+                  <div className="space-y-3">
+                    {selectedDayIsos.map((rawDay) => {
+                      const dk = isoDateKey(rawDay);
+                      const openForDay = openSlotsByDay.get(dk) ?? [];
+                      const selectedForDay = selectedDaySlots[dk] ?? [];
                       return (
-                        <label key={id} className={checkRowClass}>
-                          <input
-                            type="checkbox"
-                            className="size-4 shrink-0 accent-green-950"
-                            checked={selectedSlotIds.includes(id)}
-                            onChange={() =>
-                              setSelectedSlotIds((prev) => toggleId(prev, id))
-                            }
-                          />
-                          <span>
-                            {slotSelectLabel(
-                              s,
-                              originalIndex >= 0 ? originalIndex : 0,
-                            )}
-                          </span>
-                        </label>
+                        <div key={dk}>
+                          <div className="mb-1 flex items-center justify-between gap-2">
+                            <span className="text-xs font-semibold text-green-950">
+                              {dayTitleByIso.get(dk) ?? dk}
+                            </span>
+                            {openForDay.length > 0 ? (
+                              <button
+                                type="button"
+                                className="text-xs font-semibold text-green-900 underline hover:no-underline"
+                                onClick={() => {
+                                  const all = openForDay.map((s) =>
+                                    String(s.id),
+                                  );
+                                  const allSelected =
+                                    all.length > 0 &&
+                                    all.every((id) =>
+                                      selectedForDay.includes(id),
+                                    );
+                                  setSelectedDaySlots((prev) => ({
+                                    ...prev,
+                                    [dk]: allSelected ? [] : all,
+                                  }));
+                                }}
+                              >
+                                {openForDay.every((s) =>
+                                  selectedForDay.includes(String(s.id)),
+                                )
+                                  ? "Clear"
+                                  : "Select all"}
+                              </button>
+                            ) : null}
+                          </div>
+                          {openForDay.length === 0 ? (
+                            <p className="text-sm text-green-900/75">
+                              No open slots this day for the selected driver(s).
+                            </p>
+                          ) : (
+                            <div className="space-y-0.5">
+                              {openForDay.map((s) => {
+                                const id = String(s.id);
+                                const originalIndex = daySlots.findIndex(
+                                  (slot) => String(slot.id) === id,
+                                );
+                                return (
+                                  <label key={id} className={checkRowClass}>
+                                    <input
+                                      type="checkbox"
+                                      className="size-4 shrink-0 accent-green-950"
+                                      checked={selectedForDay.includes(id)}
+                                      onChange={() =>
+                                        setSelectedDaySlots((prev) => ({
+                                          ...prev,
+                                          [dk]: toggleId(
+                                            prev[dk] ?? [],
+                                            id,
+                                          ),
+                                        }))
+                                      }
+                                    />
+                                    <span>
+                                      {slotSelectLabel(
+                                        s,
+                                        originalIndex >= 0
+                                          ? originalIndex
+                                          : 0,
+                                      )}
+                                    </span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
                       );
                     })}
                   </div>
@@ -726,14 +932,14 @@ export default function AssignLoadsheetModal({
               {assignTargetCount > 0 ? (
                 <p className="text-xs text-green-900/80">
                   Will copy this sheet into{" "}
-                  <strong>{assignTargetCount}</strong> schedule cell
+                  <strong>{assignTargetCount}</strong> open schedule cell
                   {assignTargetCount === 1 ? "" : "s"}
                   {selectedDayIsos.length > 1
                     ? ` across ${selectedDayIsos.length} days`
                     : selectedDayIsos.length === 1
                       ? " on the selected day"
                       : ""}
-                  .
+                  . Taken slots on other days stay untouched.
                 </p>
               ) : null}
             </>
@@ -769,21 +975,6 @@ export default function AssignLoadsheetModal({
                 )}
               </select>
             </label>
-          )}
-
-          {preview && (
-            <div className="rounded-lg border border-green-950/20 bg-green-950/5 p-3 text-xs leading-relaxed text-green-900">
-              <div className="mb-1 font-semibold text-green-950">Preview</div>
-              <div className="mb-1 font-medium whitespace-pre-wrap text-green-950/90">
-                Load notes (auto): {preview.notesAuto}
-              </div>
-              <div>Origin {preview.origin || "—"}</div>
-              <div>End user {preview.end_user || "—"}</div>
-              <div>
-                MT {preview.mt || "—"} · Rate {preview.rate || "—"} · FSC{" "}
-                {preview.fsc || "—"}
-              </div>
-            </div>
           )}
 
           <div className="mt-2 flex justify-end gap-2 border-t border-green-950/15 pt-4">
