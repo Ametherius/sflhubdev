@@ -11,6 +11,7 @@ const navLinks = [
   { label: "Dashboard", href: "/dashboard" },
   { label: "Schedule", href: "/schedule" },
   { label: "Load Planner", href: "/planner" },
+  { label: "Samsara", href: "/samsara" },
 ];
 
 export default function Header() {

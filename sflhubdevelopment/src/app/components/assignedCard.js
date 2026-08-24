@@ -29,8 +29,8 @@ export default function AssignedCard({
   const shell = listItem
     ? "m-0 flex w-full flex-col rounded-none bg-white p-5 shadow-none"
     : embedded
-    ? "m-0 flex h-auto min-h-0 w-[22rem] min-w-[22rem] max-w-[22rem] shrink-0 flex-col rounded-none border-0 border-r border-green-950/25 bg-white p-5 shadow-none lg:h-full"
-    : "m-1 ml-3 w-90 rounded-lg rounded-r-none bg-white p-5";
+      ? "m-0 flex h-auto min-h-0 w-[22rem] min-w-[22rem] max-w-[22rem] shrink-0 flex-col rounded-none border-0 border-r border-green-950/25 bg-white p-5 shadow-none lg:h-full"
+      : "m-1 ml-3 w-90 rounded-lg rounded-r-none bg-white p-5";
 
   return (
     <div className={shell}>
@@ -46,14 +46,16 @@ export default function AssignedCard({
         <p>{division}</p>
       </div>
       {embedded ? (
-        <div className="flex flex-col items-center gap-0.5 border-b border-green-950/20 pb-2 text-center text-green-950">
-          <p className="text-sm font-semibold">
+        <div className="grid grid-cols-2 items-center border-b h-14 border-green-950/20 text-center text-green-950">
+          <p className="text-sm font-semibold h-14 block bg-green-950 text-white p-2">
             Week total:{" "}
-            <span className="tabular-nums">{weekTotalDisplay || "$0.00"}</span>
+            <span className="tabular-nums block">
+              {weekTotalDisplay || "$0.00"}
+            </span>
           </p>
-          <p className="text-xs font-medium text-green-950/85">
+          <p className="text-sm block font-bold text-white h-14 bg-green-950 p-2">
             Revenue/mi:{" "}
-            <span className="tabular-nums">
+            <span className="tabular-nums block">
               {weekRevenuePerKmDisplay || "—"}
             </span>
           </p>
