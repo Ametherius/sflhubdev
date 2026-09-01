@@ -11,13 +11,26 @@ export function useScheduleWeeks() {
   const supabase = useMemo(() => createClient(), []);
 
   const refreshWeeks = useCallback(async () => {
-    const { user, error: userError } = await getAuthUser(supabase);
-    if (userError || !user) return;
+    const { error: userError, aborted } = await getAuthUser(supabase);
+    if (userError) return;
 
     const { data, error } = await supabase
       .from("schedule_weeks")
       .select("id, week_start_date, created_at")
       .order("week_start_date", { ascending: false });
+
+    const shouldRetry = aborted && (error || !(data?.length));
+    if (shouldRetry) {
+      await new Promise((r) => setTimeout(r, 200));
+      const retry = await supabase
+        .from("schedule_weeks")
+        .select("id, week_start_date, created_at")
+        .order("week_start_date", { ascending: false });
+      if (!retry.error) {
+        setWeeks(retry.data ?? []);
+        return;
+      }
+    }
 
     if (error) {
       console.error(error.message);

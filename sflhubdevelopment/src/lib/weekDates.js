@@ -8,7 +8,12 @@ export function toISODate(d) {
 
 /** Parse YYYY-MM-DD as local noon (stable across DST). */
 export function parseISODateLocal(iso) {
-  const [y, m, d] = iso.split("-").map(Number);
+  if (iso == null || iso === "") return new Date(NaN);
+  if (iso instanceof Date) {
+    return new Date(iso.getFullYear(), iso.getMonth(), iso.getDate(), 12, 0, 0, 0);
+  }
+  const day = String(iso).slice(0, 10);
+  const [y, m, d] = day.split("-").map(Number);
   return new Date(y, m - 1, d, 12, 0, 0, 0);
 }
 

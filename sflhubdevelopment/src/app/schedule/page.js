@@ -39,6 +39,7 @@ import { isScheduleWeekFkError } from "@/lib/scheduleLoadsPersist";
 import AssignedUnitsPanel from "../components/assignedUnitsPanel";
 import LoadsheetMenu from "../components/loadsheetMenu";
 import {
+  parseISODateLocal,
   resolveDefaultScheduleWeekId,
   weekAcceptsNewAssignments,
   weekIsComplete,
@@ -820,7 +821,7 @@ export default function Schedule() {
               weeks.map((w) => (
                 <option key={w.id} value={w.id}>
                   Week of{" "}
-                  {new Date(`${w.week_start_date}T12:00:00`).toLocaleDateString(
+                  {parseISODateLocal(w.week_start_date).toLocaleDateString(
                     undefined,
                     {
                       weekday: "short",

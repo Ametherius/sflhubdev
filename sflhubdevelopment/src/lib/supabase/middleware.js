@@ -36,7 +36,13 @@ export async function updateSession(request) {
   const publicRoutes = ["/login", "/"];
 
   // protect sections by prefix
-  const protectedPrefixes = ["/dashboard", "/schedule", "/planner"];
+  const protectedPrefixes = [
+    "/dashboard",
+    "/schedule",
+    "/planner",
+    "/samsara",
+    "/motive",
+  ];
 
   const isPublic = publicRoutes.includes(pathname);
   const isProtected = protectedPrefixes.some((prefix) =>
