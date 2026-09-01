@@ -1,3 +1,4 @@
+import { getMotiveData } from "@/lib/motiveAPI";
 import { getData } from "@/lib/samsaraAPI";
 
 export default async function Samsara() {
@@ -20,7 +21,7 @@ export default async function Samsara() {
                   </p>
                 </div>
               </div>
-              <div className="flex text-green-950 mt-6 mb-0">
+              <div className="flex text-green-950 mt-6 mb-0 p-1">
                 <p className="m-1 text-sm">
                   <span className="font-bold text-gray-600 text-sm">
                     Plate:{" "}

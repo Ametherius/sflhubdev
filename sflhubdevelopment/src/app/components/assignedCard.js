@@ -21,6 +21,8 @@ export default function AssignedCard({
   weekTotalDisplay = "",
   /** CAD revenue per km for the week (embedded schedule rows). */
   weekRevenuePerKmDisplay = "",
+  /** Motive odometer week miles for this unit number. */
+  weekMilesDisplay = "",
   /** When true, sits flush inside ScheduleRow (no outer margin / full-height column). */
   embedded = false,
   /** Full-width card inside Assigned Units panel (no sticky / margins). */
@@ -46,20 +48,30 @@ export default function AssignedCard({
         <p>{division}</p>
       </div>
       {embedded ? (
-        <div className="grid grid-cols-2 items-center border-b h-14 border-green-950/20 text-center text-green-950">
-          <p className="text-sm font-semibold h-14 block bg-green-950 text-white p-2">
-            Week total:{" "}
-            <span className="tabular-nums block">
-              {weekTotalDisplay || "$0.00"}
-            </span>
-          </p>
-          <p className="text-sm block font-bold text-white h-14 bg-green-950 p-2">
-            Revenue/mi:{" "}
-            <span className="tabular-nums block">
-              {weekRevenuePerKmDisplay || "—"}
-            </span>
-          </p>
-        </div>
+        <>
+          <div className="grid grid-cols-3 items-center border-b h-14 border-green-950/20 text-center text-green-950">
+            <p className="text-sm font-semibold h-14 block bg-green-950 text-white p-2">
+              Week total:{" "}
+              <span className="tabular-nums block">
+                {weekTotalDisplay || "$0.00"}
+              </span>
+            </p>
+            <p className="text-sm block font-bold text-white h-14 bg-green-950 p-2">
+              Revenue/mi:{" "}
+              <span className="tabular-nums block">
+                {weekRevenuePerKmDisplay || "—"}
+              </span>
+            </p>
+            <div className="border-b h-14 border-green-950/20 text-center">
+              <p className="text-sm font-semibold bg-green-950 text-white p-2">
+                Weekly Mi:{" "}
+                <span className="tabular-nums block">
+                  {weekMilesDisplay || "—"}
+                </span>
+              </p>
+            </div>
+          </div>
+        </>
       ) : null}
       <div className="grid grid-cols-2">
         <div className="flex justify-start p-2 text-green-950">

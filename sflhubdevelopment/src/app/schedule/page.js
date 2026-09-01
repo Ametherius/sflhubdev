@@ -49,9 +49,9 @@ import {
   deleteDriverConfirmOptions,
   deleteLoadsheetConfirmOptions,
   changeUnitConfirmOptions,
-  removeWeekAssignmentConfirmOptions,
 } from "@/lib/confirmEdit";
 import { usePermissions } from "@/context/permissionsContext";
+import { useMotiveWeekMiles } from "@/hooks/useMotiveWeekMiles";
 
 export default function Schedule() {
   const confirm = useConfirm();
@@ -83,6 +83,11 @@ export default function Schedule() {
   const [changeUnitRow, setChangeUnitRow] = useState(null);
   const [changeUnitValue, setChangeUnitValue] = useState("");
   const [changeUnitSaving, setChangeUnitSaving] = useState(false);
+  const [deleteUnitRow, setDeleteUnitRow] = useState(null);
+  const [deleteUnitWeeks, setDeleteUnitWeeks] = useState([]);
+  const [deleteWeekIds, setDeleteWeekIds] = useState([]);
+  const [deleteFromLiveBoard, setDeleteFromLiveBoard] = useState(false);
+  const [deleteSaving, setDeleteSaving] = useState(false);
   const [driverValue, setDriverValue] = useState("");
   const [unitValue, setUnitValue] = useState("");
   const [editDriver, setEditDriver] = useState(null);
@@ -151,6 +156,9 @@ export default function Schedule() {
   const [weekDisplayRows, refreshSnapshots] = useWeekAssignments(
     resolvedWeekId,
     assigned,
+    selectedWeek?.week_start_date ?? null,
+  );
+  const motiveMilesByUnit = useMotiveWeekMiles(
     selectedWeek?.week_start_date ?? null,
   );
 
@@ -407,36 +415,23 @@ export default function Schedule() {
     }
   }
 
-  async function handleRemoveWeekAssignment(
+  async function removeAssignmentFromWeek({
     scheduleAssignmentId,
-    { pastWeek = false, weekId = null, inUseUnitId = null } = {},
-  ) {
-    if (
-      scheduleAssignmentId == null &&
-      (weekId == null || inUseUnitId == null)
-    ) {
-      return;
-    }
-    if (!(await confirm(removeWeekAssignmentConfirmOptions({ pastWeek }))))
-      return;
-
+    weekId,
+    inUseUnitId = null,
+  }) {
     const targetWeekId = weekId ?? resolvedWeekId;
     if (!targetWeekId) {
-      alert("No week selected.");
-      return;
+      return { error: { message: "No week selected." } };
     }
 
-    // Strictly this week only — never delete other weeks for this unit.
     if (scheduleAssignmentId != null) {
       const { error: loadsByAssignErr } = await supabase
         .from("schedule_loads")
         .delete()
         .eq("week_id", targetWeekId)
         .eq("schedule_assignment_id", scheduleAssignmentId);
-      if (loadsByAssignErr) {
-        alert(loadsByAssignErr.message);
-        return;
-      }
+      if (loadsByAssignErr) return { error: loadsByAssignErr };
     }
 
     if (inUseUnitId != null) {
@@ -445,10 +440,7 @@ export default function Schedule() {
         .delete()
         .eq("week_id", targetWeekId)
         .eq("in_use_unit_id", inUseUnitId);
-      if (loadsByUnitErr) {
-        alert(loadsByUnitErr.message);
-        return;
-      }
+      if (loadsByUnitErr) return { error: loadsByUnitErr };
     }
 
     if (scheduleAssignmentId != null) {
@@ -457,23 +449,16 @@ export default function Schedule() {
         .delete()
         .eq("id", scheduleAssignmentId)
         .eq("week_id", targetWeekId);
-      if (assignErr) {
-        alert(assignErr.message);
-        return;
-      }
+      if (assignErr) return { error: assignErr };
     } else if (inUseUnitId != null) {
       const { error: assignErr } = await supabase
         .from("schedule_assignments")
         .delete()
         .eq("week_id", targetWeekId)
         .eq("in_use_unit_id", inUseUnitId);
-      if (assignErr) {
-        alert(assignErr.message);
-        return;
-      }
+      if (assignErr) return { error: assignErr };
     }
 
-    // Keep live-board units off this week after delete (ensure won't re-add).
     if (inUseUnitId != null) {
       const { error: exErr } = await supabase
         .from("schedule_week_unit_exclusions")
@@ -487,13 +472,72 @@ export default function Schedule() {
           exErr.message ?? "",
         )
       ) {
-        alert(exErr.message);
-        return;
+        return { error: exErr };
       }
     }
 
-    await refreshSnapshots();
-    await refreshLoads();
+    return { error: null };
+  }
+
+  function closeDeleteUnitModal() {
+    setDeleteUnitRow(null);
+    setDeleteUnitWeeks([]);
+    setDeleteWeekIds([]);
+    setDeleteFromLiveBoard(false);
+  }
+
+  function toggleDeleteWeek(weekId) {
+    const key = String(weekId);
+    setDeleteWeekIds((prev) =>
+      prev.some((id) => String(id) === key)
+        ? prev.filter((id) => String(id) !== key)
+        : [...prev, weekId],
+    );
+  }
+
+  async function handleConfirmDeleteWeeks() {
+    if (!deleteUnitRow) return;
+    if (!deleteWeekIds.length && !deleteFromLiveBoard) {
+      alert("Select at least one week, or remove from the live board.");
+      return;
+    }
+
+    setDeleteSaving(true);
+    try {
+      for (const weekId of deleteWeekIds) {
+        const info =
+          deleteUnitWeeks.find((w) => String(w.weekId) === String(weekId)) ??
+          null;
+        const { error } = await removeAssignmentFromWeek({
+          scheduleAssignmentId: info?.assignmentId ?? null,
+          weekId,
+          inUseUnitId:
+            info?.inUseUnitId ?? deleteUnitRow.inUseUnitId ?? null,
+        });
+        if (error) {
+          alert(error.message);
+          return;
+        }
+      }
+
+      if (deleteFromLiveBoard && deleteUnitRow.inUseUnitId != null) {
+        const { error } = await supabase
+          .from("in_use_units")
+          .delete()
+          .eq("id", deleteUnitRow.inUseUnitId);
+        if (error) {
+          alert(error.message);
+          return;
+        }
+        await refreshAssigned();
+      }
+
+      closeDeleteUnitModal();
+      await refreshSnapshots();
+      await refreshLoads();
+    } finally {
+      setDeleteSaving(false);
+    }
   }
 
   async function handleRemoveWeekRow(row) {
@@ -503,31 +547,58 @@ export default function Schedule() {
       return;
     }
 
-    let assignmentId = row.scheduleAssignmentId ?? null;
-    if (!assignmentId && row.inUseUnitId) {
-      const { data, error } = await supabase
-        .from("schedule_assignments")
-        .select("id")
-        .eq("week_id", resolvedWeekId)
-        .eq("in_use_unit_id", row.inUseUnitId)
-        .limit(1);
-      if (error) {
-        alert(error.message);
-        return;
-      }
-      assignmentId = data?.[0]?.id ?? null;
-    }
-
-    if (!assignmentId && !row.inUseUnitId) {
-      alert("No schedule assignment found for this unit on this week.");
+    let q = supabase
+      .from("schedule_assignments")
+      .select("id, week_id, in_use_unit_id");
+    if (row.driver?.id && row.unit?.id) {
+      q = q.eq("driverid", row.driver.id).eq("unitid", row.unit.id);
+    } else if (row.inUseUnitId != null) {
+      q = q.eq("in_use_unit_id", row.inUseUnitId);
+    } else if (row.scheduleAssignmentId) {
+      q = q.eq("id", row.scheduleAssignmentId);
+    } else {
+      alert("No schedule assignment found for this unit.");
       return;
     }
 
-    await handleRemoveWeekAssignment(assignmentId, {
-      pastWeek: !isLiveWeek,
-      weekId: resolvedWeekId,
-      inUseUnitId: row.inUseUnitId ?? null,
-    });
+    const { data, error } = await q;
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    const weekById = new Map((weeks ?? []).map((w) => [String(w.id), w]));
+    const listed = [];
+    const seen = new Set();
+    for (const a of data ?? []) {
+      const weekId = a.week_id;
+      if (weekId == null || seen.has(String(weekId))) continue;
+      seen.add(String(weekId));
+      listed.push({
+        weekId,
+        assignmentId: a.id ?? null,
+        inUseUnitId: a.in_use_unit_id ?? row.inUseUnitId ?? null,
+        weekStart: weekById.get(String(weekId))?.week_start_date ?? null,
+      });
+    }
+
+    if (!seen.has(String(resolvedWeekId))) {
+      listed.push({
+        weekId: resolvedWeekId,
+        assignmentId: row.scheduleAssignmentId ?? null,
+        inUseUnitId: row.inUseUnitId ?? null,
+        weekStart: selectedWeek?.week_start_date ?? null,
+      });
+    }
+
+    listed.sort((a, b) =>
+      String(b.weekStart ?? "").localeCompare(String(a.weekStart ?? "")),
+    );
+
+    setDeleteUnitRow(row);
+    setDeleteUnitWeeks(listed);
+    setDeleteWeekIds([resolvedWeekId]);
+    setDeleteFromLiveBoard(false);
   }
 
   function rowActionHandler(row) {
@@ -922,6 +993,96 @@ export default function Schedule() {
         </div>
       </Modal>
 
+      <Modal
+        className={`fixed p-6 z-50 rounded-lg bottom-0 right-0 max-w-lg ${deleteUnitRow ? "" : "hidden"}`}
+      >
+        <button
+          type="button"
+          className="text-green-950 text-2xl absolute top-0 right-0 m-3 cursor-pointer"
+          onClick={closeDeleteUnitModal}
+        >
+          <FaTimes />
+        </button>
+        <div className="flex flex-col gap-3 pr-8">
+          <h3 className="text-lg font-bold text-green-950">Delete unit</h3>
+          <p className="text-sm text-green-900/85">
+            {deleteUnitRow?.driver?.name ?? "Driver"} · Unit{" "}
+            {deleteUnitRow?.unit?.unit ?? "—"}
+          </p>
+          <p className="text-xs text-green-900/70">
+            Choose which weeks to remove this driver and unit from. Load data
+            for selected weeks will be deleted.
+          </p>
+          <div className="rounded-lg border border-green-950/20 bg-green-950/5 p-3">
+            <p className="mb-2 text-sm font-semibold text-green-950">
+              Schedule weeks
+            </p>
+            {deleteUnitWeeks.length === 0 ? (
+              <p className="text-sm text-green-900/80">No weeks found.</p>
+            ) : (
+              <div className="max-h-36 space-y-1 overflow-y-auto">
+                {deleteUnitWeeks.map((w) => {
+                  const past = weekIsComplete(w.weekStart);
+                  const checked = deleteWeekIds.some(
+                    (id) => String(id) === String(w.weekId),
+                  );
+                  return (
+                    <label
+                      key={w.weekId}
+                      className="flex cursor-pointer items-center gap-2 text-sm text-green-950"
+                    >
+                      <input
+                        type="checkbox"
+                        className="size-4 accent-green-950"
+                        checked={checked}
+                        onChange={() => toggleDeleteWeek(w.weekId)}
+                      />
+                      <span>
+                        Week of{" "}
+                        {w.weekStart
+                          ? new Date(
+                              `${w.weekStart}T12:00:00`,
+                            ).toLocaleDateString(undefined, {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            })
+                          : "Unknown"}
+                        {past ? " (past)" : ""}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+          {deleteUnitRow?.inUseUnitId != null ? (
+            <label className="flex cursor-pointer items-start gap-2 text-sm text-green-950">
+              <input
+                type="checkbox"
+                className="mt-0.5 size-4 accent-green-950"
+                checked={deleteFromLiveBoard}
+                onChange={(e) => setDeleteFromLiveBoard(e.target.checked)}
+              />
+              <span>
+                <span className="font-semibold">
+                  Also remove from live assigned board
+                </span>
+                <span className="block text-xs text-green-900/75">
+                  Other weeks you do not select stay on the schedule unless they
+                  are still open and tied to the live board.
+                </span>
+              </span>
+            </label>
+          ) : null}
+          <ButtonDark
+            text={deleteSaving ? "Deleting…" : "Delete unit"}
+            type="button"
+            onClick={() => void handleConfirmDeleteWeeks()}
+          />
+        </div>
+      </Modal>
+
       <div
         className={`w-96 bg-white overflow-y-scroll max-h-screen z-50 fixed top-0 right-0 mx-0 p-3 border-2 flex flex-wrap ${unitsShowing ? "" : "hidden"} justify-center`}
       >
@@ -1078,6 +1239,7 @@ export default function Schedule() {
                 onLoadsUpdated={refreshLoads}
                 onLoadPatched={mergeScheduleLoad}
                 onLoadSheetsUpdated={refreshLoadSheets}
+                motiveMilesByUnit={motiveMilesByUnit}
               />
             ))}
           </div>

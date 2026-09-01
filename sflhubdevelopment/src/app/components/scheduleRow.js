@@ -5,11 +5,12 @@ import AssignedCard from "./assignedCard";
 import UnitWeekLoadsGrid from "./unitWeekLoadsGrid";
 import { addDays, parseISODateLocal } from "@/lib/weekDates";
 import { formatLoadTotalCad } from "@/lib/loadTotal";
-import { formatWeekRevenuePerKm, kmToMiles } from "@/lib/revenuePerKm";
+import { formatWeekRevenuePerKm } from "@/lib/revenuePerKm";
+import { sumWeekUnitRevenue } from "@/lib/weekUnitRevenue";
 import {
-  sumWeekUnitKms,
-  sumWeekUnitRevenue,
-} from "@/lib/weekUnitRevenue";
+  formatWeekMiles,
+  normalizeUnitNumber,
+} from "@/lib/motiveWeekMiles";
 
 function formatWeekBanner(weekStartISO) {
   if (!weekStartISO) return null;
@@ -49,21 +50,24 @@ export default function ScheduleRow({
   onLoadsUpdated,
   onLoadPatched,
   onLoadSheetsUpdated,
+  motiveMilesByUnit = {},
 }) {
   const driver = assignment?.driver;
   const unit = assignment?.unit;
 
   const banner = formatWeekBanner(weekStartISO);
 
-  const { weekTotalDisplay, weekRevenuePerKmDisplay } = useMemo(() => {
-    const revenue = sumWeekUnitRevenue(loads);
-    const kms = sumWeekUnitKms(loads);
-    const miles = kmToMiles(kms);
-    return {
-      weekTotalDisplay: formatLoadTotalCad(String(revenue)) || "$0.00",
-      weekRevenuePerKmDisplay: formatWeekRevenuePerKm(revenue, miles),
-    };
-  }, [loads]);
+  const { weekTotalDisplay, weekRevenuePerKmDisplay, weekMilesDisplay } =
+    useMemo(() => {
+      const revenue = sumWeekUnitRevenue(loads);
+      const unitKey = normalizeUnitNumber(unit?.unit);
+      const motiveMiles = unitKey ? motiveMilesByUnit[unitKey] : null;
+      return {
+        weekTotalDisplay: formatLoadTotalCad(String(revenue)) || "$0.00",
+        weekRevenuePerKmDisplay: formatWeekRevenuePerKm(revenue, motiveMiles),
+        weekMilesDisplay: formatWeekMiles(motiveMiles),
+      };
+    }, [loads, unit?.unit, motiveMilesByUnit]);
 
   if (!driver || !unit) return null;
 
@@ -91,6 +95,7 @@ export default function ScheduleRow({
             ufaPIN={unit.ufaPIN}
             weekTotalDisplay={weekTotalDisplay}
             weekRevenuePerKmDisplay={weekRevenuePerKmDisplay}
+            weekMilesDisplay={weekMilesDisplay}
             onDelete={assignment.isArchived ? undefined : onDelete}
             deleteLabel={deleteLabel}
             onSecondaryAction={onSecondaryAction}

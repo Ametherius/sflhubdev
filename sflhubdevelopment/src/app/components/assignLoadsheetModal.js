@@ -72,6 +72,19 @@ function toggleId(list, id) {
   return list.includes(key) ? list.filter((x) => x !== key) : [...list, key];
 }
 
+function sourceAssignableKey(inUseUnitId, scheduleAssignmentId) {
+  if (inUseUnitId != null && String(inUseUnitId).trim() !== "") {
+    return String(inUseUnitId);
+  }
+  if (
+    scheduleAssignmentId != null &&
+    String(scheduleAssignmentId).trim() !== ""
+  ) {
+    return `sa:${scheduleAssignmentId}`;
+  }
+  return "";
+}
+
 function findScheduleRowForCell(
   weekLoads,
   dayIso,
@@ -184,14 +197,11 @@ export default function AssignLoadsheetModal({
     queueMicrotask(() => {
       setLoadsheetId(loadsheets[0] ? String(loadsheets[0].id) : "");
 
-      const defaultUnits =
-        inUseUnitId != null && String(inUseUnitId).trim() !== ""
-          ? [String(inUseUnitId)]
-          : scheduleAssignmentId != null &&
-              String(scheduleAssignmentId).trim() !== ""
-            ? [`sa:${scheduleAssignmentId}`]
-            : [];
-      setSelectedUnitIds(defaultUnits);
+      const sourceKey = sourceAssignableKey(
+        inUseUnitId,
+        scheduleAssignmentId,
+      );
+      setSelectedUnitIds(sourceKey ? [sourceKey] : []);
       setSelectedDaySlots({});
 
       const openDay =
@@ -213,21 +223,62 @@ export default function AssignLoadsheetModal({
     return supportsMultiDriverAssign(calc.loadCategory);
   }, [selectedSheet]);
 
+  const sourceUnitKey = sourceAssignableKey(
+    inUseUnitId,
+    scheduleAssignmentId,
+  );
+
   const filteredAssignableUnits = useMemo(() => {
-    if (!multiAssignMode || !selectedSheet) return assignableUnits;
-    const calc = calcOptionsFromSheet(selectedSheet);
-    return assignableUnits.filter((u) =>
-      driverDivisionMatchesLoadCategory(calc.loadCategory, u.division),
+    const sourceKey = sourceAssignableKey(inUseUnitId, scheduleAssignmentId);
+    let list = assignableUnits;
+    if (multiAssignMode && selectedSheet) {
+      const calc = calcOptionsFromSheet(selectedSheet);
+      list = assignableUnits.filter(
+        (u) =>
+          assignableUnitRowKey(u) === sourceKey ||
+          driverDivisionMatchesLoadCategory(calc.loadCategory, u.division),
+      );
+    }
+    if (!sourceKey) return list;
+    const sourceIdx = list.findIndex(
+      (u) => assignableUnitRowKey(u) === sourceKey,
     );
-  }, [assignableUnits, multiAssignMode, selectedSheet]);
+    if (sourceIdx <= 0) return list;
+    const next = [...list];
+    const [source] = next.splice(sourceIdx, 1);
+    next.unshift(source);
+    return next;
+  }, [
+    assignableUnits,
+    multiAssignMode,
+    selectedSheet,
+    inUseUnitId,
+    scheduleAssignmentId,
+  ]);
 
   useEffect(() => {
-    if (!multiAssignMode) return;
+    if (!open || !multiAssignMode) return;
     const valid = new Set(
       filteredAssignableUnits.map((u) => assignableUnitRowKey(u)),
     );
-    setSelectedUnitIds((prev) => prev.filter((id) => valid.has(id)));
-  }, [multiAssignMode, filteredAssignableUnits, loadsheetId]);
+    setSelectedUnitIds((prev) => {
+      const next = prev.filter((id) => valid.has(id) || id === sourceUnitKey);
+      if (
+        sourceUnitKey &&
+        valid.has(sourceUnitKey) &&
+        !next.includes(sourceUnitKey)
+      ) {
+        return [sourceUnitKey, ...next];
+      }
+      return next;
+    });
+  }, [
+    open,
+    multiAssignMode,
+    filteredAssignableUnits,
+    loadsheetId,
+    sourceUnitKey,
+  ]);
 
   const weekLoadsForLookup = allWeekLoads ?? loads;
 
