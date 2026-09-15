@@ -108,7 +108,7 @@ export default function NewLoadsheetModal({ open, onClose, onCreated }) {
     const cat = normalizeLoadCategory(loadCategory, false);
     setSaving(true);
     const { error } = await supabase.from("loadsheets").insert({
-      load_number: num,
+      load_number: nullIfEmpty(num),
       broker: nullIfEmpty(broker),
       origin: nullIfEmpty(origin),
       end_user: nullIfEmpty(endUser),
@@ -126,9 +126,11 @@ export default function NewLoadsheetModal({ open, onClose, onCreated }) {
         alert(
           "The loadsheets table is not available yet. Apply the latest Supabase migration, then try again.",
         );
-      } else if (/load_category|usd_cad_rate|kms|column .* does not exist/i.test(
-        error.message ?? "",
-      )) {
+      } else if (
+        /load_category|usd_cad_rate|kms|column .* does not exist/i.test(
+          error.message ?? "",
+        )
+      ) {
         alert(
           "Load type / KMs / FX need the latest Supabase migrations. Apply migrations, then try again.",
         );
@@ -193,7 +195,10 @@ export default function NewLoadsheetModal({ open, onClose, onCreated }) {
             </select>
           </label>
           <label className="block text-sm font-medium">
-            Broker <span className="font-normal text-green-900/60">(optional)</span>
+            Broker{" "}
+            <span className="font-normal text-green-900/60 italic">
+              (Optional)
+            </span>
             <input
               className={inputClass}
               value={broker}
@@ -202,13 +207,15 @@ export default function NewLoadsheetModal({ open, onClose, onCreated }) {
             />
           </label>
           <label className="block text-sm font-medium">
-            Load number <span className="text-red-700">*</span>
+            Load number{" "}
+            <span className="font-normal text-green-900/60 italic">
+              (Optional)
+            </span>
             <input
               className={inputClass}
               value={loadNumber}
               onChange={(e) => setLoadNumber(e.target.value)}
               placeholder="e.g. 1042"
-              required
             />
           </label>
           <label className="block text-sm font-medium">
@@ -250,9 +257,7 @@ export default function NewLoadsheetModal({ open, onClose, onCreated }) {
                 value={rate}
                 onChange={(e) => setRate(e.target.value)}
                 placeholder={
-                  fieldRules.rateIsFlatTotal
-                    ? "Total amount (CAD)"
-                    : "Rate"
+                  fieldRules.rateIsFlatTotal ? "Total amount (CAD)" : "Rate"
                 }
               />
             </label>
@@ -318,7 +323,8 @@ export default function NewLoadsheetModal({ open, onClose, onCreated }) {
             />
           </label>
           <label className="block text-sm font-medium">
-            KMs <span className="font-normal text-green-900/60">(optional)</span>
+            KMs{" "}
+            <span className="font-normal text-green-900/60">(optional)</span>
             <input
               className={inputClass}
               value={kms}
@@ -335,7 +341,10 @@ export default function NewLoadsheetModal({ open, onClose, onCreated }) {
             >
               Cancel
             </button>
-            <ButtonDark type="submit" text={saving ? "Saving…" : "Save load sheet"} />
+            <ButtonDark
+              type="submit"
+              text={saving ? "Saving…" : "Save load sheet"}
+            />
           </div>
         </form>
       </div>

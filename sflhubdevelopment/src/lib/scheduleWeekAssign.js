@@ -89,6 +89,18 @@ export async function assignDriverUnitToWeeks(
       continue;
     }
 
+    const { error: exErr } = await supabase
+      .from("schedule_week_unit_exclusions")
+      .delete()
+      .eq("week_id", weekId)
+      .eq("in_use_unit_id", inUseUnitId);
+    if (
+      exErr &&
+      !/schedule_week_unit_exclusions|does not exist/i.test(exErr.message ?? "")
+    ) {
+      return { error: exErr };
+    }
+
     const { error } = await supabase.rpc("ensure_schedule_loads_for_unit_week", {
       p_week_id: weekId,
       p_in_use_unit_id: inUseUnitId,

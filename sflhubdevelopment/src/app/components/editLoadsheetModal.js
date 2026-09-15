@@ -63,6 +63,9 @@ export default function EditLoadsheetModal({
   scheduleInvoiced = undefined,
   scheduleLoadCategory = undefined,
   scheduleUsdCadRate = undefined,
+  /** Day / slot labels when opened from a schedule card (Sheet). */
+  scheduleDayTitle = null,
+  scheduleSlotTitle = null,
   readOnly = false,
   onSaved,
   /** Called after syncing this slot's schedule_loads row (refresh week loads) */
@@ -705,6 +708,13 @@ export default function EditLoadsheetModal({
         <h2 id="edit-loadsheet-title" className="mb-1 text-xl font-bold">
           Edit load sheet
         </h2>
+        {scheduleDayTitle || scheduleSlotTitle ? (
+          <p className="mb-2 text-sm text-green-900/80">
+            {scheduleDayTitle ? <strong>{scheduleDayTitle}</strong> : null}
+            {scheduleDayTitle && scheduleSlotTitle ? " · " : null}
+            {scheduleSlotTitle ? <strong>{scheduleSlotTitle}</strong> : null}
+          </p>
+        ) : null}
         <p className="mb-4 text-sm text-green-900/80">
           {scheduleLoadId
             ? "Edits this schedule slot only. The load sheet library template is not changed."

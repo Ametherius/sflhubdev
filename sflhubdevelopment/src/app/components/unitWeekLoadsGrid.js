@@ -692,7 +692,7 @@ export default function UnitWeekLoadsGrid({
                   : "flex flex-col gap-2"
               }
             >
-              {slots.map((slot) => {
+              {slots.map((slot, slotIndex) => {
                 const row =
                   slot.id != null
                     ? loadMap.get(`${d.iso}-${String(slot.id)}`)
@@ -737,6 +737,8 @@ export default function UnitWeekLoadsGrid({
                                   : undefined,
                               scheduleLoadCategory: row?.load_category,
                               scheduleUsdCadRate: row?.usd_cad_rate,
+                              scheduleDayTitle: d.columnTitle ?? d.label,
+                              scheduleSlotTitle: `Slot ${slotIndex + 1} of 3 (${slotLabel(slot)})`,
                             })
                         : undefined
                     }
@@ -776,6 +778,8 @@ export default function UnitWeekLoadsGrid({
         scheduleInvoiced={editLoadsheetTarget?.scheduleInvoiced}
         scheduleLoadCategory={editLoadsheetTarget?.scheduleLoadCategory}
         scheduleUsdCadRate={editLoadsheetTarget?.scheduleUsdCadRate}
+        scheduleDayTitle={editLoadsheetTarget?.scheduleDayTitle ?? null}
+        scheduleSlotTitle={editLoadsheetTarget?.scheduleSlotTitle ?? null}
         readOnly={readOnly}
         loadSheets={loadSheets}
         onSaved={onLoadSheetsUpdated ?? (async () => {})}

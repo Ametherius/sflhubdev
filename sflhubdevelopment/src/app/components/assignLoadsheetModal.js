@@ -19,10 +19,7 @@ import {
   scheduleLoadErrorMessage,
 } from "@/lib/scheduleLoadsPersist";
 import { assignableUnitRowKey } from "@/lib/scheduleWeekAssign";
-import {
-  computeLoadTotalDisplay,
-  formatLoadTotalCad,
-} from "@/lib/loadTotal";
+import { computeLoadTotalDisplay, formatLoadTotalCad } from "@/lib/loadTotal";
 import SearchableSelect from "./searchableSelect";
 const LOADS_PER_DAY = 3;
 
@@ -57,7 +54,8 @@ function strTrim(v) {
 
 function slotOptionLabel(slot) {
   if (slot?.name != null && String(slot.name).trim() !== "") return slot.name;
-  if (slot?.label != null && String(slot.label).trim() !== "") return slot.label;
+  if (slot?.label != null && String(slot.label).trim() !== "")
+    return slot.label;
   return `Load ${slot.sort_order ?? "?"}`;
 }
 
@@ -178,6 +176,24 @@ export default function AssignLoadsheetModal({
   const [selectedDayIsos, setSelectedDayIsos] = useState([]);
   const [saving, setSaving] = useState(false);
 
+  const loadsheetsByBroker = useMemo(() => {
+    return [...(loadsheets ?? [])].sort((a, b) => {
+      const brokerA = strTrim(a.broker);
+      const brokerB = strTrim(b.broker);
+      if (!brokerA && brokerB) return 1;
+      if (brokerA && !brokerB) return -1;
+      const brokerCmp = brokerA.localeCompare(brokerB, undefined, {
+        sensitivity: "base",
+      });
+      if (brokerCmp !== 0) return brokerCmp;
+      return strTrim(a.load_number).localeCompare(
+        strTrim(b.load_number),
+        undefined,
+        { numeric: true, sensitivity: "base" },
+      );
+    });
+  }, [loadsheets]);
+
   const sortedSlots = useMemo(() => {
     if (!loadSlots?.length) return [];
     return [...loadSlots].sort((a, b) => {
@@ -195,22 +211,30 @@ export default function AssignLoadsheetModal({
   useEffect(() => {
     if (!open) return;
     queueMicrotask(() => {
-      setLoadsheetId(loadsheets[0] ? String(loadsheets[0].id) : "");
-
-      const sourceKey = sourceAssignableKey(
-        inUseUnitId,
-        scheduleAssignmentId,
+      setLoadsheetId(
+        loadsheetsByBroker[0] ? String(loadsheetsByBroker[0].id) : "",
       );
+
+      const sourceKey = sourceAssignableKey(inUseUnitId, scheduleAssignmentId);
       setSelectedUnitIds(sourceKey ? [sourceKey] : []);
       setSelectedDaySlots({});
 
       const openDay =
-        dayIso != null && String(dayIso).trim() !== "" ? isoDateKey(dayIso) : "";
+        dayIso != null && String(dayIso).trim() !== ""
+          ? isoDateKey(dayIso)
+          : "";
       const dayValid =
         openDay && weekDays.some((d) => isoDateKey(d.iso) === openDay);
       setSelectedDayIsos(dayValid ? [openDay] : []);
     });
-  }, [open, initialSlotId, inUseUnitId, scheduleAssignmentId, dayIso, weekDays]);
+  }, [
+    open,
+    initialSlotId,
+    inUseUnitId,
+    scheduleAssignmentId,
+    dayIso,
+    weekDays,
+  ]);
 
   const selectedSheet = useMemo(
     () => loadsheets.find((s) => String(s.id) === String(loadsheetId)),
@@ -223,10 +247,7 @@ export default function AssignLoadsheetModal({
     return supportsMultiDriverAssign(calc.loadCategory);
   }, [selectedSheet]);
 
-  const sourceUnitKey = sourceAssignableKey(
-    inUseUnitId,
-    scheduleAssignmentId,
-  );
+  const sourceUnitKey = sourceAssignableKey(inUseUnitId, scheduleAssignmentId);
 
   const filteredAssignableUnits = useMemo(() => {
     const sourceKey = sourceAssignableKey(inUseUnitId, scheduleAssignmentId);
@@ -348,9 +369,8 @@ export default function AssignLoadsheetModal({
         ? String(initialSlotId)
         : "";
     const preferred = want && ids.has(want) ? want : "";
-    const first = preferred || (availableSlots[0]?.id
-      ? String(availableSlots[0].id)
-      : "");
+    const first =
+      preferred || (availableSlots[0]?.id ? String(availableSlots[0].id) : "");
     setSlotId((prev) => (prev && ids.has(prev) ? prev : first));
   }, [open, multiAssignMode, availableSlots, initialSlotId]);
 
@@ -373,7 +393,8 @@ export default function AssignLoadsheetModal({
             ? String(initialSlotId)
             : "";
         const preferred = want && openIds.has(want) ? want : "";
-        const first = preferred || (openList[0]?.id ? String(openList[0].id) : "");
+        const first =
+          preferred || (openList[0]?.id ? String(openList[0].id) : "");
         next[dk] = first ? [first] : [];
       }
       return next;
@@ -520,7 +541,9 @@ export default function AssignLoadsheetModal({
         return;
       }
       if (!daySlots.length) {
-        alert("No load slots available. Fix load_slots access, then try again.");
+        alert(
+          "No load slots available. Fix load_slots access, then try again.",
+        );
         return;
       }
       if (assignTargetCount === 0) {
@@ -682,14 +705,14 @@ export default function AssignLoadsheetModal({
           {multiAssignMode
             ? ", then pick days, drivers, and slots to fill."
             : " and slot, then apply — values are copied into this week only."}{" "}
-          To change the reusable template itself, use <strong>Sheet</strong> on a
-          load card.
+          To change the reusable template itself, use <strong>Sheet</strong> on
+          a load card.
         </p>
 
         {loadsheets.length === 0 ? (
           <p className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
-            No load sheets yet. Tap <strong>New load sheet</strong> in the bottom
-            bar, save one, then try again.
+            No load sheets yet. Tap <strong>New load sheet</strong> in the
+            bottom bar, save one, then try again.
           </p>
         ) : null}
 
@@ -714,7 +737,7 @@ export default function AssignLoadsheetModal({
               label="Load sheet"
               placeholder="Search load sheets…"
               emptyMessage="No load sheets match."
-              options={loadsheets}
+              options={loadsheetsByBroker}
               value={loadsheetId}
               onChange={setLoadsheetId}
               autoSelectFirst
@@ -727,7 +750,7 @@ export default function AssignLoadsheetModal({
                 const num = strTrim(s.load_number) || String(s.id);
                 const origin = strTrim(s.origin);
                 const endUser = strTrim(s.end_user);
-                const parts = [num];
+                const parts = [strTrim(s.broker)].filter(Boolean);
                 if (origin) parts.push(origin);
                 if (endUser) parts.push(endUser);
                 return parts.join(" · ");
@@ -953,19 +976,14 @@ export default function AssignLoadsheetModal({
                                       onChange={() =>
                                         setSelectedDaySlots((prev) => ({
                                           ...prev,
-                                          [dk]: toggleId(
-                                            prev[dk] ?? [],
-                                            id,
-                                          ),
+                                          [dk]: toggleId(prev[dk] ?? [], id),
                                         }))
                                       }
                                     />
                                     <span>
                                       {slotSelectLabel(
                                         s,
-                                        originalIndex >= 0
-                                          ? originalIndex
-                                          : 0,
+                                        originalIndex >= 0 ? originalIndex : 0,
                                       )}
                                     </span>
                                   </label>
@@ -982,8 +1000,8 @@ export default function AssignLoadsheetModal({
 
               {assignTargetCount > 0 ? (
                 <p className="text-xs text-green-900/80">
-                  Will copy this sheet into{" "}
-                  <strong>{assignTargetCount}</strong> open schedule cell
+                  Will copy this sheet into <strong>{assignTargetCount}</strong>{" "}
+                  open schedule cell
                   {assignTargetCount === 1 ? "" : "s"}
                   {selectedDayIsos.length > 1
                     ? ` across ${selectedDayIsos.length} days`
