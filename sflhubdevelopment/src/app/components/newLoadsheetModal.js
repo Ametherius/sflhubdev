@@ -9,6 +9,7 @@ import {
   computeUsGrainUsdTotal,
   fetchLiveUsdCadRate,
   fieldRulesForCategory,
+  isIrmStyleCategory,
   loadCategoryStorageValue,
   normalizeLoadCategory,
   totalFormulaHint,
@@ -100,15 +101,10 @@ export default function NewLoadsheetModal({ open, onClose, onCreated }) {
   async function handleSubmit(e) {
     e.preventDefault();
     if (saving) return;
-    const num = loadNumber.trim();
-    if (!num) {
-      alert("Load number is required.");
-      return;
-    }
     const cat = normalizeLoadCategory(loadCategory, false);
     setSaving(true);
     const { error } = await supabase.from("loadsheets").insert({
-      load_number: nullIfEmpty(num),
+      load_number: nullIfEmpty(loadNumber),
       broker: nullIfEmpty(broker),
       origin: nullIfEmpty(origin),
       end_user: nullIfEmpty(endUser),
@@ -268,7 +264,7 @@ export default function NewLoadsheetModal({ open, onClose, onCreated }) {
               <span className="font-normal text-green-900/60">
                 {loadCategory === "cargill"
                   ? "(KMs × FSC + rate × MT)"
-                  : loadCategory === "irm"
+                  : isIrmStyleCategory(loadCategory)
                     ? "(FSC is % — added onto rate × MT)"
                     : "(556 × FSC + rate)"}
               </span>

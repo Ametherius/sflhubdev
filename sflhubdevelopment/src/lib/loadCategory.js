@@ -13,6 +13,12 @@ export const LOAD_CATEGORIES = [
   { id: "us_grain", label: "US Grain", storage: "US Grain" },
   { id: "cargill", label: "Cargill", storage: "Cargill" },
   { id: "irm", label: "IRM", storage: "IRM" },
+  { id: "bayer", label: "Bayer", storage: "Bayer" },
+  {
+    id: "richardson_pioneer",
+    label: "Richardson Pioneer",
+    storage: "Richardson Pioneer",
+  },
   { id: "chicken", label: "Chicken", storage: "Chicken" },
   { id: "cattle", label: "Cattle", storage: "Cattle" },
   { id: "tanker", label: "Tanker", storage: "Tanker" },
@@ -20,6 +26,13 @@ export const LOAD_CATEGORIES = [
 ];
 
 export const DEFAULT_LOAD_CATEGORY = "canadian_grain";
+
+/** IRM / Bayer / Richardson Pioneer: FSC is a percent on rate × MT. */
+const IRM_STYLE_IDS = new Set(["irm", "bayer", "richardson_pioneer"]);
+
+export function isIrmStyleCategory(loadCategory, flatRate = false) {
+  return IRM_STYLE_IDS.has(normalizeLoadCategory(loadCategory, flatRate));
+}
 
 const BY_ID = new Map(LOAD_CATEGORIES.map((c) => [c.id, c]));
 const VALID_IDS = new Set(BY_ID.keys());
@@ -32,6 +45,8 @@ for (const c of LOAD_CATEGORIES) {
   ALIAS_TO_ID.set(normalizeKey(c.storage), c.id);
 }
 ALIAS_TO_ID.set(normalizeKey("us grain"), "us_grain");
+ALIAS_TO_ID.set(normalizeKey("richardson"), "richardson_pioneer");
+ALIAS_TO_ID.set(normalizeKey("pioneer"), "richardson_pioneer");
 
 function normalizeKey(s) {
   return String(s ?? "")
@@ -110,7 +125,9 @@ export function computeLoadTotalDisplay({
       if (m == null || r == null || f == null || k == null) return "";
       return roundMoney(k * f + r * m);
     }
-    case "irm": {
+    case "irm":
+    case "bayer":
+    case "richardson_pioneer": {
       const m = parseMetricNum(mt);
       const f = parseMetricNum(fsc);
       if (m == null || r == null || f == null) return "";
@@ -163,6 +180,8 @@ export function totalFormulaHint(loadCategory, flatRate = false) {
     case "cargill":
       return "KMs × FSC + rate × MT";
     case "irm":
+    case "bayer":
+    case "richardson_pioneer":
       return "rate × MT + (rate × MT × FSC%)";
     case "legacy_flat":
       return "rate × FSC (legacy)";
@@ -181,12 +200,12 @@ export function fieldRulesForCategory(loadCategory, flatRate = false) {
       cat === "generic" ||
       cat === "us_grain" ||
       cat === "cargill" ||
-      cat === "irm",
+      IRM_STYLE_IDS.has(cat),
     showFsc:
       cat === "chicken" ||
       cat === "legacy_flat" ||
       cat === "cargill" ||
-      cat === "irm",
+      IRM_STYLE_IDS.has(cat),
     rateIsFlatTotal: cat === "cattle" || cat === "tanker",
     showUsdCad: cat === "us_grain",
     mtRequired:
@@ -194,8 +213,8 @@ export function fieldRulesForCategory(loadCategory, flatRate = false) {
       cat === "generic" ||
       cat === "us_grain" ||
       cat === "cargill" ||
-      cat === "irm",
-    fscRequired: cat === "chicken" || cat === "cargill" || cat === "irm",
+      IRM_STYLE_IDS.has(cat),
+    fscRequired: cat === "chicken" || cat === "cargill" || IRM_STYLE_IDS.has(cat),
     rateRequired: true,
   };
 }
@@ -237,9 +256,14 @@ export function driverDivisionMatchesLoadCategory(
         (/canadian/.test(n) && /grain/.test(n))
       );
     case "irm":
-      // IRM is under Canadian Grain Division — both match.
+    case "bayer":
+    case "richardson_pioneer":
+      // IRM / Bayer / Richardson Pioneer sit under Canadian Grain.
       return (
         n.includes("irm") ||
+        n.includes("bayer") ||
+        n.includes("richardson") ||
+        n.includes("pioneer") ||
         (/canadian/.test(n) && /grain/.test(n))
       );
     case "canadian_grain":

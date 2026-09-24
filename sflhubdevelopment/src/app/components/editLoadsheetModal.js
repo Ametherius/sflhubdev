@@ -9,6 +9,7 @@ import {
   computeUsGrainUsdTotal,
   fetchLiveUsdCadRate,
   fieldRulesForCategory,
+  isIrmStyleCategory,
   loadCategoryFromStorage,
   loadCategoryStorageValue,
   normalizeLoadCategory,
@@ -911,7 +912,7 @@ export default function EditLoadsheetModal({
                   ? "(556 × FSC + rate)"
                   : loadCategory === "cargill"
                     ? "(KMs × FSC + rate × MT)"
-                    : loadCategory === "irm"
+                    : isIrmStyleCategory(loadCategory)
                       ? "(FSC is % — added onto rate × MT)"
                       : "(legacy flat: rate × FSC)"
               }
