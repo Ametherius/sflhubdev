@@ -21,10 +21,6 @@ import {
   formatUsdTotal,
 } from "@/lib/loadTotal";
 import {
-  computeRevenuePerKm,
-  formatRevenuePerKmCad,
-} from "@/lib/revenuePerKm";
-import {
   brokerFromScheduleLoadNote,
   buildScheduleLoadPayload,
   nextCopyLoadNumber,
@@ -188,17 +184,6 @@ export default function EditLoadsheetModal({
     return formatUsdTotal(computeUsGrainUsdTotal(mt, rate));
   }, [loadCategory, mt, rate]);
 
-  const revenuePerKmPreview = useMemo(() => {
-    const rev = loadTotalPreview
-      ? Number(String(loadTotalPreview).replace(/,/g, ""))
-      : null;
-    const perKm =
-      rev != null && Number.isFinite(rev)
-        ? computeRevenuePerKm(rev, kms)
-        : null;
-    return formatRevenuePerKmCad(perKm);
-  }, [loadTotalPreview, kms]);
-
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect -- hydrate form when sheet/slot changes */
     if (!open) {
@@ -206,6 +191,41 @@ export default function EditLoadsheetModal({
       return;
     }
     if (!selected) {
+      if (scheduleLoadId && scheduleSlotRow) {
+        const hydrateKey = `slot:${scheduleLoadId}:`;
+        if (lastHydratedKeyRef.current === hydrateKey) return;
+        lastHydratedKeyRef.current = hydrateKey;
+        const slot = scheduleSlotRow;
+        liveSyncReadyRef.current = false;
+        setLoadNumber(
+          slot.load_number != null ? String(slot.load_number) : "",
+        );
+        setOrigin(slot.origin != null ? String(slot.origin) : "");
+        setEndUser(slot.end_user != null ? String(slot.end_user) : "");
+        setMt(slot.mt != null ? String(slot.mt) : "");
+        setRate(slot.rate != null ? String(slot.rate) : "");
+        setFsc(slot.fsc != null ? String(slot.fsc) : "");
+        setBroker(brokerFromScheduleLoadNote(slot.load_note) || "");
+        setKms(slot.kms != null ? String(slot.kms) : "");
+        setInvoiced(Boolean(slot.invoiced));
+        setLoadCategory(
+          loadCategoryFromStorage(
+            slot.load_category ?? scheduleLoadCategory ?? null,
+          ),
+        );
+        setUsdCadRate(
+          slot.usd_cad_rate != null
+            ? String(slot.usd_cad_rate)
+            : scheduleUsdCadRate != null
+              ? String(scheduleUsdCadRate)
+              : "",
+        );
+        setFieldTextColors(parseFieldTextColors(slot.field_text_colors));
+        queueMicrotask(() => {
+          liveSyncReadyRef.current = true;
+        });
+        return;
+      }
       lastHydratedKeyRef.current = null;
       setLoadNumber("");
       setOrigin("");
@@ -308,10 +328,10 @@ export default function EditLoadsheetModal({
 
   const saveLoadsheet = useCallback(
     async (overrides = {}) => {
-      if (!selectedId) return { error: null };
+      if (!scheduleLoadId && !selectedId) return { error: null };
 
       const num = (overrides.loadNumber ?? loadNumber).trim();
-      if (!num) return { error: null };
+      if (!scheduleLoadId && !num) return { error: null };
 
       const values = {
         loadNumber: num,
@@ -333,7 +353,7 @@ export default function EditLoadsheetModal({
 
       if (scheduleLoadId) {
         const schedulePayload = buildScheduleLoadPayload({
-          loadsheetId: selectedId,
+          loadsheetId: selectedId || null,
           loadNumber: values.loadNumber,
           origin: values.origin,
           endUser: values.endUser,
@@ -418,8 +438,7 @@ export default function EditLoadsheetModal({
     ],
   );
 
-  const fieldLocked = (idSelected = selectedId) =>
-    readOnly || !idSelected;
+  const fieldLocked = () => readOnly;
 
   function reportSaveError(error) {
     const msg = error?.message ?? String(error);
@@ -446,18 +465,18 @@ export default function EditLoadsheetModal({
 
   const persistLive = useCallback(
     async (overrides = {}) => {
-      if (!selectedId || !liveSyncReadyRef.current) return;
+      if ((!selectedId && !scheduleLoadId) || !liveSyncReadyRef.current) return;
       if (Date.now() < liveSyncSuppressUntilRef.current) return;
       const { error } = await saveLoadsheet(overrides);
       if (error) {
         reportSaveError(error);
       }
     },
-    [selectedId, saveLoadsheet],
+    [selectedId, scheduleLoadId, saveLoadsheet],
   );
 
   useEffect(() => {
-    if (!open || !selectedId || !liveSyncReadyRef.current) {
+    if (!open || (!selectedId && !scheduleLoadId) || !liveSyncReadyRef.current) {
       return;
     }
 
@@ -472,6 +491,7 @@ export default function EditLoadsheetModal({
   }, [
     open,
     selectedId,
+    scheduleLoadId,
     loadNumber,
     origin,
     endUser,
@@ -503,7 +523,7 @@ export default function EditLoadsheetModal({
 
   function handleLoadCategoryChange(next) {
     setLoadCategory(next);
-    if (!selectedId) return;
+    if (!scheduleLoadId && !selectedId) return;
     void (async () => {
       const { error } = await saveLoadsheet({ loadCategory: next });
       if (error) reportSaveError(error);
@@ -511,7 +531,7 @@ export default function EditLoadsheetModal({
   }
 
   async function handleFetchLiveUsdCad() {
-    if (!selectedId || fetchingFx) return;
+    if (fetchingFx) return;
     setFetchingFx(true);
     try {
       const rate = await fetchLiveUsdCadRate();
@@ -525,7 +545,8 @@ export default function EditLoadsheetModal({
   }
 
   async function handleInvoicedChange(checked) {
-    if (!selectedId) return;
+    if (readOnly) return;
+    if (!scheduleLoadId && !selectedId) return;
     setInvoiced(checked);
     if (scheduleLoadId) {
       const { data, error } = await persistScheduleLoad(supabase, {
@@ -619,14 +640,16 @@ export default function EditLoadsheetModal({
   async function handleSubmit(e) {
     e.preventDefault();
     if (saving) return;
-    if (!selectedId) {
-      alert("Choose which load sheet to edit.");
-      return;
-    }
-    const num = loadNumber.trim();
-    if (!num) {
-      alert("Load number is required.");
-      return;
+    if (!scheduleLoadId) {
+      if (!selectedId) {
+        alert("Choose which load sheet to edit.");
+        return;
+      }
+      const num = loadNumber.trim();
+      if (!num) {
+        alert("Load number is required.");
+        return;
+      }
     }
     if (scheduleLoadId) {
       if (!(await confirm(saveChangesConfirmOptions("this schedule slot")))) {
@@ -736,12 +759,14 @@ export default function EditLoadsheetModal({
           </div>
         ) : null}
 
-        {loadSheets.length === 0 ? (
+        {!scheduleLoadId && loadSheets.length === 0 ? (
           <p className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
             No load sheets yet. Use <strong>New load sheet</strong> in the
             bottom bar first.
           </p>
-        ) : (
+        ) : null}
+
+        {!scheduleLoadId && loadSheets.length > 0 ? (
           <label className="mb-3 block text-sm font-medium">
             Load sheet
             <select
@@ -762,7 +787,7 @@ export default function EditLoadsheetModal({
               })}
             </select>
           </label>
-        )}
+        ) : null}
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
           {showFieldColors ? (
@@ -773,7 +798,7 @@ export default function EditLoadsheetModal({
           ) : null}
           <FieldWithTextColor
             label="Load number"
-            required
+            required={!scheduleLoadId}
             fieldKey="load_number"
             colors={fieldTextColors}
             onColorChange={setFieldColor}
@@ -785,7 +810,7 @@ export default function EditLoadsheetModal({
               value={loadNumber}
               onChange={(e) => setLoadNumber(e.target.value)}
               placeholder="e.g. 1042"
-              required
+              required={!scheduleLoadId}
               disabled={fieldLocked()}
               style={
                 showFieldColors && fieldTextColors.load_number
@@ -836,6 +861,7 @@ export default function EditLoadsheetModal({
               }
             />
           </FieldWithTextColor>
+          {!scheduleLoadId ? (
           <label className="block text-sm font-medium">
             Load type
             <select
@@ -854,6 +880,7 @@ export default function EditLoadsheetModal({
               ))}
             </select>
           </label>
+          ) : null}
           <div
             className={`grid gap-3 ${fieldRules.showMt ? "grid-cols-2" : "grid-cols-1"}`}
           >
@@ -981,38 +1008,6 @@ export default function EditLoadsheetModal({
             />
           </label>
           <FieldWithTextColor
-            label="KMs"
-            hint="(for revenue/km)"
-            fieldKey="kms"
-            colors={fieldTextColors}
-            onColorChange={setFieldColor}
-            showColor={showFieldColors}
-            disabled={fieldLocked()}
-          >
-            <input
-              className={inputClass}
-              value={kms}
-              onChange={(e) => setKms(e.target.value)}
-              placeholder="e.g. 450"
-              disabled={fieldLocked()}
-              style={
-                showFieldColors && fieldTextColors.kms
-                  ? { color: fieldTextColors.kms }
-                  : undefined
-              }
-            />
-          </FieldWithTextColor>
-          <label className="block text-sm font-medium">
-            Revenue/km{" "}
-            <span className="font-normal text-green-900/60">(total ÷ KMs)</span>
-            <input
-              className={`${inputClass} cursor-not-allowed bg-neutral-100 text-neutral-700`}
-              readOnly
-              value={revenuePerKmPreview}
-              placeholder="—"
-            />
-          </label>
-          <FieldWithTextColor
             label="Broker"
             hint="(optional)"
             fieldKey="broker"
@@ -1066,7 +1061,7 @@ export default function EditLoadsheetModal({
           </label>
 
           <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-green-950/15 pt-4">
-            {!readOnly ? (
+            {!readOnly && !scheduleLoadId ? (
               <button
                 type="button"
                 className="rounded-lg border border-green-950/30 bg-white px-3 py-2 text-sm font-semibold text-green-950 hover:bg-green-950/5 disabled:opacity-50"
@@ -1090,7 +1085,7 @@ export default function EditLoadsheetModal({
                 <ButtonDark
                   type="submit"
                   text={saving ? "Saving…" : "Done"}
-                  disabled={!selectedId || loadSheets.length === 0}
+                  disabled={!scheduleLoadId && (!selectedId || loadSheets.length === 0)}
                 />
               ) : null}
             </div>
