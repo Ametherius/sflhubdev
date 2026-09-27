@@ -208,6 +208,7 @@ export function fieldRulesForCategory(loadCategory, flatRate = false) {
       IRM_STYLE_IDS.has(cat),
     rateIsFlatTotal: cat === "cattle" || cat === "tanker",
     showUsdCad: cat === "us_grain",
+    showKms: cat === "cargill",
     mtRequired:
       cat === "canadian_grain" ||
       cat === "generic" ||

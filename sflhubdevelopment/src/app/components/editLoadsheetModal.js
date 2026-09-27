@@ -996,6 +996,30 @@ export default function EditLoadsheetModal({
               ) : null}
             </div>
           ) : null}
+          {fieldRules.showKms ? (
+            <FieldWithTextColor
+              label="KMs"
+              hint="(used in total: KMs × FSC + rate × MT)"
+              fieldKey="kms"
+              colors={fieldTextColors}
+              onColorChange={setFieldColor}
+              showColor={showFieldColors}
+              disabled={fieldLocked()}
+            >
+              <input
+                className={inputClass}
+                value={kms}
+                onChange={(e) => setKms(e.target.value)}
+                placeholder="e.g. 450"
+                disabled={fieldLocked()}
+                style={
+                  showFieldColors && fieldTextColors.kms
+                    ? { color: fieldTextColors.kms }
+                    : undefined
+                }
+              />
+            </FieldWithTextColor>
+          ) : null}
           <label className="block text-sm font-medium">
             Total (CAD){" "}
             <span className="font-normal text-green-900/60">({totalHint})</span>

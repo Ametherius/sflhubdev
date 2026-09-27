@@ -2,6 +2,12 @@ import { getMotiveData } from "@/lib/motiveAPI";
 import MotiveTruck from "../components/motiveTruck";
 
 export default async function Motive() {
+  const drivers = await getMotiveData("v1/users", {
+    role: "driver",
+    status: "active",
+  });
+  console.log(drivers);
+
   async function makeMotiveData() {
     try {
       const [vehiclesResponse, trailersResponse, dataResponse] =
@@ -46,10 +52,6 @@ export default async function Motive() {
           }
         }
       });
-
-      console.log(
-        `Successfully cached ${assetMap.size} asset mapping entry-keys.`,
-      );
 
       function haversineMeters(lat1, lon1, lat2, lon2) {
         const R = 6371000;
@@ -273,7 +275,6 @@ export default async function Motive() {
   }
 
   const vehicleData = (await makeMotiveData()) || [];
-  console.log(vehicleData);
   return (
     <div className="w-full">
       <div className="w-90 h-[calc(100vh-6.5rem)] bg-white fixed top-26 left-0 flex flex-col border-r border-gray-200">

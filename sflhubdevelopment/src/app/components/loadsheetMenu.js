@@ -14,9 +14,7 @@ export default function LoadsheetMenu({
 }) {
   const [query, setQuery] = useState("");
   const searchLoadsheets = loadsheets.filter((l) => {
-    return String(l.load_number)
-      .toLowerCase()
-      .includes(String(query.toLowerCase()));
+    return String(l.broker).toLowerCase().includes(String(query.toLowerCase()));
   });
 
   const showActions =
@@ -37,40 +35,52 @@ export default function LoadsheetMenu({
       {searchLoadsheets.map((loadsheet) => (
         <div
           key={loadsheet.id}
-          className="flex bg-gray-900 rounded-lg w-full p-1 py-auto mb-2 h-20"
+          className="flex flex-col bg-gray-900 rounded-lg w-full p-1 py-auto mb-2"
         >
-          <div className="bg-gray-900 border flex justify-center h-full items-center rounded-l-lg p-2 my-auto w-40">
-            <p className="text-white">{loadsheet.load_number}</p>
+          <div className="bg-gray-900 border rounded-t-md flex justify-center h-full w-full items-center  p-2 my-auto">
+            <p className="text-white">{loadsheet.broker}</p>
           </div>
-          {showActions ? (
-            <div className="bg-gray-900 border rounded-r-lg p-2 w-full flex my-auto h-full justify-center items-center gap-2">
-              {typeof onDelete === "function" ? (
-                <BtnRed
-                  text={<FaTimes />}
-                  type="button"
-                  onClick={() => onDelete?.(loadsheet)}
-                />
-              ) : null}
-              {typeof onEdit === "function" ? (
-                <ButtonDark
-                  text={<FaEdit />}
-                  type="button"
-                  onClick={() => onEdit?.(loadsheet)}
-                />
-              ) : null}
-              {typeof onCopy === "function" ? (
-                <BtnWhiteRounded
-                  text={<FaCopy />}
-                  type="button"
-                  onClick={() => onCopy?.(loadsheet)}
-                />
-              ) : null}
+          <div className="flex flex-1 w-full">
+            <div className="flex flex-col border border-t-0 p-2 w-1/2">
+              <span className="text-center underline">Origin</span>
+              <span className="text-center">{loadsheet.origin}</span>
             </div>
-          ) : (
-            <div className="bg-gray-900 border rounded-r-lg p-2 w-full flex my-auto h-full items-center justify-center">
-              <p className="text-xs text-white/70">View only</p>
+            <div className="flex flex-col border border-t-0 border-l-0 p-2 w-1/2">
+              <span className="text-center underline">End User</span>
+              <span className="text-center">{loadsheet.end_user}</span>
             </div>
-          )}
+          </div>
+          <div>
+            {showActions ? (
+              <div className="bg-gray-900 p-2 border border-t-0 rounded-b-md w-full flex my-auto h-full justify-center items-center gap-2">
+                {typeof onDelete === "function" ? (
+                  <BtnRed
+                    text={<FaTimes />}
+                    type="button"
+                    onClick={() => onDelete?.(loadsheet)}
+                  />
+                ) : null}
+                {typeof onEdit === "function" ? (
+                  <ButtonDark
+                    text={<FaEdit />}
+                    type="button"
+                    onClick={() => onEdit?.(loadsheet)}
+                  />
+                ) : null}
+                {typeof onCopy === "function" ? (
+                  <BtnWhiteRounded
+                    text={<FaCopy />}
+                    type="button"
+                    onClick={() => onCopy?.(loadsheet)}
+                  />
+                ) : null}
+              </div>
+            ) : (
+              <div className="bg-gray-900  p-2 w-full flex my-auto h-full items-center justify-center">
+                <p className="text-xs text-white/70">View only</p>
+              </div>
+            )}
+          </div>
         </div>
       ))}
     </div>

@@ -308,6 +308,20 @@ export default function NewLoadsheetModal({ open, onClose, onCreated }) {
               ) : null}
             </div>
           ) : null}
+          {fieldRules.showKms ? (
+            <label className="block text-sm font-medium">
+              KMs{" "}
+              <span className="font-normal text-green-900/60">
+                (used in total: KMs × FSC + rate × MT)
+              </span>
+              <input
+                className={inputClass}
+                value={kms}
+                onChange={(e) => setKms(e.target.value)}
+                placeholder="e.g. 450"
+              />
+            </label>
+          ) : null}
           <label className="block text-sm font-medium">
             Total (CAD){" "}
             <span className="font-normal text-green-900/60">({totalHint})</span>
@@ -316,16 +330,6 @@ export default function NewLoadsheetModal({ open, onClose, onCreated }) {
               readOnly
               value={loadTotalPreviewCad}
               placeholder="—"
-            />
-          </label>
-          <label className="block text-sm font-medium">
-            KMs{" "}
-            <span className="font-normal text-green-900/60">(optional)</span>
-            <input
-              className={inputClass}
-              value={kms}
-              onChange={(e) => setKms(e.target.value)}
-              placeholder="e.g. 450"
             />
           </label>
 
