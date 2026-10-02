@@ -1,52 +1,39 @@
-import { getMotiveData } from "@/lib/motiveAPI";
 import { getData } from "@/lib/samsaraAPI";
+import SamsaraMap from "../components/samsaraMap";
 
 export default async function Samsara() {
-  const data = await getData();
+  const [vehicles, stats] = await Promise.all([
+    getData("fleet/vehicles"),
+    getData("fleet/vehicles/stats?types=gps,obdOdometerMeters"),
+  ]);
 
+  const statsById = new Map(
+    (stats?.data ?? []).map((row) => [String(row.id), row]),
+  );
+
+  const units = (vehicles?.data ?? []).map((vehicle) => {
+    const stats = statsById.get(String(vehicle.id));
+    return {
+      // ...vehicle,
+      // gps: stats?.gps ?? null,
+      // odometer: stats?.obdOdometerMeters ?? null,
+
+      id: vehicle.id,
+      driver: vehicle.staticAssignedDriver?.name ?? null,
+      odometer: Math.round(stats?.obdOdometerMeters.value / 1000),
+      speed: Math.round(stats?.gps.speedMilesPerHour * 1.60934),
+      lat: stats?.gps.latitude,
+      lon: stats?.gps.longitude,
+      plate: vehicle.licensePlate,
+      vin: vehicle.vin,
+      unit: vehicle.name,
+      location: stats?.gps.reverseGeo.formattedLocation,
+    };
+  });
+  console.log(units);
   return (
-    <div className="w-full p-3">
-      {data.data.map((u) => (
-        <div key={u.id}>
-          {u.staticAssignedDriver ? (
-            <div className="bg-white rounded-xl w-90 p-2 m-2">
-              <div className="grid grid-cols-2 border-b-2 border-green-950">
-                <div className="font-bold text-green-950 mb-1">
-                  <h1>{u.staticAssignedDriver?.name}</h1>
-                </div>
-                <div className="text-green-950 flex justify-end">
-                  <p>
-                    <span className="font-bold">Unit: </span>
-                    {u.name}
-                  </p>
-                </div>
-              </div>
-              <div className="flex text-green-950 mt-6 mb-0 p-1">
-                <p className="m-1 text-sm">
-                  <span className="font-bold text-gray-600 text-sm">
-                    Plate:{" "}
-                  </span>
-                  {u.licensePlate}
-                </p>
-
-                <p className="m-1">
-                  <span className="font-bold text-sm text-gray-600">VIN: </span>
-                  {u.vin}
-                </p>
-              </div>
-            </div>
-          ) : (
-            ""
-          )}
-        </div>
-      ))}
-
-      <div className="bg-white rounded-xl text-center text-green-950 w-90 p-5 m-2">
-        These are just test results from Samsara API, a lot more information is
-        available, and potential for assigning drivers in this app to go
-        directly to Samsara and the schedule Assigned drivers to be directly
-        from Samsara
-      </div>
+    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
+      <SamsaraMap units={units} />
     </div>
   );
 }

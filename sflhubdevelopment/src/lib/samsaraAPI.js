@@ -1,8 +1,8 @@
-export const getData = async function () {
+export const getData = async function (endpoint) {
   const apiURL = "https://api.samsara.com/";
   const apiKey = process.env.SAMSARA_API_KEY;
   try {
-    const response = await fetch(`${apiURL}fleet/vehicles`, {
+    const response = await fetch(`${apiURL}${endpoint}`, {
       method: "GET",
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -19,5 +19,3 @@ export const getData = async function () {
     return null;
   }
 };
-
-export const getStats = async function () {};

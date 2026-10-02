@@ -18,3 +18,15 @@ body {
   font-family: Arial, Helvetica, sans-serif;
   box-sizing: border-box;
 }
+
+.leaflet-tooltip.unit-label {
+  background-color: black;
+  border: none;
+  color: white;
+  border-radius: 10px;
+  padding: 6px;
+}
+
+.leaflet-tooltip.unit-label.leaflet-tooltip-top::before {
+  border-top-color: black;
+}

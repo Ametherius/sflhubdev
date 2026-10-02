@@ -10,9 +10,9 @@ export default function AppShell({ children }) {
   const showHeader = !HIDE_HEADER_PATHS.has(pathname);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div className="flex h-full min-h-0 flex-1 flex-col">
       {showHeader ? <Header /> : null}
-      <div className="min-h-0 flex-1">{children}</div>
+      <div className="flex min-h-0 flex-1 flex-col">{children}</div>
     </div>
   );
 }
