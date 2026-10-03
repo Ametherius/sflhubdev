@@ -1,9 +1,12 @@
+"use server";
+
+const apiURL = "https://api.samsara.com/";
+const apiKey = process.env.SAMSARA_API_KEY;
 export const getData = async function (endpoint) {
-  const apiURL = "https://api.samsara.com/";
-  const apiKey = process.env.SAMSARA_API_KEY;
   try {
     const response = await fetch(`${apiURL}${endpoint}`, {
       method: "GET",
+      cache: "no-store",
       headers: {
         Authorization: `Bearer ${apiKey}`,
         Accept: "application/json",
@@ -19,3 +22,24 @@ export const getData = async function (endpoint) {
     return null;
   }
 };
+
+export async function postData(endpoint, payload) {
+  try {
+    const res = await fetch(`${apiURL}${endpoint}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        Accept: "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) throw new Error("POST error");
+
+    const result = await res.json();
+    return result;
+  } catch (err) {
+    console.error("Failed to send message");
+    throw err;
+  }
+}

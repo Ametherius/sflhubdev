@@ -7,6 +7,9 @@ export default async function Samsara() {
     getData("fleet/vehicles/stats?types=gps,obdOdometerMeters"),
   ]);
 
+  const drivers = (await getData("fleet/drivers"))?.data ?? [];
+  // console.log(drivers);
+
   const statsById = new Map(
     (stats?.data ?? []).map((row) => [String(row.id), row]),
   );
@@ -27,13 +30,14 @@ export default async function Samsara() {
       plate: vehicle.licensePlate,
       vin: vehicle.vin,
       unit: vehicle.name,
-      location: stats?.gps.reverseGeo.formattedLocation,
+      location:
+        stats?.gps?.address?.name || stats?.gps?.reverseGeo?.formattedLocation,
     };
   });
-  console.log(units);
+  // console.log(units);
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
-      <SamsaraMap units={units} />
+      <SamsaraMap units={units} drivers={drivers} />
     </div>
   );
 }
