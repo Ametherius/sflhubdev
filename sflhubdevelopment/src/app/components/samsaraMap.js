@@ -6,10 +6,10 @@ const SamsaraClient = dynamic(() => import("./samsaraClient"), {
   ssr: false,
 });
 
-export default function SamsaraMap({ units, drivers }) {
+export default function SamsaraMap({ units, drivers, addresses }) {
   return (
     <div className="flex h-full min-h-0 w-full flex-1 flex-col">
-      <SamsaraClient units={units} drivers={drivers} />
+      <SamsaraClient units={units} drivers={drivers} addresses={addresses} />
     </div>
   );
 }

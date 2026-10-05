@@ -15,7 +15,7 @@ export const getData = async function (endpoint) {
     if (!response.ok) throw new Error(`HTTP Error! Status ${response.status}`);
 
     const result = await response.json();
-    console.log("Samsara Data:", result);
+    // console.log("Samsara Data:", result);
     return result;
   } catch (error) {
     console.error("Failed to retrieve data:", error.message);
@@ -30,16 +30,19 @@ export async function postData(endpoint, payload) {
       headers: {
         Authorization: `Bearer ${apiKey}`,
         Accept: "application/json",
+        "Content-Type": "application/json",
       },
       body: JSON.stringify(payload),
     });
 
-    if (!res.ok) throw new Error("POST error");
+    if (!res.ok) {
+      const detail = await res.text();
+      throw new Error(`POST ${res.status}: ${detail}`);
+    }
 
-    const result = await res.json();
-    return result;
+    return await res.json();
   } catch (err) {
-    console.error("Failed to send message");
+    console.error("Failed to send route:", err);
     throw err;
   }
 }

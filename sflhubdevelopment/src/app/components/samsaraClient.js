@@ -38,9 +38,19 @@ function mapUnits(vehicles, stats) {
   });
 }
 
-export default function SamsaraClient({ units: initialUnits, drivers }) {
+export default function SamsaraClient({
+  units: initialUnits,
+  drivers,
+  addresses,
+}) {
   const [units, setUnits] = useState(initialUnits ?? []);
   const [open, setOpen] = useState();
+  const [selectedUser, setSelectedUSer] = useState("");
+  const [origin, setOrigin] = useState("");
+  const [endUser, setEndUser] = useState("");
+  const [originArrivalTime, setOriginArrivalTime] = useState("");
+  const [endUserArrivalTime, setEndUserArrivalTime] = useState("");
+  const [dispatchID, setDispatchID] = useState("");
 
   useEffect(() => {
     const id = setInterval(async () => {
@@ -53,23 +63,53 @@ export default function SamsaraClient({ units: initialUnits, drivers }) {
     return () => clearInterval(id);
   }, []);
 
-  const [selectedUser, setSelectedUSer] = useState("");
-  const [message, setMessage] = useState("");
   const defaultCenter =
     units.length > 0 ? [units[0].lat, units[0].lon] : [49.2827, -123.1207];
 
   async function sendDispatch(e) {
     e.preventDefault();
-    await postData("v1/fleet/messages", {
-      driverIds: [selectedUser],
-      text: message,
+    if (
+      !selectedUser ||
+      !origin ||
+      !endUser ||
+      !originArrivalTime ||
+      !endUserArrivalTime ||
+      !dispatchID
+    ) {
+      return;
+    }
+
+    await postData("fleet/routes", {
+      name: dispatchID,
+      driverId: String(selectedUser),
+      settings: { routeStartingCondition: "arriveFirstStop" },
+      stops: [
+        {
+          name: "Origin",
+          addressId: String(origin),
+          scheduledArrivalTime: new Date(originArrivalTime).toISOString(),
+        },
+        {
+          name: "End User",
+          addressId: String(endUser),
+          scheduledArrivalTime: new Date(endUserArrivalTime).toISOString(),
+        },
+      ],
     });
+
+    setEndUser("");
+    setOrigin("");
+    setSelectedUSer("");
+    setDispatchID("");
+    setOriginArrivalTime("");
+    setEndUserArrivalTime("");
   }
+  const inputStyle = "border-2 border-green-950 rounded-md text-green-950 p-2";
 
   return (
     <div className="flex min-h-0 h-full w-full flex-1 overflow-hidden">
       <DispatchModal
-        className={`absolute p-5 top-1/2 left-1/2 transform -translate-y-1/2 bg-white rounded-xl z-10 shadow-xl ${open ? "" : "hidden"}`}
+        className={`absolute w-90 p-5 top-1/2 left-1/2 transform -translate-y-1/2 bg-white rounded-xl z-10 shadow-xl ${open ? "" : "hidden"}`}
       >
         <div className="text-center font-bold text-2xl text-green-950 mb-2 underline px-2">
           <h1>Create Dispatch</h1>
@@ -77,30 +117,82 @@ export default function SamsaraClient({ units: initialUnits, drivers }) {
         <div>
           <form>
             <div className="flex flex-col m-1">
-              <label className="text-green-950">Select User</label>
+              <label className="text-green-950">Select Driver</label>
               <select
                 value={selectedUser}
                 onChange={(e) => setSelectedUSer(e.target.value)}
-                className="border-2 border-green-950 rounded-md text-green-950 p-2"
+                className={inputStyle}
               >
-                <option value="" className="">
-                  Please Choose User
-                </option>
+                <option value="">Please Choose Driver</option>
                 {drivers?.map((u) => (
                   <option key={u.id} value={u.id}>
                     {u.name}
                   </option>
                 ))}
               </select>
+            </div>
+            <div className="border-2 border-green-950 rounded-lg my-4 p-3">
               <div className="flex flex-col m-1">
-                <label className="text-green-950">Message</label>
-                <textarea
-                  className="border-2 border-green-950 rounded-md p-2 text-green-950"
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                ></textarea>
+                <label className="text-green-950">Arrival Time</label>
+                <input
+                  className={inputStyle}
+                  type="datetime-local"
+                  value={originArrivalTime}
+                  onChange={(e) => setOriginArrivalTime(e.target.value)}
+                />
+              </div>
+              <div className="flex flex-col m-1">
+                <label className="text-green-950">Origin</label>
+                <select
+                  value={origin}
+                  onChange={(e) => setOrigin(e.target.value)}
+                  className={inputStyle}
+                >
+                  <option value="">Select Origin</option>
+                  {addresses.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
+            <div className="border-2 border-green-950 rounded-lg my-4 p-3">
+              <div className="flex flex-col m-1">
+                <label className="text-green-950">Arrival Time</label>
+                <input
+                  type="datetime-local"
+                  value={endUserArrivalTime}
+                  onChange={(e) => setEndUserArrivalTime(e.target.value)}
+                  className={inputStyle}
+                />
+              </div>
+              <div className="flex flex-col m-1">
+                <label className="text-green-950">End User</label>
+                <select
+                  value={endUser}
+                  onChange={(e) => setEndUser(e.target.value)}
+                  className={inputStyle}
+                >
+                  <option value="">Select End User</option>
+                  {addresses.map((a) => (
+                    <option value={a.id} key={a.id}>
+                      {a.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="flex flex-col m-1">
+              <label className="text-green-950">Dispatch Name</label>
+              <input
+                type="text"
+                className={inputStyle}
+                value={dispatchID}
+                onChange={(e) => setDispatchID(e.target.value)}
+              />
+            </div>
+
             <div className="flex justify-center">
               <ButtonDark text="Send Dispatch" onClick={sendDispatch} />
             </div>
