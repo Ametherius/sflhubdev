@@ -44,7 +44,7 @@ export default function SamsaraClient({
   addresses,
 }) {
   const [units, setUnits] = useState(initialUnits ?? []);
-  const [open, setOpen] = useState();
+  const [open, setOpen] = useState("false");
   const [selectedUser, setSelectedUSer] = useState("");
   const [origin, setOrigin] = useState("");
   const [endUser, setEndUser] = useState("");
@@ -103,13 +103,14 @@ export default function SamsaraClient({
     setDispatchID("");
     setOriginArrivalTime("");
     setEndUserArrivalTime("");
+    setOpen("false");
   }
   const inputStyle = "border-2 border-green-950 rounded-md text-green-950 p-2";
 
   return (
     <div className="flex min-h-0 h-full w-full flex-1 overflow-hidden">
       <DispatchModal
-        className={`absolute w-90 p-5 top-1/2 left-1/2 transform -translate-y-1/2 bg-white rounded-xl z-10 shadow-xl ${open ? "" : "hidden"}`}
+        className={`absolute w-90 p-5 top-1/2 left-1/2 transform -translate-y-1/2 bg-white rounded-xl z-10 shadow-xl ${open ? "hidden" : ""}`}
       >
         <div className="text-center font-bold text-2xl text-green-950 mb-2 underline px-2">
           <h1>Create Dispatch</h1>
