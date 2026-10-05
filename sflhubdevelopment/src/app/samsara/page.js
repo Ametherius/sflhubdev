@@ -9,7 +9,7 @@ export default async function Samsara() {
 
   const drivers = (await getData("fleet/drivers"))?.data ?? [];
 
-  const addresses = (await getData("addresses")).data ?? [];
+  const addresses = (await getData("addresses"))?.data ?? [];
   console.log(addresses);
   console.log(drivers);
   const statsById = new Map(
