@@ -79,8 +79,7 @@ export default function ProfileSettingsModal({ open, onClose }) {
       return;
     }
 
-    const changingPassword =
-      currentPassword || newPassword || confirmPassword;
+    const changingPassword = currentPassword || newPassword || confirmPassword;
     if (changingPassword) {
       if (newPassword.length < 8) {
         setError("New password must be at least 8 characters.");
@@ -176,7 +175,10 @@ export default function ProfileSettingsModal({ open, onClose }) {
           Profile Settings
         </h2>
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-          <label className="flex flex-col text-sm font-medium" htmlFor="profile-name">
+          <label
+            className="flex flex-col text-sm font-medium"
+            htmlFor="profile-name"
+          >
             Name
             <input
               id="profile-name"
@@ -190,10 +192,10 @@ export default function ProfileSettingsModal({ open, onClose }) {
             />
           </label>
           <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-green-900/60">
-            Change password
+            Change Password
           </p>
           <label className="flex flex-col text-sm font-medium">
-            Current password
+            Current Password
             <input
               type="password"
               autoComplete="current-password"
@@ -203,7 +205,7 @@ export default function ProfileSettingsModal({ open, onClose }) {
             />
           </label>
           <label className="flex flex-col text-sm font-medium">
-            New password
+            New Password
             <input
               type="password"
               autoComplete="new-password"
@@ -213,7 +215,7 @@ export default function ProfileSettingsModal({ open, onClose }) {
             />
           </label>
           <label className="flex flex-col text-sm font-medium">
-            Confirm new password
+            Confirm New Password
             <input
               type="password"
               autoComplete="new-password"
@@ -223,7 +225,9 @@ export default function ProfileSettingsModal({ open, onClose }) {
             />
           </label>
           {error ? (
-            <p className="text-center text-sm font-bold text-red-700">{error}</p>
+            <p className="text-center text-sm font-bold text-red-700">
+              {error}
+            </p>
           ) : null}
           {success ? (
             <p className="text-center text-sm font-bold text-green-800">
