@@ -13,8 +13,15 @@ export default function LoadsheetMenu({
   onCopy,
 }) {
   const [query, setQuery] = useState("");
+  const [endUserQuery, setEndUserQuery] = useState("");
   const searchLoadsheets = loadsheets.filter((l) => {
-    return String(l.broker).toLowerCase().includes(String(query.toLowerCase()));
+    const originMatch = String(l.origin ?? "")
+      .toLowerCase()
+      .includes(query.toLowerCase());
+    const endUserMatch = String(l.end_user ?? "")
+      .toLowerCase()
+      .includes(endUserQuery.toLowerCase());
+    return originMatch && endUserMatch;
   });
 
   const showActions =
@@ -30,7 +37,14 @@ export default function LoadsheetMenu({
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         className="border-2 border-green-950 p-2 text-green-950 rounded-md mb-3"
-        placeholder="Search Loadsheets..."
+        placeholder="Search Origin..."
+      />
+      <input
+        type="search"
+        placeholder="Search End User..."
+        value={endUserQuery}
+        onChange={(e) => setEndUserQuery(e.target.value)}
+        className="border-2 border-green-950 p-2 text-green-950 rounded-md mb-3"
       />
       {searchLoadsheets.map((loadsheet) => (
         <div
