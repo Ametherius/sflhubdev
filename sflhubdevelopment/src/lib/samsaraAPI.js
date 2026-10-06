@@ -46,3 +46,27 @@ export async function postData(endpoint, payload) {
     throw err;
   }
 }
+
+export async function patchData(endpoint, payload) {
+  try {
+    const res = await fetch(`${apiURL}${endpoint}`, {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const detail = await res.text();
+      throw new Error(`PATCH ${res.status}: ${detail}`);
+    }
+
+    return await res.json();
+  } catch (err) {
+    console.error("Failed to update route:", err);
+    throw err;
+  }
+}

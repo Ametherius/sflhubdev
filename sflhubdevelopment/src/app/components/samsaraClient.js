@@ -15,7 +15,7 @@ import DispatchModal from "./dispatchModal";
 import { useState, useEffect } from "react";
 import { FaList } from "react-icons/fa";
 import ButtonDark from "./buttonDark";
-import { getData, postData } from "@/lib/samsaraAPI";
+import { getData, patchData, postData } from "@/lib/samsaraAPI";
 
 function mapUnits(vehicles, stats) {
   const statsById = new Map(
@@ -50,7 +50,6 @@ export default function SamsaraClient({
   const [endUser, setEndUser] = useState("");
   const [originArrivalTime, setOriginArrivalTime] = useState("");
   const [endUserArrivalTime, setEndUserArrivalTime] = useState("");
-  const [dispatchID, setDispatchID] = useState("");
   const [originNotes, setOriginNotes] = useState("");
   const [endUserNotes, setEndUserNotes] = useState("");
 
@@ -65,9 +64,6 @@ export default function SamsaraClient({
     return () => clearInterval(id);
   }, []);
 
-  const defaultCenter =
-    units.length > 0 ? [units[0].lat, units[0].lon] : [49.2827, -123.1207];
-
   async function sendDispatch(e) {
     e.preventDefault();
     if (
@@ -75,14 +71,13 @@ export default function SamsaraClient({
       !origin ||
       !endUser ||
       !originArrivalTime ||
-      !endUserArrivalTime ||
-      !dispatchID
+      !endUserArrivalTime
     ) {
       return;
     }
 
-    await postData("fleet/routes", {
-      name: dispatchID,
+    const created = await postData("fleet/routes", {
+      name: "Dispatch",
       driverId: String(selectedUser),
       settings: { routeStartingCondition: "arriveFirstStop" },
       stops: [
@@ -101,22 +96,31 @@ export default function SamsaraClient({
       ],
     });
 
+    const routeId = created?.data?.id;
+    if (routeId) {
+      await patchData(`fleet/routes/${routeId}`, {
+        name: `Dispatch-${routeId}`,
+      });
+    }
+
     setEndUser("");
     setOrigin("");
     setSelectedUSer("");
-    setDispatchID("");
     setOriginArrivalTime("");
     setEndUserArrivalTime("");
     setEndUserNotes("");
     setOriginNotes("");
     setOpen("false");
   }
+
+  const defaultCenter =
+    units.length > 0 ? [units[0].lat, units[0].lon] : [49.2827, -123.1207];
   const inputStyle = "border-2 border-green-950 rounded-md text-green-950 p-2";
 
   return (
     <div className="flex min-h-0 h-full w-full flex-1 overflow-hidden">
       <DispatchModal
-        className={`absolute w-90 p-5 top-1/2 left-1/2 transform -translate-y-1/2 bg-white rounded-xl z-10 shadow-xl ${open ? "hidden" : ""}`}
+        className={`absolute w-96 p-5 top-1/2 left-1/2 transform -translate-y-1/2 bg-white rounded-xl z-10 shadow-xl ${open ? "hidden" : ""}`}
       >
         <div className="text-center font-bold text-2xl text-green-950 mb-2 underline px-2">
           <h1>Create Dispatch</h1>
@@ -206,16 +210,6 @@ export default function SamsaraClient({
                 ></textarea>
               </div>
             </div>
-            <div className="flex flex-col m-1">
-              <label className="text-green-950">Dispatch Name</label>
-              <input
-                type="text"
-                className={inputStyle}
-                value={dispatchID}
-                onChange={(e) => setDispatchID(e.target.value)}
-              />
-            </div>
-
             <div className="flex justify-center">
               <ButtonDark text="Send Dispatch" onClick={sendDispatch} />
             </div>
