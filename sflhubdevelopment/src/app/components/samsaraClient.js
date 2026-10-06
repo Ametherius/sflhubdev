@@ -51,6 +51,8 @@ export default function SamsaraClient({
   const [originArrivalTime, setOriginArrivalTime] = useState("");
   const [endUserArrivalTime, setEndUserArrivalTime] = useState("");
   const [dispatchID, setDispatchID] = useState("");
+  const [originNotes, setOriginNotes] = useState("");
+  const [endUserNotes, setEndUserNotes] = useState("");
 
   useEffect(() => {
     const id = setInterval(async () => {
@@ -88,11 +90,13 @@ export default function SamsaraClient({
           name: "Origin",
           addressId: String(origin),
           scheduledArrivalTime: new Date(originArrivalTime).toISOString(),
+          notes: originNotes,
         },
         {
           name: "End User",
           addressId: String(endUser),
           scheduledArrivalTime: new Date(endUserArrivalTime).toISOString(),
+          notes: endUserNotes,
         },
       ],
     });
@@ -103,6 +107,8 @@ export default function SamsaraClient({
     setDispatchID("");
     setOriginArrivalTime("");
     setEndUserArrivalTime("");
+    setEndUserNotes("");
+    setOriginNotes("");
     setOpen("false");
   }
   const inputStyle = "border-2 border-green-950 rounded-md text-green-950 p-2";
@@ -157,6 +163,14 @@ export default function SamsaraClient({
                   ))}
                 </select>
               </div>
+              <div className="flex flex-col m-1">
+                <label className="text-green-950">Origin Notes</label>
+                <textarea
+                  value={originNotes}
+                  onChange={(e) => setOriginNotes(e.target.value)}
+                  className={inputStyle}
+                ></textarea>
+              </div>
             </div>
             <div className="border-2 border-green-950 rounded-lg my-4 p-3">
               <div className="flex flex-col m-1">
@@ -182,6 +196,14 @@ export default function SamsaraClient({
                     </option>
                   ))}
                 </select>
+              </div>
+              <div className="flex flex-col m-1">
+                <label className="text-green-950">End User Notes</label>
+                <textarea
+                  value={endUserNotes}
+                  onChange={(e) => setEndUserNotes(e.target.value)}
+                  className={inputStyle}
+                ></textarea>
               </div>
             </div>
             <div className="flex flex-col m-1">
