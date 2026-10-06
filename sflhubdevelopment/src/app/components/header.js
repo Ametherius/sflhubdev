@@ -4,8 +4,8 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useMemo, useState } from "react";
-import { FaCog } from "react-icons/fa";
-import { useUser } from "@/hooks/useUser";
+import { FaUserCircle } from "react-icons/fa";
+import ProfileSettingsModal from "./profileSettingsModal";
 
 const navLinks = [
   { label: "Dashboard", href: "/dashboard" },
@@ -15,38 +15,38 @@ const navLinks = [
 ];
 
 export default function Header() {
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   return (
     <div className="bg-gray-800 w-full">
-      <HeaderTitle onToggle={() => setIsSettingsOpen((open) => !open)} />
+      <HeaderTitle onOpenProfile={() => setIsProfileOpen(true)} />
       <Navbar />
-      {isSettingsOpen ? (
-        <SettingsMenu onClose={() => setIsSettingsOpen(false)} />
-      ) : null}
+      <ProfileSettingsModal
+        open={isProfileOpen}
+        onClose={() => setIsProfileOpen(false)}
+      />
     </div>
   );
 }
 
-function HeaderTitle({ onToggle }) {
+function HeaderTitle({ onOpenProfile }) {
   return (
     <div className="bg-gray-500 text-center my-auto py-auto p-3 w-full grid grid-cols-3">
-      <div className="flex justify-start items-center">
-        <button
-          type="button"
-          className="text-2xl hover:text-green-700 transition-all hover:scale-[1.4] hidden"
-          onClick={onToggle}
-          aria-label="Settings"
-        >
-          <FaCog />
-        </button>
-      </div>
+      <div className="flex justify-start items-center" />
       <div className="flex justify-center">
         <h1 className="font-bold text-3xl text-center text-white">
           SFL Dispatch Hub
         </h1>
       </div>
-      <div className="flex justify-end">
+      <div className="flex items-center justify-end gap-2">
+        <button
+          type="button"
+          onClick={onOpenProfile}
+          className="flex items-center justify-center rounded-md p-2 text-3xl text-white transition-all hover:scale-110 hover:text-green-950"
+          aria-label="Profile settings"
+        >
+          <FaUserCircle />
+        </button>
         <LogoutButton />
       </div>
     </div>
@@ -95,57 +95,5 @@ function Navbar() {
         );
       })}
     </nav>
-  );
-}
-
-function SettingsMenu({ onClose }) {
-  const [name, setName] = useState("");
-  const [activeUser] = useUser();
-  const inputStyle =
-    "rounded-lg font-bold border border-green-950 p-1 text-green-950";
-
-  return (
-    <div
-      className="w-fit h-fit bg-white z-50 flex flex-col justify-center p-4 fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 rounded-xl"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="settings-title"
-    >
-      <h2 id="settings-title" className="text-green-950 text-center font-bold">
-        Settings
-      </h2>
-      {activeUser?.email ? (
-        <p className="mb-2 text-center text-xs text-green-900/70">
-          {activeUser.email}
-        </p>
-      ) : null}
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-        }}
-      >
-        <div className="flex flex-col mb-2">
-          <label className="text-green-950" htmlFor="settings-name">
-            Name
-          </label>
-          <input
-            id="settings-name"
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className={inputStyle}
-          />
-        </div>
-        <div className="mt-3 flex justify-end">
-          <button
-            type="button"
-            className="rounded-full px-4 py-2 text-sm font-semibold text-green-950 hover:bg-green-950/10"
-            onClick={onClose}
-          >
-            Close
-          </button>
-        </div>
-      </form>
-    </div>
   );
 }
