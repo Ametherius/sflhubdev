@@ -32,14 +32,20 @@ import {
 } from "@/lib/scheduleLoadsPersist";
 import { useConfirm } from "@/context/confirmContext";
 import { saveChangesConfirmOptions } from "@/lib/confirmEdit";
-import {
-  FieldWithTextColor,
-  parseFieldTextColors,
-} from "./fieldWithTextColor";
+import { FieldWithTextColor, parseFieldTextColors } from "./fieldWithTextColor";
 
 function nullIfEmpty(s) {
   const t = String(s ?? "").trim();
   return t.length ? t : null;
+}
+
+function loadSheetOptionLabel(s) {
+  const loadNumber = String(s?.load_number ?? "").trim();
+  const origin = String(s?.origin ?? "").trim();
+  const broker = String(s?.broker ?? "").trim();
+  const parts = loadNumber ? [loadNumber, origin] : [origin, broker];
+  const label = parts.filter(Boolean).join(" · ");
+  return label || "Untitled load sheet";
 }
 
 /**
@@ -197,9 +203,7 @@ export default function EditLoadsheetModal({
         lastHydratedKeyRef.current = hydrateKey;
         const slot = scheduleSlotRow;
         liveSyncReadyRef.current = false;
-        setLoadNumber(
-          slot.load_number != null ? String(slot.load_number) : "",
-        );
+        setLoadNumber(slot.load_number != null ? String(slot.load_number) : "");
         setOrigin(slot.origin != null ? String(slot.origin) : "");
         setEndUser(slot.end_user != null ? String(slot.end_user) : "");
         setMt(slot.mt != null ? String(slot.mt) : "");
@@ -331,7 +335,6 @@ export default function EditLoadsheetModal({
       if (!scheduleLoadId && !selectedId) return { error: null };
 
       const num = (overrides.loadNumber ?? loadNumber).trim();
-      if (!scheduleLoadId && !num) return { error: null };
 
       const values = {
         loadNumber: num,
@@ -389,7 +392,7 @@ export default function EditLoadsheetModal({
       }
 
       const sheetUpdate = {
-        load_number: values.loadNumber,
+        load_number: nullIfEmpty(values.loadNumber),
         origin: nullIfEmpty(values.origin),
         end_user: nullIfEmpty(values.endUser),
         mt: nullIfEmpty(values.mt),
@@ -476,7 +479,11 @@ export default function EditLoadsheetModal({
   );
 
   useEffect(() => {
-    if (!open || (!selectedId && !scheduleLoadId) || !liveSyncReadyRef.current) {
+    if (
+      !open ||
+      (!selectedId && !scheduleLoadId) ||
+      !liveSyncReadyRef.current
+    ) {
       return;
     }
 
@@ -645,11 +652,6 @@ export default function EditLoadsheetModal({
         alert("Choose which load sheet to edit.");
         return;
       }
-      const num = loadNumber.trim();
-      if (!num) {
-        alert("Load number is required.");
-        return;
-      }
     }
     if (scheduleLoadId) {
       if (!(await confirm(saveChangesConfirmOptions("this schedule slot")))) {
@@ -778,7 +780,7 @@ export default function EditLoadsheetModal({
             >
               <option value="">Select a load sheet…</option>
               {loadSheets.map((s) => {
-                const label = String(s.load_number ?? "").trim() || s.id;
+                const label = loadSheetOptionLabel(s);
                 return (
                   <option key={s.id} value={s.id}>
                     {s.invoiced ? `${label} (invoiced)` : label}
@@ -798,19 +800,16 @@ export default function EditLoadsheetModal({
           ) : null}
           <FieldWithTextColor
             label="Load number"
-            required={!scheduleLoadId}
             fieldKey="load_number"
             colors={fieldTextColors}
             onColorChange={setFieldColor}
             showColor={showFieldColors}
-            disabled={fieldLocked()}
           >
             <input
               className={inputClass}
               value={loadNumber}
               onChange={(e) => setLoadNumber(e.target.value)}
               placeholder="e.g. 1042"
-              required={!scheduleLoadId}
               disabled={fieldLocked()}
               style={
                 showFieldColors && fieldTextColors.load_number
@@ -862,24 +861,24 @@ export default function EditLoadsheetModal({
             />
           </FieldWithTextColor>
           {!scheduleLoadId ? (
-          <label className="block text-sm font-medium">
-            Load type
-            <select
-              className={selectClass}
-              value={loadCategory}
-              disabled={fieldLocked()}
-              onChange={(e) => handleLoadCategoryChange(e.target.value)}
-            >
-              {loadCategory === "legacy_flat" ? (
-                <option value="legacy_flat">Legacy flat (rate × FSC)</option>
-              ) : null}
-              {LOAD_CATEGORIES.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.label}
-                </option>
-              ))}
-            </select>
-          </label>
+            <label className="block text-sm font-medium">
+              Load type
+              <select
+                className={selectClass}
+                value={loadCategory}
+                disabled={fieldLocked()}
+                onChange={(e) => handleLoadCategoryChange(e.target.value)}
+              >
+                {loadCategory === "legacy_flat" ? (
+                  <option value="legacy_flat">Legacy flat (rate × FSC)</option>
+                ) : null}
+                {LOAD_CATEGORIES.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+            </label>
           ) : null}
           <div
             className={`grid gap-3 ${fieldRules.showMt ? "grid-cols-2" : "grid-cols-1"}`}
@@ -1109,7 +1108,9 @@ export default function EditLoadsheetModal({
                 <ButtonDark
                   type="submit"
                   text={saving ? "Saving…" : "Done"}
-                  disabled={!scheduleLoadId && (!selectedId || loadSheets.length === 0)}
+                  disabled={
+                    !scheduleLoadId && (!selectedId || loadSheets.length === 0)
+                  }
                 />
               ) : null}
             </div>
