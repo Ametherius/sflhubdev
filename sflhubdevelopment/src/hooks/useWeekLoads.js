@@ -2,7 +2,7 @@
 
 import { createClient } from "@/lib/supabase/client";
 import { getAuthUser } from "@/lib/supabase/authUser";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePostgresRealtime } from "./usePostgresRealtime";
 
 const LOAD_SELECT_MODERN =
@@ -75,10 +75,17 @@ function mergeLoadSlotsBySlotIndex(loadRows, slotRows) {
 /**
  * @returns {[Array, () => Promise<void>, { ready: boolean, legacySlotIndex: boolean }]}
  */
-export function useWeekLoads(weekId) {
-  const [loads, setLoads] = useState([]);
-  const [ready, setReady] = useState(false);
+export function useWeekLoads(weekId, initial = null) {
+  const seededWeekId =
+    initial?.weekId && weekId && String(initial.weekId) === String(weekId)
+      ? weekId
+      : null;
+  const [loads, setLoads] = useState(
+    seededWeekId ? (initial.loads ?? []) : [],
+  );
+  const [ready, setReady] = useState(Boolean(seededWeekId || !weekId));
   const [legacySlotIndex, setLegacySlotIndex] = useState(false);
+  const fetchedWeekRef = useRef(seededWeekId);
   const supabase = useMemo(() => createClient(), []);
 
   const refreshLoads = useCallback(async () => {
@@ -304,10 +311,16 @@ export function useWeekLoads(weekId) {
   const loadsFilter = weekId ? `week_id=eq.${weekId}` : undefined;
 
   useEffect(() => {
+    if (!weekId) {
+      fetchedWeekRef.current = null;
+      return;
+    }
+    if (fetchedWeekRef.current === weekId) return;
+    fetchedWeekRef.current = weekId;
     queueMicrotask(() => {
       void refreshLoads();
     });
-  }, [refreshLoads]);
+  }, [weekId, refreshLoads]);
 
   usePostgresRealtime(
     supabase,

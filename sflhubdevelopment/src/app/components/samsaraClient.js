@@ -15,7 +15,7 @@ import DispatchModal from "./dispatchModal";
 import { useState, useEffect } from "react";
 import { FaList } from "react-icons/fa";
 import ButtonDark from "./buttonDark";
-import { getData, patchData, postData } from "@/lib/samsaraAPI";
+import { getData, postData } from "@/lib/samsaraAPI";
 
 function mapUnits(vehicles, stats) {
   const statsById = new Map(
@@ -44,7 +44,7 @@ export default function SamsaraClient({
   addresses,
 }) {
   const [units, setUnits] = useState(initialUnits ?? []);
-  const [open, setOpen] = useState("false");
+  const [dispatchModalOpen, setDispatchModalOpen] = useState("false");
   const [selectedUser, setSelectedUSer] = useState("");
   const [origin, setOrigin] = useState("");
   const [endUser, setEndUser] = useState("");
@@ -52,6 +52,8 @@ export default function SamsaraClient({
   const [endUserArrivalTime, setEndUserArrivalTime] = useState("");
   const [originNotes, setOriginNotes] = useState("");
   const [endUserNotes, setEndUserNotes] = useState("");
+  const [dispatchID, setDispatchID] = useState("");
+  const [loadNotes, setLoadNotes] = useState("");
 
   useEffect(() => {
     const id = setInterval(async () => {
@@ -76,10 +78,14 @@ export default function SamsaraClient({
       return;
     }
 
+    const currentDate = new Date();
+    console.log(currentDate);
+
     const created = await postData("fleet/routes", {
-      name: "Dispatch",
+      name: String(dispatchID),
       driverId: String(selectedUser),
       settings: { routeStartingCondition: "arriveFirstStop" },
+      notes: String(loadNotes),
       stops: [
         {
           name: "Origin",
@@ -96,13 +102,6 @@ export default function SamsaraClient({
       ],
     });
 
-    const routeId = created?.data?.id;
-    if (routeId) {
-      await patchData(`fleet/routes/${routeId}`, {
-        name: `Dispatch-${routeId}`,
-      });
-    }
-
     setEndUser("");
     setOrigin("");
     setSelectedUSer("");
@@ -110,7 +109,21 @@ export default function SamsaraClient({
     setEndUserArrivalTime("");
     setEndUserNotes("");
     setOriginNotes("");
-    setOpen("false");
+    setDispatchModalOpen("false");
+  }
+
+  function generateUUID() {
+    const chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    const bytes = new Uint8Array(8);
+    crypto.getRandomValues(bytes);
+
+    return Array.from(bytes, (b) => chars[b % chars.length]).join("");
+  }
+
+  function openDispatchModal() {
+    const dispatchId = generateUUID();
+    setDispatchID(dispatchId);
+    setDispatchModalOpen(!dispatchModalOpen);
   }
 
   const defaultCenter =
@@ -120,98 +133,124 @@ export default function SamsaraClient({
   return (
     <div className="flex min-h-0 h-full w-full flex-1 overflow-hidden">
       <DispatchModal
-        className={`absolute w-96 p-5 top-1/2 left-1/2 transform -translate-y-1/2 bg-white rounded-xl z-10 shadow-xl ${open ? "hidden" : ""}`}
+        className={`absolute p-5 top-1/2 left-1/2 transform -translate-y-1/2 -translate-x-1/2 bg-white rounded-xl z-10 shadow-xl cursor-pointer ${dispatchModalOpen ? "hidden" : ""}`}
       >
         <div className="text-center font-bold text-2xl text-green-950 mb-2 underline px-2">
           <h1>Create Dispatch</h1>
         </div>
         <div>
           <form>
+            <div className="grid grid-cols-2">
+              <div className="flex flex-col m-1">
+                <label className="text-green-950">Select Driver</label>
+                <select
+                  value={selectedUser}
+                  onChange={(e) => setSelectedUSer(e.target.value)}
+                  className={inputStyle}
+                >
+                  <option value="">Please Choose Driver</option>
+                  {drivers?.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex flex-col m-1">
+                <label className="text-green-950">Dispatch ID</label>
+                <input
+                  type="text"
+                  value={dispatchID}
+                  className={inputStyle}
+                  onChange={(e) => setDispatchID(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="border-2 border-green-950 rounded-lg my-4 p-3">
+                <div className="flex flex-col m-1">
+                  <label className="text-green-950">Arrival Time</label>
+                  <input
+                    className={inputStyle}
+                    type="datetime-local"
+                    value={originArrivalTime}
+                    onChange={(e) => setOriginArrivalTime(e.target.value)}
+                  />
+                </div>
+                <div className="flex flex-col m-1">
+                  <label className="text-green-950">Origin</label>
+                  <select
+                    value={origin}
+                    onChange={(e) => setOrigin(e.target.value)}
+                    className={inputStyle}
+                  >
+                    <option value="">Select Origin</option>
+                    {addresses.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex flex-col m-1">
+                  <label className="text-green-950">Origin Notes</label>
+                  <textarea
+                    value={originNotes}
+                    onChange={(e) => setOriginNotes(e.target.value)}
+                    className={inputStyle}
+                  ></textarea>
+                </div>
+              </div>
+              <div className="border-2 border-green-950 rounded-lg my-4 p-3">
+                <div className="flex flex-col m-1">
+                  <label className="text-green-950">End User Time</label>
+                  <input
+                    type="datetime-local"
+                    value={endUserArrivalTime}
+                    onChange={(e) => setEndUserArrivalTime(e.target.value)}
+                    className={inputStyle}
+                  />
+                </div>
+                <div className="flex flex-col m-1">
+                  <label className="text-green-950">End User</label>
+                  <select
+                    value={endUser}
+                    onChange={(e) => setEndUser(e.target.value)}
+                    className={inputStyle}
+                  >
+                    <option value="">Select End User</option>
+                    {addresses.map((a) => (
+                      <option value={a.id} key={a.id}>
+                        {a.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex flex-col m-1">
+                  <label className="text-green-950">End User Notes</label>
+                  <textarea
+                    value={endUserNotes}
+                    onChange={(e) => setEndUserNotes(e.target.value)}
+                    className={inputStyle}
+                  ></textarea>
+                </div>
+              </div>
+            </div>
+
             <div className="flex flex-col m-1">
-              <label className="text-green-950">Select Driver</label>
-              <select
-                value={selectedUser}
-                onChange={(e) => setSelectedUSer(e.target.value)}
+              <label className="text-green-950">Load Notes</label>
+              <textarea
                 className={inputStyle}
-              >
-                <option value="">Please Choose Driver</option>
-                {drivers?.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="border-2 border-green-950 rounded-lg my-4 p-3">
-              <div className="flex flex-col m-1">
-                <label className="text-green-950">Arrival Time</label>
-                <input
-                  className={inputStyle}
-                  type="datetime-local"
-                  value={originArrivalTime}
-                  onChange={(e) => setOriginArrivalTime(e.target.value)}
-                />
-              </div>
-              <div className="flex flex-col m-1">
-                <label className="text-green-950">Origin</label>
-                <select
-                  value={origin}
-                  onChange={(e) => setOrigin(e.target.value)}
-                  className={inputStyle}
-                >
-                  <option value="">Select Origin</option>
-                  {addresses.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex flex-col m-1">
-                <label className="text-green-950">Origin Notes</label>
-                <textarea
-                  value={originNotes}
-                  onChange={(e) => setOriginNotes(e.target.value)}
-                  className={inputStyle}
-                ></textarea>
-              </div>
-            </div>
-            <div className="border-2 border-green-950 rounded-lg my-4 p-3">
-              <div className="flex flex-col m-1">
-                <label className="text-green-950">Arrival Time</label>
-                <input
-                  type="datetime-local"
-                  value={endUserArrivalTime}
-                  onChange={(e) => setEndUserArrivalTime(e.target.value)}
-                  className={inputStyle}
-                />
-              </div>
-              <div className="flex flex-col m-1">
-                <label className="text-green-950">End User</label>
-                <select
-                  value={endUser}
-                  onChange={(e) => setEndUser(e.target.value)}
-                  className={inputStyle}
-                >
-                  <option value="">Select End User</option>
-                  {addresses.map((a) => (
-                    <option value={a.id} key={a.id}>
-                      {a.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex flex-col m-1">
-                <label className="text-green-950">End User Notes</label>
-                <textarea
-                  value={endUserNotes}
-                  onChange={(e) => setEndUserNotes(e.target.value)}
-                  className={inputStyle}
-                ></textarea>
-              </div>
+                value={loadNotes}
+                onChange={(e) => setLoadNotes(e.target.value)}
+              ></textarea>
             </div>
             <div className="flex justify-center">
               <ButtonDark text="Send Dispatch" onClick={sendDispatch} />
+              <ButtonDark
+                text="Close"
+                onClick={() => setDispatchModalOpen("false")}
+              />
             </div>
           </form>
         </div>
@@ -237,7 +276,7 @@ export default function SamsaraClient({
         <div className="absolute top-2 left-16 z-10">
           <BtnWhite
             text="Create Dispatch"
-            onClick={() => setOpen(!open)}
+            onClick={() => openDispatchModal()}
             Icon={FaList}
           />
         </div>

@@ -7,7 +7,7 @@ import {
 } from "@/lib/scheduleAssignmentDisplay";
 import { compareAssignedRows } from "@/lib/divisionSort";
 import { weekAcceptsNewAssignments } from "@/lib/weekDates";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePostgresRealtime } from "./usePostgresRealtime";
 
 const ASSIGNMENT_SELECT =
@@ -20,9 +20,19 @@ export function useWeekAssignments(
   weekId,
   liveAssigned = [],
   weekStartISO = null,
+  initial = null,
 ) {
-  const [snapshots, setSnapshots] = useState([]);
-  const [excludedInUseIds, setExcludedInUseIds] = useState(() => new Set());
+  const seededWeekId =
+    initial?.weekId && weekId && String(initial.weekId) === String(weekId)
+      ? weekId
+      : null;
+  const [snapshots, setSnapshots] = useState(
+    seededWeekId ? (initial.snapshots ?? []) : [],
+  );
+  const [excludedInUseIds, setExcludedInUseIds] = useState(
+    () => new Set(seededWeekId ? (initial.exclusions ?? []) : []),
+  );
+  const fetchedWeekRef = useRef(seededWeekId);
   const supabase = useMemo(() => createClient(), []);
 
   const refreshSnapshots = useCallback(async () => {
@@ -83,8 +93,14 @@ export function useWeekAssignments(
   }, [refreshSnapshots, refreshExclusions]);
 
   useEffect(() => {
+    if (!weekId) {
+      fetchedWeekRef.current = null;
+      return;
+    }
+    if (fetchedWeekRef.current === weekId) return;
+    fetchedWeekRef.current = weekId;
     void refreshAll();
-  }, [refreshAll]);
+  }, [weekId, refreshAll]);
 
   usePostgresRealtime(
     supabase,

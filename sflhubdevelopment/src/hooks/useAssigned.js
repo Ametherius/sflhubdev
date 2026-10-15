@@ -1,14 +1,15 @@
 "use client";
 import { createClient } from "@/lib/supabase/client";
 import { getAuthUser } from "@/lib/supabase/authUser";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePostgresRealtime } from "./usePostgresRealtime";
 
 const ASSIGN_SELECT =
   "id, driverid, unitid, driver: driverid (id, name, phone, user, pass, pin, division), unit: unitid (id, unit, petro, petroPIN, ufa, ufaPIN)";
 
-export function useAssigned() {
-  const [assignedUnits, setAssignedUnits] = useState([]);
+export function useAssigned(initialAssigned) {
+  const [assignedUnits, setAssignedUnits] = useState(initialAssigned ?? []);
+  const seededRef = useRef(Array.isArray(initialAssigned));
   const supabase = useMemo(() => createClient(), []);
 
   const refreshAssigned = useCallback(async () => {
@@ -28,7 +29,10 @@ export function useAssigned() {
   }, [supabase]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- async fetch updates state in refreshAssigned
+    if (seededRef.current) {
+      seededRef.current = false;
+      return;
+    }
     void refreshAssigned();
   }, [refreshAssigned]);
 

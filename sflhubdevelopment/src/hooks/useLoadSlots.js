@@ -2,7 +2,7 @@
 
 import { createClient } from "@/lib/supabase/client";
 import { getAuthUser } from "@/lib/supabase/authUser";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePostgresRealtime } from "./usePostgresRealtime";
 
 // Schedule uses exactly three loads per day (see ensure_schedule_loads_for_week limit 3).
@@ -29,9 +29,11 @@ function isMissingSortOrderColumn(message) {
   return /\bsort_order\b/i.test(message ?? "") && /does not exist/i.test(message ?? "");
 }
 
-export function useLoadSlots() {
-  const [slots, setSlots] = useState([]);
-  const [slotsTableAvailable, setSlotsTableAvailable] = useState(false);
+export function useLoadSlots(initialSlots) {
+  const seeded = Array.isArray(initialSlots);
+  const [slots, setSlots] = useState(initialSlots ?? []);
+  const [slotsTableAvailable, setSlotsTableAvailable] = useState(seeded);
+  const seededRef = useRef(seeded);
   const supabase = useMemo(() => createClient(), []);
 
   const refreshSlots = useCallback(async () => {
@@ -86,8 +88,11 @@ export function useLoadSlots() {
   }, [supabase]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- async fetch updates state in refreshSlots
-    void refreshSlots();
+    if (seededRef.current) {
+      seededRef.current = false;
+    } else {
+      void refreshSlots();
+    }
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(() => {

@@ -3,11 +3,12 @@
 import { createClient } from "@/lib/supabase/client";
 import { getAuthUser } from "@/lib/supabase/authUser";
 import { normalizeRpcUuid } from "@/lib/scheduleLoadsPersist";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePostgresRealtime } from "./usePostgresRealtime";
 
-export function useScheduleWeeks() {
-  const [weeks, setWeeks] = useState([]);
+export function useScheduleWeeks(initialWeeks) {
+  const [weeks, setWeeks] = useState(initialWeeks ?? []);
+  const seededRef = useRef(Array.isArray(initialWeeks));
   const supabase = useMemo(() => createClient(), []);
 
   const refreshWeeks = useCallback(async () => {
@@ -59,8 +60,10 @@ export function useScheduleWeeks() {
   );
 
   useEffect(() => {
-    // Mount / client auth: load weeks from Supabase
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- async fetch updates state in refreshWeeks
+    if (seededRef.current) {
+      seededRef.current = false;
+      return;
+    }
     void refreshWeeks();
   }, [refreshWeeks]);
 
