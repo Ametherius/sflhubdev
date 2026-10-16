@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FaTimes } from "react-icons/fa";
 import ButtonDark from "./buttonDark";
+import { parseISODateLocal } from "@/lib/weekDates";
 import {
   DEFAULT_LOAD_CATEGORY,
   LOAD_CATEGORIES,
@@ -55,6 +56,7 @@ export default function EditLoadsheetModal({
   open,
   onClose,
   loadSheets = [],
+  weeks = [],
   /** Pre-select this sheet when opening from a slot that already has loadsheet_id */
   initialLoadsheetId = null,
   /** When set (opened from a grid slot), offer "remove from this slot" for schedule_loads */
@@ -89,6 +91,7 @@ export default function EditLoadsheetModal({
   const [fsc, setFsc] = useState("");
   const [broker, setBroker] = useState("");
   const [kms, setKms] = useState("");
+  const [weekStart, setWeekStart] = useState("");
   const [loadCategory, setLoadCategory] = useState(DEFAULT_LOAD_CATEGORY);
   const [usdCadRate, setUsdCadRate] = useState("");
   const [fetchingFx, setFetchingFx] = useState(false);
@@ -243,6 +246,7 @@ export default function EditLoadsheetModal({
       setUsdCadRate("");
       setInvoiced(false);
       setFieldTextColors({});
+
       return;
     }
 
@@ -313,6 +317,7 @@ export default function EditLoadsheetModal({
       );
       setKms(selected.kms != null ? String(selected.kms) : "");
       setInvoiced(Boolean(selected.invoiced));
+      setWeekStart(String(selected.week_start ?? "").slice(0, 10));
       setFieldTextColors({});
     }
 
@@ -349,6 +354,7 @@ export default function EditLoadsheetModal({
         usdCadRate: overrides.usdCadRate ?? usdCadRate,
         invoiced:
           overrides.invoiced !== undefined ? overrides.invoiced : invoiced,
+        week_start: overrides.weekStart ?? weekStart,
       };
 
       const cat = normalizeLoadCategory(values.loadCategory, false);
@@ -403,6 +409,7 @@ export default function EditLoadsheetModal({
         usd_cad_rate: nullIfEmpty(values.usdCadRate),
         flat_rate: cat === "legacy_flat",
         kms: nullIfEmpty(values.kms),
+        week_start: nullIfEmpty(values.weekStart),
         invoiced: values.invoiced,
       };
 
@@ -434,6 +441,7 @@ export default function EditLoadsheetModal({
       invoiced,
       fieldTextColors,
       scheduleLoadId,
+      weekStart,
       supabase,
       onSaved,
       onScheduleUpdated,
@@ -507,6 +515,7 @@ export default function EditLoadsheetModal({
     fsc,
     broker,
     kms,
+    weekStart,
     loadCategory,
     usdCadRate,
     fieldTextColors,
@@ -618,6 +627,7 @@ export default function EditLoadsheetModal({
         fsc: nullIfEmpty(fsc),
         broker: nullIfEmpty(broker),
         kms: nullIfEmpty(kms),
+        week_start: nullIfEmpty(weekStart),
         load_category: loadCategoryStorageValue(
           normalizeLoadCategory(loadCategory, false),
         ),
@@ -746,6 +756,36 @@ export default function EditLoadsheetModal({
             ? "Edits this schedule slot only. The load sheet library template is not changed."
             : "Updates the saved template in your library."}
         </p>
+
+        {!scheduleLoadId ? (
+          <label className="block text-sm font-medium">
+            Week
+            <select
+              className={selectClass}
+              value={weekStart}
+              disabled={fieldLocked()}
+              onChange={(e) => setWeekStart(e.target.value)}
+            >
+              {weeks.map((w) => {
+                const value = String(w.week_start_date).slice(0, 10);
+                return (
+                  <option key={w.id} value={value}>
+                    Week of{" "}
+                    {parseISODateLocal(w.week_start_date).toLocaleDateString(
+                      undefined,
+                      {
+                        weekday: "short",
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      },
+                    )}
+                  </option>
+                );
+              })}
+            </select>
+          </label>
+        ) : null}
 
         {scheduleLoadId && !readOnly ? (
           <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950">

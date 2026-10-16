@@ -767,6 +767,7 @@ export default function UnitWeekLoadsGrid({
         initialSlotId={assignTarget?.initialSlotId ?? null}
         onAssigned={onUpdated}
         onLoadPatched={onLoadPatched}
+        onLoadSheetsUpdated={onLoadSheetsUpdated}
       />
       <EditLoadsheetModal
         open={editLoadsheetTarget != null}

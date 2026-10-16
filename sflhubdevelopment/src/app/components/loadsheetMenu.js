@@ -3,7 +3,10 @@ import { FaCopy, FaEdit, FaTimes } from "react-icons/fa";
 import BtnRed from "./btnRed";
 import ButtonDark from "./buttonDark";
 import BtnWhiteRounded from "./btnWhiteRound";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { parseISODateLocal } from "@/lib/weekDates";
+
+const ALL_WEEKS = "";
 
 export default function LoadsheetMenu({
   loadsheets,
@@ -11,9 +14,20 @@ export default function LoadsheetMenu({
   onEdit,
   onDelete,
   onCopy,
+  weeks = [],
+  weekStart = null,
 }) {
   const [query, setQuery] = useState("");
   const [endUserQuery, setEndUserQuery] = useState("");
+  const [selectedWeekStart, setSelectedWeekStart] = useState(() =>
+    String(weekStart ?? "").slice(0, 10),
+  );
+
+  useEffect(() => {
+    const next = String(weekStart ?? "").slice(0, 10);
+    setSelectedWeekStart((prev) => (prev === ALL_WEEKS ? prev : next));
+  }, [weekStart]);
+
   const searchLoadsheets = loadsheets.filter((l) => {
     const originMatch = String(l.origin ?? "")
       .toLowerCase()
@@ -21,7 +35,10 @@ export default function LoadsheetMenu({
     const endUserMatch = String(l.end_user ?? "")
       .toLowerCase()
       .includes(endUserQuery.toLowerCase());
-    return originMatch && endUserMatch;
+    const sheetWeek = String(l.week_start ?? "").slice(0, 10);
+    const weekMatch =
+      !selectedWeekStart || sheetWeek === selectedWeekStart;
+    return originMatch && endUserMatch && weekMatch;
   });
 
   const showActions =
@@ -32,6 +49,30 @@ export default function LoadsheetMenu({
 
   return (
     <div className="mt-10 w-full flex flex-col">
+      <select
+        value={selectedWeekStart}
+        onChange={(e) => setSelectedWeekStart(e.target.value)}
+        className="border-2 border-green-950 p-2 text-green-950 rounded-md mb-3"
+      >
+        <option value={ALL_WEEKS}>All loadsheets</option>
+        {weeks.map((w) => {
+          const value = String(w.week_start_date).slice(0, 10);
+          return (
+            <option key={w.id} value={value}>
+              Week of{" "}
+              {parseISODateLocal(w.week_start_date).toLocaleDateString(
+                undefined,
+                {
+                  weekday: "short",
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                },
+              )}
+            </option>
+          );
+        })}
+      </select>
       <input
         type="search"
         value={query}

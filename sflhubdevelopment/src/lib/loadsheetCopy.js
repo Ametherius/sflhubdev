@@ -120,19 +120,36 @@ export function nextCopyLoadNumber(sourceLoadNumber, allSheets) {
   return `${root}-${maxSuffix + 1}`;
 }
 
-/** Insert a duplicate loadsheet row with the next -N load number suffix. */
-export async function insertLoadsheetCopy(supabase, sourceSheet, allSheets) {
+/**
+ * Insert a duplicate loadsheet row with the next -N load number suffix.
+ * @param {{ weekStart?: string, allowMissingLoadNumber?: boolean }} [options]
+ */
+export async function insertLoadsheetCopy(
+  supabase,
+  sourceSheet,
+  allSheets,
+  options = {},
+) {
   const num = strTrim(sourceSheet?.load_number);
-  if (!num) {
-    return { data: null, error: { message: "Load number is required to copy." } };
-  }
-  const newNum = nextCopyLoadNumber(num, allSheets);
-  if (!newNum) {
+  let newNum = null;
+  if (num) {
+    newNum = nextCopyLoadNumber(num, allSheets);
+    if (!newNum) {
+      return {
+        data: null,
+        error: { message: "Could not determine a copy load number." },
+      };
+    }
+  } else if (!options.allowMissingLoadNumber) {
     return {
       data: null,
-      error: { message: "Could not determine a copy load number." },
+      error: { message: "Load number is required to copy." },
     };
   }
+
+  const weekStart = nullIfEmpty(
+    String(options.weekStart ?? sourceSheet?.week_start ?? "").slice(0, 10),
+  );
 
   return supabase
     .from("loadsheets")
@@ -152,8 +169,11 @@ export async function insertLoadsheetCopy(supabase, sourceSheet, allSheets) {
       ),
       usd_cad_rate: nullIfEmpty(sourceSheet.usd_cad_rate),
       kms: nullIfEmpty(sourceSheet.kms),
+      week_start: weekStart,
       invoiced: false,
     })
-    .select("id")
+    .select(
+      "id, load_number, origin, end_user, mt, rate, fsc, broker, invoiced, flat_rate, kms, load_category, usd_cad_rate, week_start",
+    )
     .single();
 }

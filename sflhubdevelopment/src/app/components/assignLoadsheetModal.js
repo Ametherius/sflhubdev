@@ -13,6 +13,7 @@ import {
 import {
   buildScheduleLoadNote,
   buildScheduleLoadPayload,
+  insertLoadsheetCopy,
 } from "@/lib/loadsheetCopy";
 import {
   persistScheduleLoad,
@@ -166,6 +167,7 @@ export default function AssignLoadsheetModal({
   initialSlotId = null,
   onAssigned,
   onLoadPatched,
+  onLoadSheetsUpdated,
 }) {
   const supabase = useMemo(() => createClient(), []);
   const [loadsheetId, setLoadsheetId] = useState("");
@@ -476,11 +478,30 @@ export default function AssignLoadsheetModal({
       })()
     : null;
 
+  async function sheetForAssignWeek() {
+    const thisWeek = isoDateKey(weekStartISO);
+    const sheetWeek = isoDateKey(selectedSheet?.week_start);
+    if (!selectedSheet) return { sheet: null, error: null };
+    if (!thisWeek || !sheetWeek || sheetWeek === thisWeek) {
+      return { sheet: selectedSheet, error: null };
+    }
+    const { data, error } = await insertLoadsheetCopy(
+      supabase,
+      selectedSheet,
+      loadsheets,
+      { weekStart: thisWeek, allowMissingLoadNumber: true },
+    );
+    if (error) return { sheet: null, error };
+    await onLoadSheetsUpdated?.();
+    return { sheet: { ...selectedSheet, ...data }, error: null };
+  }
+
   async function persistToCell(
     targetDayIso,
     targetUnitId,
     targetSlotId,
     targetAssignmentId = null,
+    sheet = selectedSheet,
   ) {
     const dk = isoDateKey(targetDayIso);
     const row = findScheduleRowForCell(weekLoadsForLookup, dk, targetSlotId, {
@@ -488,20 +509,20 @@ export default function AssignLoadsheetModal({
       scheduleAssignmentId: targetAssignmentId,
     });
 
-    const calc = calcOptionsFromSheet(selectedSheet);
+    const calc = calcOptionsFromSheet(sheet);
     const payload = buildScheduleLoadPayload({
-      loadsheetId: selectedSheet.id,
-      loadNumber: selectedSheet.load_number,
-      origin: selectedSheet.origin,
-      endUser: selectedSheet.end_user,
-      mt: selectedSheet.mt,
-      rate: selectedSheet.rate,
-      fsc: selectedSheet.fsc,
-      broker: selectedSheet.broker,
+      loadsheetId: sheet.id,
+      loadNumber: sheet.load_number,
+      origin: sheet.origin,
+      endUser: sheet.end_user,
+      mt: sheet.mt,
+      rate: sheet.rate,
+      fsc: sheet.fsc,
+      broker: sheet.broker,
       flatRate: calc.flatRate,
       loadCategory: calc.loadCategory,
       usdCadRate: calc.usdCadRate,
-      kms: selectedSheet.kms,
+      kms: sheet.kms,
       invoiced: false,
     });
 
@@ -553,6 +574,12 @@ export default function AssignLoadsheetModal({
         return;
       }
       setSaving(true);
+      const { sheet: assignSheet, error: copyError } = await sheetForAssignWeek();
+      if (copyError || !assignSheet) {
+        setSaving(false);
+        alert(copyError?.message ?? "Could not copy load sheet for this week.");
+        return;
+      }
       let applied = 0;
       let lastError = null;
 
@@ -577,6 +604,7 @@ export default function AssignLoadsheetModal({
               unitRow?.inUseUnitId ?? null,
               sid,
               unitRow?.scheduleAssignmentId ?? null,
+              assignSheet,
             );
             if (error) {
               lastError = error;
@@ -629,11 +657,18 @@ export default function AssignLoadsheetModal({
       return;
     }
     setSaving(true);
+    const { sheet: assignSheet, error: copyError } = await sheetForAssignWeek();
+    if (copyError || !assignSheet) {
+      setSaving(false);
+      alert(copyError?.message ?? "Could not copy load sheet for this week.");
+      return;
+    }
     const { data, error } = await persistToCell(
       dayIso,
       inUseUnitId,
       slotId,
       scheduleAssignmentId,
+      assignSheet,
     );
     setSaving(false);
     if (error) {

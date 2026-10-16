@@ -1293,6 +1293,8 @@ export default function ScheduleClient({
         open={newLoadsheetModalOpen}
         onClose={() => setNewLoadsheetModalOpen(false)}
         onCreated={refreshLoadSheets}
+        weeks={weeks}
+        weekStart={selectedWeek?.week_start_date}
       />
       <EditLoadsheetModal
         open={editLoadsheetId != null}
@@ -1301,6 +1303,7 @@ export default function ScheduleClient({
         readOnly={readOnly}
         onClose={() => setEditLoadsheetId(null)}
         onSaved={refreshLoadSheets}
+        weeks={weeks}
       />
       <EditDriverModal
         open={editDriver != null}
@@ -1345,11 +1348,13 @@ export default function ScheduleClient({
           </button>
         </div>
         <LoadsheetMenu
+          weeks={weeks}
           loadsheets={loadSheets}
           readOnly={readOnly}
           onEdit={canEdit ? handleEditLoadsheet : undefined}
           onDelete={canEdit ? handleDeleteLoadsheet : undefined}
           onCopy={canEdit ? handleCopyLoadsheet : undefined}
+          weekStart={selectedWeek?.week_start_date}
         />
       </div>
     </div>

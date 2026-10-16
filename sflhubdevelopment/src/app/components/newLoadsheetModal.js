@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { FaTimes } from "react-icons/fa";
 import ButtonDark from "./buttonDark";
+import { parseISODateLocal } from "@/lib/weekDates";
 import {
   DEFAULT_LOAD_CATEGORY,
   LOAD_CATEGORIES,
@@ -26,7 +27,13 @@ function nullIfEmpty(s) {
   return t.length ? t : null;
 }
 
-export default function NewLoadsheetModal({ open, onClose, onCreated }) {
+export default function NewLoadsheetModal({
+  open,
+  onClose,
+  onCreated,
+  weeks = [],
+  weekStart: initialWeekStart = null,
+}) {
   const supabase = useMemo(() => createClient(), []);
   const [broker, setBroker] = useState("");
   const [loadNumber, setLoadNumber] = useState("");
@@ -36,6 +43,7 @@ export default function NewLoadsheetModal({ open, onClose, onCreated }) {
   const [rate, setRate] = useState("");
   const [fsc, setFsc] = useState("");
   const [kms, setKms] = useState("");
+  const [weekStart, setWeekStart] = useState("");
   const [loadCategory, setLoadCategory] = useState(DEFAULT_LOAD_CATEGORY);
   const [usdCadRate, setUsdCadRate] = useState("");
   const [fetchingFx, setFetchingFx] = useState(false);
@@ -53,7 +61,8 @@ export default function NewLoadsheetModal({ open, onClose, onCreated }) {
     setKms("");
     setLoadCategory(DEFAULT_LOAD_CATEGORY);
     setUsdCadRate("");
-  }, [open]);
+    setWeekStart(String(initialWeekStart ?? "").slice(0, 10));
+  }, [open, initialWeekStart]);
 
   const fieldRules = useMemo(
     () => fieldRulesForCategory(loadCategory, false),
@@ -115,6 +124,7 @@ export default function NewLoadsheetModal({ open, onClose, onCreated }) {
       load_category: loadCategoryStorageValue(cat),
       usd_cad_rate: nullIfEmpty(usdCadRate),
       flat_rate: false,
+      week_start: nullIfEmpty(weekStart),
     });
     setSaving(false);
     if (error) {
@@ -176,6 +186,29 @@ export default function NewLoadsheetModal({ open, onClose, onCreated }) {
         </p>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+          <select
+            value={weekStart}
+            onChange={(e) => setWeekStart(e.target.value)}
+            className="border-2 border-green-950 p-2 text-green-950 rounded-md mb-3"
+          >
+            {weeks.map((w) => {
+              const value = String(w.week_start_date).slice(0, 10);
+              return (
+                <option key={w.id} value={value}>
+                  Week of{" "}
+                  {parseISODateLocal(w.week_start_date).toLocaleDateString(
+                    undefined,
+                    {
+                      weekday: "short",
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    },
+                  )}
+                </option>
+              );
+            })}
+          </select>
           <label className="block text-sm font-medium">
             Load type
             <select

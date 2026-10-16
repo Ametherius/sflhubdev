@@ -6,11 +6,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePostgresRealtime } from "./usePostgresRealtime";
 
 const SELECT =
-  "id, load_number, origin, end_user, mt, rate, fsc, broker, invoiced, flat_rate, kms, load_category, usd_cad_rate";
+  "id, load_number, origin, end_user, mt, rate, fsc, broker, invoiced, flat_rate, kms, load_category, usd_cad_rate, week_start";
 const SELECT_LEGACY =
-  "id, load_number, origin, end_user, mt, rate, fsc, broker, invoiced";
+  "id, load_number, origin, end_user, mt, rate, fsc, broker, invoiced, week_start";
 const SELECT_LEGACY_NO_INVOICED =
-  "id, load_number, origin, end_user, mt, rate, fsc, broker";
+  "id, load_number, origin, end_user, mt, rate, fsc, broker, week_start";
 
 export function useLoadSheets() {
   const [sheets, setSheets] = useState([]);
