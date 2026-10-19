@@ -179,21 +179,27 @@ export default function AssignLoadsheetModal({
   const [saving, setSaving] = useState(false);
 
   const loadsheetsByBroker = useMemo(() => {
-    return [...(loadsheets ?? [])].sort((a, b) => {
-      const brokerA = strTrim(a.broker);
-      const brokerB = strTrim(b.broker);
-      if (!brokerA && brokerB) return 1;
-      if (brokerA && !brokerB) return -1;
-      const brokerCmp = brokerA.localeCompare(brokerB, undefined, {
-        sensitivity: "base",
+    const thisWeek = isoDateKey(weekStartISO);
+    return [...(loadsheets ?? [])]
+      .filter((sheet) => {
+        if (!thisWeek) return true;
+        return isoDateKey(sheet.week_start) === thisWeek;
+      })
+      .sort((a, b) => {
+        const brokerA = strTrim(a.broker);
+        const brokerB = strTrim(b.broker);
+        if (!brokerA && brokerB) return 1;
+        if (brokerA && !brokerB) return -1;
+        const brokerCmp = brokerA.localeCompare(brokerB, undefined, {
+          sensitivity: "base",
+        });
+        if (brokerCmp !== 0) return brokerCmp;
+        return strTrim(a.load_number).localeCompare(
+          strTrim(b.load_number),
+          undefined,
+          { numeric: true, sensitivity: "base" },
+        );
       });
-      if (brokerCmp !== 0) return brokerCmp;
-      return strTrim(a.load_number).localeCompare(
-        strTrim(b.load_number),
-        undefined,
-        { numeric: true, sensitivity: "base" },
-      );
-    });
   }, [loadsheets]);
 
   const sortedSlots = useMemo(() => {
@@ -482,14 +488,16 @@ export default function AssignLoadsheetModal({
     const thisWeek = isoDateKey(weekStartISO);
     const sheetWeek = isoDateKey(selectedSheet?.week_start);
     if (!selectedSheet) return { sheet: null, error: null };
-    if (!thisWeek || !sheetWeek || sheetWeek === thisWeek) {
+    // Already a library row for this schedule week — reuse it.
+    if (thisWeek && sheetWeek === thisWeek) {
       return { sheet: selectedSheet, error: null };
     }
+    // Undated sheets and sheets from other weeks get a dated copy for this week.
     const { data, error } = await insertLoadsheetCopy(
       supabase,
       selectedSheet,
       loadsheets,
-      { weekStart: thisWeek, allowMissingLoadNumber: true },
+      { weekStart: thisWeek || null, allowMissingLoadNumber: true },
     );
     if (error) return { sheet: null, error };
     await onLoadSheetsUpdated?.();
@@ -574,7 +582,8 @@ export default function AssignLoadsheetModal({
         return;
       }
       setSaving(true);
-      const { sheet: assignSheet, error: copyError } = await sheetForAssignWeek();
+      const { sheet: assignSheet, error: copyError } =
+        await sheetForAssignWeek();
       if (copyError || !assignSheet) {
         setSaving(false);
         alert(copyError?.message ?? "Could not copy load sheet for this week.");
