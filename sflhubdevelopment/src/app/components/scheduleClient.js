@@ -1334,7 +1334,7 @@ export default function ScheduleClient({
         onCreated={refreshUnits}
       />
       <div
-        className={`w-96 bg-white overflow-y-scroll min-h-full z-50 fixed top-0 right-0 mx-0 p-3 border-2 flex flex-col ${loadsheetMenu ? "" : "hidden"} justify-start items-center`}
+        className={`w-96 bg-white overflow-y-scroll h-full z-50 fixed top-0 right-0 mx-0 p-3 border-2 flex flex-col ${loadsheetMenu ? "" : "hidden"} justify-start items-center`}
       >
         <h2 className="text-green-950 font-bold text-2xl text-center">
           Loadsheets
