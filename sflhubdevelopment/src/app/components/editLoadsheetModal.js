@@ -34,6 +34,7 @@ import {
 import { useConfirm } from "@/context/confirmContext";
 import { saveChangesConfirmOptions } from "@/lib/confirmEdit";
 import { FieldWithTextColor, parseFieldTextColors } from "./fieldWithTextColor";
+import CopyLoadsheetWeekDialog from "./copyLoadsheetWeekDialog";
 
 function nullIfEmpty(s) {
   const t = String(s ?? "").trim();
@@ -99,6 +100,7 @@ export default function EditLoadsheetModal({
   const [fieldTextColors, setFieldTextColors] = useState({});
   const [saving, setSaving] = useState(false);
   const [copying, setCopying] = useState(false);
+  const [copyWeekOpen, setCopyWeekOpen] = useState(false);
   const [unlinking, setUnlinking] = useState(false);
   const liveSyncReadyRef = useRef(false);
   const liveSyncGenRef = useRef(0);
@@ -114,6 +116,7 @@ export default function EditLoadsheetModal({
       setScheduleSlotRow(initialScheduleRow ?? null);
     } else {
       setScheduleSlotRow(null);
+      setCopyWeekOpen(false);
     }
   }, [open, initialScheduleRow]);
 
@@ -603,7 +606,16 @@ export default function EditLoadsheetModal({
     }
   }
 
-  async function handleCopy() {
+  function requestCopy() {
+    if (copying || !selectedId) return;
+    if (!loadNumber.trim()) {
+      alert("Load number is required to copy.");
+      return;
+    }
+    setCopyWeekOpen(true);
+  }
+
+  async function handleCopy(destinationWeekStart) {
     if (copying || !selectedId) return;
     const num = loadNumber.trim();
     if (!num) {
@@ -615,6 +627,10 @@ export default function EditLoadsheetModal({
       alert("Could not determine a copy load number.");
       return;
     }
+    const destination = String(destinationWeekStart ?? weekStart ?? "").slice(
+      0,
+      10,
+    );
     setCopying(true);
     const { data, error } = await supabase
       .from("loadsheets")
@@ -627,7 +643,7 @@ export default function EditLoadsheetModal({
         fsc: nullIfEmpty(fsc),
         broker: nullIfEmpty(broker),
         kms: nullIfEmpty(kms),
-        week_start: nullIfEmpty(weekStart),
+        week_start: nullIfEmpty(destination),
         load_category: loadCategoryStorageValue(
           normalizeLoadCategory(loadCategory, false),
         ),
@@ -650,7 +666,9 @@ export default function EditLoadsheetModal({
     }
     setSelectedId(String(data.id));
     setLoadNumber(newNum);
+    setWeekStart(destination);
     setInvoiced(false);
+    setCopyWeekOpen(false);
     await onSaved?.();
   }
 
@@ -1129,7 +1147,7 @@ export default function EditLoadsheetModal({
                 type="button"
                 className="rounded-lg border border-green-950/30 bg-white px-3 py-2 text-sm font-semibold text-green-950 hover:bg-green-950/5 disabled:opacity-50"
                 disabled={fieldLocked() || copying}
-                onClick={() => void handleCopy()}
+                onClick={requestCopy}
               >
                 {copying ? "Copying…" : "Copy load sheet"}
               </button>
@@ -1157,6 +1175,22 @@ export default function EditLoadsheetModal({
           </div>
         </form>
       </div>
+      <CopyLoadsheetWeekDialog
+        open={copyWeekOpen}
+        weeks={weeks}
+        initialWeekStart={weekStart}
+        summary={[loadNumber, origin, endUser]
+          .map((part) => String(part ?? "").trim())
+          .filter(Boolean)
+          .join(" · ")}
+        copying={copying}
+        onCancel={() => {
+          if (!copying) setCopyWeekOpen(false);
+        }}
+        onConfirm={(destinationWeekStart) =>
+          void handleCopy(destinationWeekStart)
+        }
+      />
     </div>
   );
 }

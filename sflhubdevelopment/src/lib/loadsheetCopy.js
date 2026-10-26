@@ -154,7 +154,7 @@ export async function insertLoadsheetCopy(
   return supabase
     .from("loadsheets")
     .insert({
-      load_number: newNum,
+      load_number: nullIfEmpty(newNum),
       origin: nullIfEmpty(sourceSheet.origin),
       end_user: nullIfEmpty(sourceSheet.end_user),
       mt: nullIfEmpty(sourceSheet.mt),

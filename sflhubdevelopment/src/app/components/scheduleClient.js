@@ -143,10 +143,12 @@ export default function ScheduleClient({
     setEditLoadsheetId(sheet.id);
   }
 
-  async function handleCopyLoadsheet(sheet) {
-    if (!sheet?.id || copyingLoadsheetId) return;
+  async function handleCopyLoadsheet(sheet, weekStart) {
+    if (!sheet?.id || copyingLoadsheetId) return false;
     setCopyingLoadsheetId(sheet.id);
-    const { error } = await insertLoadsheetCopy(supabase, sheet, loadSheets);
+    const { error } = await insertLoadsheetCopy(supabase, sheet, loadSheets, {
+      weekStart,
+    });
     setCopyingLoadsheetId(null);
     if (error) {
       if (/does not exist|schema cache|PGRST205/i.test(error.message ?? "")) {
@@ -156,9 +158,10 @@ export default function ScheduleClient({
       } else {
         alert(error.message);
       }
-      return;
+      return false;
     }
     await refreshLoadSheets();
+    return true;
   }
 
   const selectedWeek = useMemo(

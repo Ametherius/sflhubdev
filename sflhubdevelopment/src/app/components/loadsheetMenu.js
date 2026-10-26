@@ -5,6 +5,7 @@ import ButtonDark from "./buttonDark";
 import BtnWhiteRounded from "./btnWhiteRound";
 import { useEffect, useState } from "react";
 import { parseISODateLocal } from "@/lib/weekDates";
+import CopyLoadsheetWeekDialog from "./copyLoadsheetWeekDialog";
 
 const ALL_WEEKS = "";
 
@@ -22,6 +23,8 @@ export default function LoadsheetMenu({
   const [selectedWeekStart, setSelectedWeekStart] = useState(() =>
     String(weekStart ?? "").slice(0, 10),
   );
+  const [copySheet, setCopySheet] = useState(null);
+  const [copying, setCopying] = useState(false);
 
   useEffect(() => {
     const next = String(weekStart ?? "").slice(0, 10);
@@ -29,16 +32,17 @@ export default function LoadsheetMenu({
   }, [weekStart]);
 
   const searchLoadsheets = loadsheets.filter((l) => {
-    const originMatch = String(l.origin ?? "")
-      .toLowerCase()
-      .includes(query.toLowerCase());
-    const endUserMatch = String(l.end_user ?? "")
-      .toLowerCase()
-      .includes(endUserQuery.toLowerCase());
+    const q = query.trim().toLowerCase();
+    const textMatch =
+      !q ||
+      [l.broker, l.origin, l.end_user].some((value) =>
+        String(value ?? "")
+          .toLowerCase()
+          .includes(q),
+      );
     const sheetWeek = String(l.week_start ?? "").slice(0, 10);
-    const weekMatch =
-      !selectedWeekStart || sheetWeek === selectedWeekStart;
-    return originMatch && endUserMatch && weekMatch;
+    const weekMatch = !selectedWeekStart || sheetWeek === selectedWeekStart;
+    return textMatch && weekMatch;
   });
 
   const showActions =
@@ -46,6 +50,27 @@ export default function LoadsheetMenu({
     (typeof onEdit === "function" ||
       typeof onDelete === "function" ||
       typeof onCopy === "function");
+
+  const copySummary = copySheet
+    ? [copySheet.load_number, copySheet.origin, copySheet.end_user]
+        .map((part) => String(part ?? "").trim())
+        .filter(Boolean)
+        .join(" · ")
+    : "";
+
+  async function confirmCopy(destinationWeekStart) {
+    if (!copySheet || copying) return;
+    setCopying(true);
+    try {
+      const ok = await onCopy?.(copySheet, destinationWeekStart);
+      if (ok !== false) {
+        setSelectedWeekStart(String(destinationWeekStart).slice(0, 10));
+        setCopySheet(null);
+      }
+    } finally {
+      setCopying(false);
+    }
+  }
 
   return (
     <div className="mt-10 w-full flex flex-col">
@@ -78,15 +103,9 @@ export default function LoadsheetMenu({
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         className="border-2 border-green-950 p-2 text-green-950 rounded-md mb-3"
-        placeholder="Search Origin..."
+        placeholder="Search Loadsheets..."
       />
-      <input
-        type="search"
-        placeholder="Search End User..."
-        value={endUserQuery}
-        onChange={(e) => setEndUserQuery(e.target.value)}
-        className="border-2 border-green-950 p-2 text-green-950 rounded-md mb-3"
-      />
+
       {searchLoadsheets.map((loadsheet) => (
         <div
           key={loadsheet.id}
@@ -126,7 +145,7 @@ export default function LoadsheetMenu({
                   <BtnWhiteRounded
                     text={<FaCopy />}
                     type="button"
-                    onClick={() => onCopy?.(loadsheet)}
+                    onClick={() => setCopySheet(loadsheet)}
                   />
                 ) : null}
               </div>
@@ -138,6 +157,21 @@ export default function LoadsheetMenu({
           </div>
         </div>
       ))}
+      <CopyLoadsheetWeekDialog
+        open={copySheet != null}
+        weeks={weeks}
+        initialWeekStart={String(
+          copySheet?.week_start ?? weekStart ?? "",
+        ).slice(0, 10)}
+        summary={copySummary}
+        copying={copying}
+        onCancel={() => {
+          if (!copying) setCopySheet(null);
+        }}
+        onConfirm={(destinationWeekStart) =>
+          void confirmCopy(destinationWeekStart)
+        }
+      />
     </div>
   );
 }
