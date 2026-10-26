@@ -19,7 +19,6 @@ export default function LoadsheetMenu({
   weekStart = null,
 }) {
   const [query, setQuery] = useState("");
-  const [endUserQuery, setEndUserQuery] = useState("");
   const [selectedWeekStart, setSelectedWeekStart] = useState(() =>
     String(weekStart ?? "").slice(0, 10),
   );

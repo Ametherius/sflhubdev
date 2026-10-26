@@ -257,7 +257,6 @@ export default function SamsaraClient({
       </DispatchModal>
       <div className="flex min-h-0 w-90 shrink-0 flex-col overflow-y-auto overflow-x-hidden bg-white p-2">
         {units.map((u) => {
-          if (u.driver === null) return;
           return (
             <SamsaraUnit
               key={u.id}

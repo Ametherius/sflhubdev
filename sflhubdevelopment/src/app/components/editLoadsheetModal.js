@@ -608,22 +608,14 @@ export default function EditLoadsheetModal({
 
   function requestCopy() {
     if (copying || !selectedId) return;
-    if (!loadNumber.trim()) {
-      alert("Load number is required to copy.");
-      return;
-    }
     setCopyWeekOpen(true);
   }
 
   async function handleCopy(destinationWeekStart) {
     if (copying || !selectedId) return;
     const num = loadNumber.trim();
-    if (!num) {
-      alert("Load number is required to copy.");
-      return;
-    }
-    const newNum = nextCopyLoadNumber(num, loadSheets);
-    if (!newNum) {
+    const newNum = num ? nextCopyLoadNumber(num, loadSheets) : "";
+    if (num && !newNum) {
       alert("Could not determine a copy load number.");
       return;
     }
@@ -635,7 +627,7 @@ export default function EditLoadsheetModal({
     const { data, error } = await supabase
       .from("loadsheets")
       .insert({
-        load_number: newNum,
+        load_number: nullIfEmpty(newNum),
         origin: nullIfEmpty(origin),
         end_user: nullIfEmpty(endUser),
         mt: nullIfEmpty(mt),

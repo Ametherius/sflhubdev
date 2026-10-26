@@ -121,7 +121,8 @@ export function nextCopyLoadNumber(sourceLoadNumber, allSheets) {
 }
 
 /**
- * Insert a duplicate loadsheet row with the next -N load number suffix.
+ * Insert a duplicate loadsheet row.
+ * A load number is copied with the next -N suffix. A blank load number stays blank.
  * @param {{ weekStart?: string, allowMissingLoadNumber?: boolean }} [options]
  */
 export async function insertLoadsheetCopy(
@@ -140,11 +141,6 @@ export async function insertLoadsheetCopy(
         error: { message: "Could not determine a copy load number." },
       };
     }
-  } else if (!options.allowMissingLoadNumber) {
-    return {
-      data: null,
-      error: { message: "Load number is required to copy." },
-    };
   }
 
   const weekStart = nullIfEmpty(
