@@ -63,7 +63,6 @@ export default function LoadsheetMenu({
     try {
       const ok = await onCopy?.(copySheet, destinationWeekStart);
       if (ok !== false) {
-        setSelectedWeekStart(String(destinationWeekStart).slice(0, 10));
         setCopySheet(null);
       }
     } finally {

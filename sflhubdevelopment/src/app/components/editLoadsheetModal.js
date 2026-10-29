@@ -108,6 +108,7 @@ export default function EditLoadsheetModal({
   const [scheduleSlotRow, setScheduleSlotRow] = useState(null);
   const liveSyncSuppressUntilRef = useRef(0);
   const slotMetaFetchGenRef = useRef(0);
+  const copyingRef = useRef(false);
 
   useEffect(() => {
     if (open) {
@@ -202,6 +203,7 @@ export default function EditLoadsheetModal({
       lastHydratedKeyRef.current = null;
       return;
     }
+    if (copyingRef.current) return;
     if (!selected) {
       if (scheduleLoadId && scheduleSlotRow) {
         const hydrateKey = `slot:${scheduleLoadId}:`;
@@ -236,6 +238,9 @@ export default function EditLoadsheetModal({
         });
         return;
       }
+      liveSyncReadyRef.current = false;
+      liveSyncGenRef.current += 1;
+      if (copying) return;
       lastHydratedKeyRef.current = null;
       setLoadNumber("");
       setOrigin("");
@@ -357,7 +362,6 @@ export default function EditLoadsheetModal({
         usdCadRate: overrides.usdCadRate ?? usdCadRate,
         invoiced:
           overrides.invoiced !== undefined ? overrides.invoiced : invoiced,
-        week_start: overrides.weekStart ?? weekStart,
       };
 
       const cat = normalizeLoadCategory(values.loadCategory, false);
@@ -412,9 +416,12 @@ export default function EditLoadsheetModal({
         usd_cad_rate: nullIfEmpty(values.usdCadRate),
         flat_rate: cat === "legacy_flat",
         kms: nullIfEmpty(values.kms),
-        week_start: nullIfEmpty(values.weekStart),
         invoiced: values.invoiced,
       };
+
+      if (overrides.includeWeek) {
+        sheetUpdate.week_start = nullIfEmpty(values.weekStart);
+      }
 
       const { error } = await supabase
         .from("loadsheets")
@@ -518,7 +525,6 @@ export default function EditLoadsheetModal({
     fsc,
     broker,
     kms,
-    weekStart,
     loadCategory,
     usdCadRate,
     fieldTextColors,
@@ -612,6 +618,10 @@ export default function EditLoadsheetModal({
   }
 
   async function handleCopy(destinationWeekStart) {
+    liveSyncReadyRef.current = false;
+    liveSyncGenRef.current += 1;
+    liveSyncSuppressUntilRef.current = Date.now() + 1500;
+    copyingRef.current = true;
     if (copying || !selectedId) return;
     const num = loadNumber.trim();
     const newNum = num ? nextCopyLoadNumber(num, loadSheets) : "";
@@ -645,7 +655,7 @@ export default function EditLoadsheetModal({
       })
       .select("id")
       .single();
-    setCopying(false);
+
     if (error) {
       if (/does not exist|schema cache|PGRST205/i.test(error.message ?? "")) {
         alert(
@@ -654,14 +664,13 @@ export default function EditLoadsheetModal({
       } else {
         alert(error.message);
       }
+      setCopying(false);
       return;
     }
-    setSelectedId(String(data.id));
-    setLoadNumber(newNum);
-    setWeekStart(destination);
-    setInvoiced(false);
+
     setCopyWeekOpen(false);
     await onSaved?.();
+    setCopying(false);
   }
 
   async function handleSubmit(e) {
@@ -681,7 +690,9 @@ export default function EditLoadsheetModal({
     setSaving(true);
     liveSyncGenRef.current += 1;
     const { error } = await saveLoadsheet(
-      scheduleLoadId ? { includeInvoicedOnSchedule: true } : {},
+      scheduleLoadId
+        ? { includeInvoicedOnSchedule: true }
+        : { includeWeek: true },
     );
     setSaving(false);
     if (error) {
