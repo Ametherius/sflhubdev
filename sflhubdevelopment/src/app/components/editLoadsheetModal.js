@@ -622,11 +622,15 @@ export default function EditLoadsheetModal({
     liveSyncGenRef.current += 1;
     liveSyncSuppressUntilRef.current = Date.now() + 1500;
     copyingRef.current = true;
-    if (copying || !selectedId) return;
+    if (copying || !selectedId) {
+      copyingRef.current = false;
+      return;
+    }
     const num = loadNumber.trim();
     const newNum = num ? nextCopyLoadNumber(num, loadSheets) : "";
     if (num && !newNum) {
       alert("Could not determine a copy load number.");
+      copyingRef.current = false;
       return;
     }
     const destination = String(destinationWeekStart ?? weekStart ?? "").slice(
@@ -670,6 +674,7 @@ export default function EditLoadsheetModal({
 
     setCopyWeekOpen(false);
     await onSaved?.();
+    copyingRef.current = false;
     setCopying(false);
   }
 
