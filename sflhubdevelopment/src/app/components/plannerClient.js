@@ -15,7 +15,7 @@ import {
   readSlotBrokerId,
   readSlotWeekId,
 } from "@/lib/plannerSlots";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { FaEye, FaEyeSlash, FaList, FaPlus, FaTimes } from "react-icons/fa";
 import BtnWhite from "./btnWhite";
 import EditPlannerSlotModal from "./editPlannerSlotModal";
@@ -69,10 +69,10 @@ export default function PlannerClient({
   const [canOpen, setCanOpen] = useState(false);
   const [usOpen, setUsOpen] = useState(false);
   const [cattleOpen, setCattleOpen] = useState(false);
+  const skipInitialSlotFetch = useRef(true);
 
   const slotCols = useMemo(
-    () =>
-      slotColumnsProp ?? plannerSlotColumns(initialSlots?.[0] ?? null),
+    () => slotColumnsProp ?? plannerSlotColumns(initialSlots?.[0] ?? null),
     [slotColumnsProp, initialSlots],
   );
 
@@ -138,6 +138,10 @@ export default function PlannerClient({
   // Load only the active week's real slots (skip blank junk; UI pads empties).
   useEffect(() => {
     if (!resolveWeekId || !plannerSchemaReady) return;
+    if (skipInitialSlotFetch.current) {
+      skipInitialSlotFetch.current = false;
+      return;
+    }
 
     let cancelled = false;
 

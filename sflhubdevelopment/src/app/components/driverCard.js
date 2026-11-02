@@ -5,7 +5,7 @@ export default function DriverCard({ driver, onEdit, onDelete }) {
   const { name, phone, user, pass, pin, division } = driver;
 
   return (
-    <div className="m-3 w-120 rounded-lg border-2 bg-gray-500 p-3 shadow-lg">
+    <div className="mb-2 w-full rounded-lg border-2 bg-gray-500 p-3 shadow-lg">
       <div className="mb-3 border-2 bg-gray-900 p-2">
         <h3 className="p-3 text-center font-bold text-white">{name}</h3>
       </div>

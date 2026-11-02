@@ -54,6 +54,8 @@ import {
 import { usePermissions } from "@/context/permissionsContext";
 import { useMotiveWeekMiles } from "@/hooks/useMotiveWeekMiles";
 import { compareAssignedRows } from "@/lib/divisionSort";
+import DriversPanel from "./driversPanel";
+import UnitsPanel from "./unitsPanel";
 
 export default function ScheduleClient({
   weeks: initialWeeks = [],
@@ -84,10 +86,8 @@ export default function ScheduleClient({
   );
   const [newWeekModalOpen, setNewWeekModalOpen] = useState(false);
   const [newLoadsheetModalOpen, setNewLoadsheetModalOpen] = useState(false);
-  const [assignedMenu, setAssignedMenu] = useState(false);
-  const [unitsShowing, setUnitsShowing] = useState(false);
-  const [driversShowing, setDriversShowing] = useState(false);
   const [searchDrivers, setSearchDrivers] = useState("");
+  const [openPanel, setOpenPanel] = useState(null);
   const [searchUnits, setSearchUnits] = useState("");
   const [searchSchedule, setSearchSchedule] = useState("");
   const [assignModal, setAssignModal] = useState(false);
@@ -117,7 +117,6 @@ export default function ScheduleClient({
     initialWeekId ? initialLoadSlots : undefined,
   );
   const [loadSheets, refreshLoadSheets] = useLoadSheets();
-  const [loadsheetMenu, setLoadsheetMenu] = useState(false);
   const [editLoadsheetId, setEditLoadsheetId] = useState(null);
   const [copyingLoadsheetId, setCopyingLoadsheetId] = useState(null);
   const [sortScheduleBy, setSortScheduleBy] = useState("");
@@ -459,6 +458,10 @@ export default function ScheduleClient({
     }
   }
 
+  const togglePanel = function (name) {
+    setOpenPanel((current) => (current === name ? null : name));
+  };
+
   async function removeAssignmentFromWeek({
     scheduleAssignmentId,
     weekId,
@@ -731,31 +734,6 @@ export default function ScheduleClient({
     const { error, weekId } = await createWeek(weekStartISO);
     if (weekId) setSelectedWeekId(weekId);
     return { error };
-  }
-
-  function toggleUnitMenu() {
-    if (driversShowing) setDriversShowing(false);
-    if (assignedMenu) setAssignedMenu(false);
-    setUnitsShowing(!unitsShowing);
-  }
-
-  function toggleLoadsheets() {
-    if (unitsShowing) setUnitsShowing(false);
-    if (driversShowing) setDriversShowing(false);
-    if (assignedMenu) setAssignedMenu(false);
-    setLoadsheetMenu(!loadsheetMenu);
-  }
-
-  function toggleDriverMenu() {
-    if (unitsShowing) setUnitsShowing(false);
-    if (assignedMenu) setAssignedMenu(false);
-    setDriversShowing(!driversShowing);
-  }
-
-  function toggleAssignedMenu() {
-    if (unitsShowing) setUnitsShowing(false);
-    if (driversShowing) setDriversShowing(false);
-    setAssignedMenu(!assignedMenu);
   }
 
   function toggleAssignWeek(weekId) {
@@ -1126,17 +1104,17 @@ export default function ScheduleClient({
         </div>
       </Modal>
 
-      <div
-        className={`w-96 bg-white overflow-y-scroll max-h-screen z-50 fixed top-0 right-0 mx-0 p-3 border-2 flex flex-wrap ${unitsShowing ? "" : "hidden"} justify-center`}
+      {/* <div
+        className={`w-96 bg-white overflow-y-scroll max-h-screen z-50 fixed top-0 right-0 mx-0 p-3 border-2 flex flex-wrap justify-center`}
       >
         <button
           type="button"
           className="text-green-950 absolute top-0 right-0 m-3 text-2xl cursor-pointer"
-          onClick={() => setUnitsShowing(false)}
+          onClick={() => setOpenPanel(null)}
         >
           <FaTimes />
-        </button>
-        <div className="mt-8 flex w-80 items-center gap-2">
+        </button> */}
+      {/* <div className="mt-8 flex w-80 items-center gap-2">
           {canEdit ? (
             <button
               type="button"
@@ -1165,19 +1143,55 @@ export default function ScheduleClient({
             />
           );
         })}
-      </div>
-      <AssignedUnitsPanel
-        open={assignedMenu}
-        onClose={() => setAssignedMenu(false)}
-        assigned={assigned}
-      />
-      <div
-        className={`w-130 bg-white overflow-y-scroll max-h-screen fixed top-0 right-0 mx-0 p-3 z-50 border-2 flex flex-wrap ${driversShowing ? "" : "hidden"} justify-center`}
+      </div> */}
+      {openPanel === "units" && (
+        <UnitsPanel
+          open
+          onClose={() => setOpenPanel(null)}
+          units={units}
+          onEdit={canEdit ? (unitRow) => setEditUnit(unitRow) : undefined}
+          onDelete={
+            canEdit ? (unitRow) => setDeleteUnitRow(unitRow) : undefined
+          }
+          canEdit={canEdit}
+        />
+      )}
+      {openPanel === "assigned" && (
+        <AssignedUnitsPanel
+          open
+          onClose={() => setOpenPanel(null)}
+          assigned={assigned}
+        />
+      )}
+      {openPanel === "loadsheets" && (
+        <LoadsheetMenu
+          open
+          onClose={() => setOpenPanel(null)}
+          weeks={weeks}
+          loadsheets={loadSheets}
+          readOnly={readOnly}
+          onEdit={canEdit ? handleEditLoadsheet : undefined}
+          onDelete={canEdit ? handleDeleteLoadsheet : undefined}
+          onCopy={canEdit ? handleCopyLoadsheet : undefined}
+          weekStart={selectedWeek?.week_start_date}
+        />
+      )}
+      {openPanel === "drivers" && (
+        <DriversPanel
+          drivers={drivers}
+          onClose={() => setOpenPanel(null)}
+          onEdit={setEditDriver}
+          onDelete={handleDeleteDriver}
+          canEdit={canEdit}
+        />
+      )}
+      {/* <div
+        className={`w-130 bg-white overflow-y-scroll max-h-screen fixed top-0 right-0 mx-0 p-3 z-50 border-2 flex flex-wrap justify-center`}
       >
         <button
           type="button"
           className="text-green-950 absolute top-0 right-0 m-3 text-2xl cursor-pointer"
-          onClick={() => setDriversShowing(false)}
+          onClick={() => setOpenPanel(null)}
         >
           <FaTimes />
         </button>
@@ -1209,11 +1223,23 @@ export default function ScheduleClient({
             onDelete={canEdit ? () => handleDeleteDriver(d.id) : undefined}
           />
         ))}
-      </div>
+      </div> */}
       <div className="fixed bottom-0 left-1/2 z-40 flex w-full max-w-full -translate-x-1/2 flex-wrap justify-center bg-none">
-        <BtnWhite text="Loadsheets" Icon={FaList} onClick={toggleLoadsheets} />
-        <BtnWhite text="Units" Icon={FaTruck} onClick={toggleUnitMenu} />
-        <BtnWhite text="Drivers" Icon={FaUser} onClick={toggleDriverMenu} />
+        <BtnWhite
+          text="Loadsheets"
+          Icon={FaList}
+          onClick={() => togglePanel("loadsheets")}
+        />
+        <BtnWhite
+          text="Units"
+          Icon={FaTruck}
+          onClick={() => togglePanel("units")}
+        />
+        <BtnWhite
+          text="Drivers"
+          Icon={FaUser}
+          onClick={() => togglePanel("drivers")}
+        />
         {canEdit ? (
           <>
             <BtnWhite
@@ -1239,7 +1265,7 @@ export default function ScheduleClient({
         <BtnWhite
           Icon={FaTruck}
           text="Assigned Units"
-          onClick={toggleAssignedMenu}
+          onClick={() => togglePanel("assigned")}
         />
       </div>
       <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -1336,30 +1362,6 @@ export default function ScheduleClient({
         onClose={() => setNewUnitModalOpen(false)}
         onCreated={refreshUnits}
       />
-      <div
-        className={`w-96 bg-white overflow-y-scroll h-full z-50 fixed top-0 right-0 mx-0 p-3 border-2 flex flex-col ${loadsheetMenu ? "" : "hidden"} justify-start items-center`}
-      >
-        <h2 className="text-green-950 font-bold text-2xl text-center">
-          Loadsheets
-        </h2>
-        <div className="fixed top-0 right-0 m-3 mr-4 text-2xl text-green-950 cursor-pointer ">
-          <button
-            className="text-green-950 text-3xl"
-            onClick={() => setLoadsheetMenu(false)}
-          >
-            <FaTimes />
-          </button>
-        </div>
-        <LoadsheetMenu
-          weeks={weeks}
-          loadsheets={loadSheets}
-          readOnly={readOnly}
-          onEdit={canEdit ? handleEditLoadsheet : undefined}
-          onDelete={canEdit ? handleDeleteLoadsheet : undefined}
-          onCopy={canEdit ? handleCopyLoadsheet : undefined}
-          weekStart={selectedWeek?.week_start_date}
-        />
-      </div>
     </div>
   );
 }

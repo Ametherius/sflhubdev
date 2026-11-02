@@ -17,6 +17,7 @@ export default function LoadsheetMenu({
   onCopy,
   weeks = [],
   weekStart = null,
+  onClose,
 }) {
   const [query, setQuery] = useState("");
   const [selectedWeekStart, setSelectedWeekStart] = useState(() =>
@@ -70,8 +71,24 @@ export default function LoadsheetMenu({
     }
   }
 
+  const col3style =
+    "border border-t-0 border-r-0 w-1/3 flex flex-col items-center";
+  const col3styleRight = "border border-t-0 w-1/3 flex flex-col items-center";
+  const titleStyle = "border border-t-0 border-l-0 border-r-0 font-bold";
+
   return (
-    <div className="mt-10 w-full flex flex-col">
+    <div className="h-screen w-98 fixed top-0 right-0 z-100 p-3 bg-white flex flex-col overflow-hidden">
+      <div className="text-center text-2xl text-green-950 font-bold border-b-2 border-green-950 mb-3">
+        <h2>Loadsheets Menu</h2>
+      </div>
+      <div
+        className="absolute top-0 left-0 text-green-950 p-3 text-2xl cursor-pointer"
+        onClick={onClose}
+      >
+        <button type="button">
+          <FaTimes />
+        </button>
+      </div>
       <select
         value={selectedWeekStart}
         onChange={(e) => setSelectedWeekStart(e.target.value)}
@@ -103,58 +120,73 @@ export default function LoadsheetMenu({
         className="border-2 border-green-950 p-2 text-green-950 rounded-md mb-3"
         placeholder="Search Loadsheets..."
       />
-
-      {searchLoadsheets.map((loadsheet) => (
-        <div
-          key={loadsheet.id}
-          className="flex flex-col bg-gray-900 rounded-lg w-full p-1 py-auto mb-2"
-        >
-          <div className="bg-gray-900 border rounded-t-md flex justify-center h-full w-full items-center  p-2 my-auto">
-            <p className="text-white">{loadsheet.broker}</p>
-          </div>
-          <div className="flex flex-1 w-full">
-            <div className="flex flex-col border border-t-0 p-2 w-1/2">
-              <span className="text-center underline">Origin</span>
-              <span className="text-center">{loadsheet.origin}</span>
+      <div className="flex-1 overflow-y-auto min-h-0">
+        {searchLoadsheets.map((loadsheet) => (
+          <div
+            key={loadsheet.id}
+            className="flex flex-col bg-gray-900 rounded-lg w-full p-1 py-auto mb-2"
+          >
+            <div className="bg-gray-900 border rounded-t-md flex justify-center h-full w-full items-center  p-2 my-auto">
+              <p className="text-white">{loadsheet.broker}</p>
             </div>
-            <div className="flex flex-col border border-t-0 border-l-0 p-2 w-1/2">
-              <span className="text-center underline">End User</span>
-              <span className="text-center">{loadsheet.end_user}</span>
+            <div className="flex flex-1 w-full">
+              <div className="flex flex-col border border-t-0 p-2 w-1/2">
+                <span className="text-center underline">Origin</span>
+                <span className="text-center">{loadsheet.origin}</span>
+              </div>
+              <div className="flex flex-col border border-t-0 border-l-0 p-2 w-1/2">
+                <span className="text-center underline">End User</span>
+                <span className="text-center">{loadsheet.end_user}</span>
+              </div>
+            </div>
+            <div className="flex flex-1 w-full">
+              <div className={col3style}>
+                <span className={titleStyle}>MT</span>
+                <span>{loadsheet.mt}</span>
+              </div>
+              <div className={col3style}>
+                <span className={titleStyle}>Rate</span>
+                <span>{loadsheet.rate}</span>
+              </div>
+              <div className={col3styleRight}>
+                <span className={titleStyle}>FSC</span>
+                <span>{loadsheet.fsc}</span>
+              </div>
+            </div>
+            <div>
+              {showActions ? (
+                <div className="bg-gray-900 p-2 border border-t-0 rounded-b-md w-full flex my-auto h-full justify-center items-center gap-2">
+                  {typeof onDelete === "function" ? (
+                    <BtnRed
+                      text={<FaTimes />}
+                      type="button"
+                      onClick={() => onDelete?.(loadsheet)}
+                    />
+                  ) : null}
+                  {typeof onEdit === "function" ? (
+                    <ButtonDark
+                      text={<FaEdit />}
+                      type="button"
+                      onClick={() => onEdit?.(loadsheet)}
+                    />
+                  ) : null}
+                  {typeof onCopy === "function" ? (
+                    <BtnWhiteRounded
+                      text={<FaCopy />}
+                      type="button"
+                      onClick={() => setCopySheet(loadsheet)}
+                    />
+                  ) : null}
+                </div>
+              ) : (
+                <div className="bg-gray-900  p-2 w-full flex my-auto h-full items-center justify-center">
+                  <p className="text-xs text-white/70">View only</p>
+                </div>
+              )}
             </div>
           </div>
-          <div>
-            {showActions ? (
-              <div className="bg-gray-900 p-2 border border-t-0 rounded-b-md w-full flex my-auto h-full justify-center items-center gap-2">
-                {typeof onDelete === "function" ? (
-                  <BtnRed
-                    text={<FaTimes />}
-                    type="button"
-                    onClick={() => onDelete?.(loadsheet)}
-                  />
-                ) : null}
-                {typeof onEdit === "function" ? (
-                  <ButtonDark
-                    text={<FaEdit />}
-                    type="button"
-                    onClick={() => onEdit?.(loadsheet)}
-                  />
-                ) : null}
-                {typeof onCopy === "function" ? (
-                  <BtnWhiteRounded
-                    text={<FaCopy />}
-                    type="button"
-                    onClick={() => setCopySheet(loadsheet)}
-                  />
-                ) : null}
-              </div>
-            ) : (
-              <div className="bg-gray-900  p-2 w-full flex my-auto h-full items-center justify-center">
-                <p className="text-xs text-white/70">View only</p>
-              </div>
-            )}
-          </div>
-        </div>
-      ))}
+        ))}
+      </div>
       <CopyLoadsheetWeekDialog
         open={copySheet != null}
         weeks={weeks}

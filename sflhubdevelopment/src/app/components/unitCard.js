@@ -5,7 +5,7 @@ export default function UnitCard({ unit: unitRow, onEdit }) {
   const { unit, petro, petroPIN, ufa, ufaPIN } = unitRow;
 
   return (
-    <div className="m-3 w-80 rounded-lg border-2 bg-gray-500 p-3 shadow-lg">
+    <div className="my-3 w-full rounded-lg border-2 bg-gray-500 p-3 shadow-lg">
       <div className="mb-3 border-2 bg-gray-900 p-2">
         <h3 className="p-3 text-center font-bold text-white">Unit: {unit}</h3>
       </div>

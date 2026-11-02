@@ -172,7 +172,9 @@ export async function detectPlannerSlotColumns(
 }
 
 export function plannerSlotSchemaErrorMessage(missing = []) {
-  const cols = missing.length ? missing.join(", ") : "broker_id, week_id, plan_date";
+  const cols = missing.length
+    ? missing.join(", ")
+    : "broker_id, week_id, plan_date";
   return (
     `Planner table is missing column(s): ${cols}. ` +
     "Run supabase/migrations/20260630120000_planner_slots_schema.sql in the Supabase SQL editor, then reload."
@@ -283,7 +285,16 @@ export function plannerSlotStatusClass(slot, cols = plannerSlotColumns(slot)) {
 }
 
 export function buildPlannerSlotInsert(
-  { brokerId, weekId, planDate, sortOrder, origin, endUser, unitNumber, driverName },
+  {
+    brokerId,
+    weekId,
+    planDate,
+    sortOrder,
+    origin,
+    endUser,
+    unitNumber,
+    driverName,
+  },
   cols = plannerSlotColumns(),
 ) {
   const row = {
