@@ -1104,46 +1104,6 @@ export default function ScheduleClient({
         </div>
       </Modal>
 
-      {/* <div
-        className={`w-96 bg-white overflow-y-scroll max-h-screen z-50 fixed top-0 right-0 mx-0 p-3 border-2 flex flex-wrap justify-center`}
-      >
-        <button
-          type="button"
-          className="text-green-950 absolute top-0 right-0 m-3 text-2xl cursor-pointer"
-          onClick={() => setOpenPanel(null)}
-        >
-          <FaTimes />
-        </button> */}
-      {/* <div className="mt-8 flex w-80 items-center gap-2">
-          {canEdit ? (
-            <button
-              type="button"
-              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-green-950 text-xl text-white shadow-md hover:bg-green-900"
-              onClick={() => setNewUnitModalOpen(true)}
-              aria-label="Add unit"
-              title="Add unit"
-            >
-              <FaPlus />
-            </button>
-          ) : null}
-          <input
-            type="search"
-            value={searchUnits}
-            placeholder="Search Units..."
-            onChange={(e) => setSearchUnits(e.target.value)}
-            className="min-w-0 flex-1 rounded-lg bg-gray-700 p-4 text-white"
-          />
-        </div>
-        {searchedUnits.map((u) => {
-          return (
-            <UnitCard
-              key={u.id}
-              unit={u}
-              onEdit={canEdit ? (unitRow) => setEditUnit(unitRow) : undefined}
-            />
-          );
-        })}
-      </div> */}
       {openPanel === "units" && (
         <UnitsPanel
           open
@@ -1185,45 +1145,7 @@ export default function ScheduleClient({
           canEdit={canEdit}
         />
       )}
-      {/* <div
-        className={`w-130 bg-white overflow-y-scroll max-h-screen fixed top-0 right-0 mx-0 p-3 z-50 border-2 flex flex-wrap justify-center`}
-      >
-        <button
-          type="button"
-          className="text-green-950 absolute top-0 right-0 m-3 text-2xl cursor-pointer"
-          onClick={() => setOpenPanel(null)}
-        >
-          <FaTimes />
-        </button>
-        <div className="mt-8 flex w-80 items-center gap-2">
-          {canEdit ? (
-            <button
-              type="button"
-              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-green-950 text-xl text-white shadow-md hover:bg-green-900"
-              onClick={() => setNewDriverModalOpen(true)}
-              aria-label="Add driver"
-              title="Add driver"
-            >
-              <FaPlus />
-            </button>
-          ) : null}
-          <input
-            type="search"
-            value={searchDrivers}
-            placeholder="Search Drivers..."
-            onChange={(e) => setSearchDrivers(e.target.value)}
-            className="min-w-0 flex-1 rounded-lg bg-gray-700 p-4 text-white z-10"
-          />
-        </div>
-        {searchedDrivers.map((d) => (
-          <DriverCard
-            key={d.id}
-            driver={d}
-            onEdit={canEdit ? (drv) => setEditDriver(drv) : undefined}
-            onDelete={canEdit ? () => handleDeleteDriver(d.id) : undefined}
-          />
-        ))}
-      </div> */}
+
       <div className="fixed bottom-0 left-1/2 z-40 flex w-full max-w-full -translate-x-1/2 flex-wrap justify-center bg-none">
         <BtnWhite
           text="Loadsheets"

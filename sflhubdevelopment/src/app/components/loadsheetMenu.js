@@ -139,19 +139,8 @@ export default function LoadsheetMenu({
                 <span className="text-center">{loadsheet.end_user}</span>
               </div>
             </div>
-            <div className="flex flex-1 w-full">
-              <div className={col3style}>
-                <span className={titleStyle}>MT</span>
-                <span>{loadsheet.mt}</span>
-              </div>
-              <div className={col3style}>
-                <span className={titleStyle}>Rate</span>
-                <span>{loadsheet.rate}</span>
-              </div>
-              <div className={col3styleRight}>
-                <span className={titleStyle}>FSC</span>
-                <span>{loadsheet.fsc}</span>
-              </div>
+            <div className="flex flex-1 w-full border border-t-0 justify-center p-2">
+              <span>{loadsheet.load_number || loadsheet.load_category}</span>
             </div>
             <div>
               {showActions ? (

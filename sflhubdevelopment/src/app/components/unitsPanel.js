@@ -18,7 +18,7 @@ export default function UnitsPanel({
       .includes(String(searchUnits).toLowerCase());
   });
   return (
-    <div className="w-98 h-screen bg-white flex flex-col overflow-hidden fixed top-0 right-0 z-50 p-3">
+    <div className="w-98 h-screen bg-white flex flex-col overflow-hidden fixed top-0 right-0 z-50 p-2">
       <div className="absolute top-0 left-0 p-2">
         <button
           type="button"
@@ -34,7 +34,7 @@ export default function UnitsPanel({
       <div className="flex justify-center">
         <input
           type="search"
-          className="rounded-md border-2 border-green-950 p-2 text-green-950 w-full mx-5"
+          className="rounded-md border-2 border-green-950 p-2 text-green-950 w-full mx-5 my-2"
           placeholder="Search Units..."
           value={searchUnits}
           onChange={(e) => setSearchUnits(e.target.value)}
