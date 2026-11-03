@@ -8,11 +8,9 @@ import BtnWhite from "../components/btnWhite";
 import { FaCheck } from "react-icons/fa";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { useRouter } from "next/navigation";
 
 export default function Login() {
   const supabase = createClient();
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState(null);
@@ -28,7 +26,8 @@ export default function Login() {
     if (error) {
       setError(error.message);
     } else {
-      router.push("/");
+      // Full navigation so the new session cookie is on the next request.
+      window.location.assign("/dashboard");
     }
   };
   return (

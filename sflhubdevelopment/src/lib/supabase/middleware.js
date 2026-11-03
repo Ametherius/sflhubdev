@@ -2,8 +2,16 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse } from "next/server";
 
+function applyCookies(response, cookiesToSet) {
+  cookiesToSet.forEach(({ name, value, options }) => {
+    response.cookies.set(name, value, options);
+  });
+  return response;
+}
+
 export async function updateSession(request) {
   let response = NextResponse.next({ request });
+  const pendingCookies = [];
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -14,13 +22,12 @@ export async function updateSession(request) {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
+          pendingCookies.splice(0, pendingCookies.length, ...cookiesToSet);
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value),
           );
           response = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options),
-          );
+          applyCookies(response, cookiesToSet);
         },
       },
     },
@@ -32,9 +39,6 @@ export async function updateSession(request) {
 
   const pathname = request.nextUrl.pathname;
 
-  // routes anyone can access
-  const publicRoutes = ["/login", "/"];
-
   // protect sections by prefix
   const protectedPrefixes = [
     "/dashboard",
@@ -44,7 +48,6 @@ export async function updateSession(request) {
     "/motive",
   ];
 
-  const isPublic = publicRoutes.includes(pathname);
   const isProtected = protectedPrefixes.some((prefix) =>
     pathname.startsWith(prefix),
   );
@@ -52,13 +55,15 @@ export async function updateSession(request) {
   if (!user && isProtected) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
-    return NextResponse.redirect(url);
+    // A redirect built from scratch drops the refreshed session cookie.
+    // The browser then keeps the old token and the next refresh is logged out.
+    return applyCookies(NextResponse.redirect(url), pendingCookies);
   }
 
   if (user && pathname === "/login") {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
-    return NextResponse.redirect(url);
+    return applyCookies(NextResponse.redirect(url), pendingCookies);
   }
 
   return response;
