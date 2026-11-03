@@ -23,6 +23,7 @@ import NewBrokerModal from "./newBrokerModal";
 import NewPlannerSlotModal from "./newPlannerSlotModal";
 import PlannerDayGrid from "./plannerDayGrid";
 import PlannerRow from "./plannerRow";
+import BrokerPanel from "./brokerPanel";
 
 function nextSortOrder(existingDaySlots, cols) {
   return (
@@ -66,9 +67,7 @@ export default function PlannerClient({
   const [hiddenBrokerIds, setHiddenBrokerIds] = useState(() => new Set());
   const [togglingHideBrokerId, setTogglingHideBrokerId] = useState(null);
   const [division, setDivision] = useState("Canadian Grain");
-  const [canOpen, setCanOpen] = useState(false);
-  const [usOpen, setUsOpen] = useState(false);
-  const [cattleOpen, setCattleOpen] = useState(false);
+  const [openPanel, setOpenPanel] = useState(null);
   const skipInitialSlotFetch = useRef(true);
 
   const slotCols = useMemo(
@@ -478,22 +477,8 @@ export default function PlannerClient({
     [brokers],
   );
 
-  const toggleCan = function () {
-    if (usOpen) setUsOpen(false);
-    if (cattleOpen) setCattleOpen(false);
-    setCanOpen(!canOpen);
-  };
-
-  const toggleUs = function () {
-    if (canOpen) setCanOpen(false);
-    if (cattleOpen) setCattleOpen(false);
-    setUsOpen(!usOpen);
-  };
-
-  const toggleCattle = function () {
-    if (usOpen) setUsOpen(false);
-    if (canOpen) setCanOpen(false);
-    setCattleOpen(!cattleOpen);
+  const togglePanel = function (name) {
+    setOpenPanel((current) => (current === name ? null : name));
   };
 
   const cattleBrokers = useMemo(
@@ -561,23 +546,60 @@ export default function PlannerClient({
           Icon={FaList}
           text="Canadian Grain Brokers"
           type="button"
-          onClick={toggleCan}
+          onClick={() => togglePanel("can")}
         />
         <BtnWhite
           Icon={FaList}
           text="US Grain Brokers"
           type="button"
-          onClick={toggleUs}
+          onClick={() => togglePanel("us")}
         />
         <BtnWhite
           Icon={FaList}
           text="Cattle Brokers"
           type="button"
-          onClick={toggleCattle}
+          onClick={() => togglePanel("cattle")}
         />
       </div>
 
-      <div
+      {openPanel === "can" && (
+        <BrokerPanel
+          title="Canadian Brokers List"
+          brokers={canGrainBrokers}
+          onClose={() => setOpenPanel(null)}
+          hiddenBrokerIds={hiddenBrokerIds}
+          canEdit={canEdit}
+          onHide={handleHideBroker}
+          onDelete={handleDeleteBroker}
+          onUnhide={handleUnhideBroker}
+        />
+      )}
+      {openPanel === "us" && (
+        <BrokerPanel
+          title="US Brokers List"
+          brokers={usGrainBrokers}
+          onClose={() => setOpenPanel(null)}
+          hiddenBrokerIds={hiddenBrokerIds}
+          canEdit={canEdit}
+          onHide={handleHideBroker}
+          onDelete={handleDeleteBroker}
+          onUnhide={handleUnhideBroker}
+        />
+      )}
+      {openPanel === "cattle" && (
+        <BrokerPanel
+          title="Cattle Brokers List"
+          brokers={cattleBrokers}
+          onClose={() => setOpenPanel(null)}
+          hiddenBrokerIds={hiddenBrokerIds}
+          canEdit={canEdit}
+          onHide={handleHideBroker}
+          onDelete={handleDeleteBroker}
+          onUnhide={handleUnhideBroker}
+        />
+      )}
+
+      {/* <div
         className={`fixed top-0 right-0 bg-white w-90 h-screen z-50 ${canOpen ? "" : "hidden"} overflow-y-scroll`}
       >
         <div className="p-3 text-2xl flex font-bold text-green-950">
@@ -630,7 +652,7 @@ export default function PlannerClient({
         <div className="flex flex-col items-center">
           {cattleBrokers.map(renderBrokerListItem)}
         </div>
-      </div>
+      </div> */}
       <EditPlannerSlotModal
         open={editSlotTarget != null}
         onClose={() => setEditSlotTarget(null)}
