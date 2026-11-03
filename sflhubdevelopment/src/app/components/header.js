@@ -89,7 +89,12 @@ function Navbar() {
           : "bg-black p-2 text-white hover:bg-yellow-700";
 
         return (
-          <Link key={link.href} href={link.href} prefetch className={classes}>
+          <Link
+            key={link.href}
+            href={link.href}
+            prefetch={false}
+            className={classes}
+          >
             {link.label}
           </Link>
         );

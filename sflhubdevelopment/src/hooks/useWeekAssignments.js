@@ -51,7 +51,11 @@ export function useWeekAssignments(
       .eq("week_id", weekId);
 
     if (error) {
-      if (/schedule_assignments|column .* does not exist/i.test(error.message ?? "")) {
+      if (
+        /schedule_assignments|column .* does not exist/i.test(
+          error.message ?? "",
+        )
+      ) {
         setSnapshots([]);
         return;
       }
@@ -77,7 +81,11 @@ export function useWeekAssignments(
       .eq("week_id", weekId);
 
     if (error) {
-      if (/schedule_week_unit_exclusions|does not exist/i.test(error.message ?? "")) {
+      if (
+        /schedule_week_unit_exclusions|does not exist/i.test(
+          error.message ?? "",
+        )
+      ) {
         setExcludedInUseIds(new Set());
         return;
       }
@@ -89,7 +97,9 @@ export function useWeekAssignments(
     setExcludedInUseIds(
       new Set(
         (data ?? [])
-          .map((r) => (r.in_use_unit_id != null ? String(r.in_use_unit_id) : null))
+          .map((r) =>
+            r.in_use_unit_id != null ? String(r.in_use_unit_id) : null,
+          )
           .filter(Boolean),
       ),
     );

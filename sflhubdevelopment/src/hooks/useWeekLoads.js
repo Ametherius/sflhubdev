@@ -29,7 +29,10 @@ function isMissingLoadSlotIdColumn(message) {
 }
 
 function isMissingSortOrderColumn(message) {
-  return /\bsort_order\b/i.test(message ?? "") && /does not exist/i.test(message ?? "");
+  return (
+    /\bsort_order\b/i.test(message ?? "") &&
+    /does not exist/i.test(message ?? "")
+  );
 }
 
 /** Merge load_slots by load_slot_id (post-migration schema). */
@@ -80,9 +83,7 @@ export function useWeekLoads(weekId, initial = null) {
     initial?.weekId && weekId && String(initial.weekId) === String(weekId)
       ? weekId
       : null;
-  const [loads, setLoads] = useState(
-    seededWeekId ? (initial.loads ?? []) : [],
-  );
+  const [loads, setLoads] = useState(seededWeekId ? (initial.loads ?? []) : []);
   const [ready, setReady] = useState(Boolean(seededWeekId || !weekId));
   const [legacySlotIndex, setLegacySlotIndex] = useState(false);
   const fetchedWeekRef = useRef(seededWeekId);
@@ -177,7 +178,9 @@ export function useWeekLoads(weekId, initial = null) {
 
     if (
       modern.error &&
-      /"(origin|end_user|mt|rate|load_total)"/i.test(modern.error.message ?? "") &&
+      /"(origin|end_user|mt|rate|load_total)"/i.test(
+        modern.error.message ?? "",
+      ) &&
       /does not exist/i.test(modern.error.message ?? "")
     ) {
       modern = await supabase
@@ -231,14 +234,23 @@ export function useWeekLoads(weekId, initial = null) {
         .in("id", ids);
       if (slotsRes.error) {
         if (isMissingSortOrderColumn(slotsRes.error.message)) {
-          slotsRes = await supabase.from("load_slots").select("id").in("id", ids);
+          slotsRes = await supabase
+            .from("load_slots")
+            .select("id")
+            .in("id", ids);
         } else if (/does not exist/i.test(slotsRes.error.message ?? "")) {
-          slotsRes = await supabase.from("load_slots").select("id, sort_order").in("id", ids);
+          slotsRes = await supabase
+            .from("load_slots")
+            .select("id, sort_order")
+            .in("id", ids);
           if (
             slotsRes.error &&
             isMissingSortOrderColumn(slotsRes.error.message)
           ) {
-            slotsRes = await supabase.from("load_slots").select("id").in("id", ids);
+            slotsRes = await supabase
+              .from("load_slots")
+              .select("id")
+              .in("id", ids);
           }
         }
       }
@@ -289,7 +301,10 @@ export function useWeekLoads(weekId, initial = null) {
         .select("id, name, label")
         .order("id", { ascending: true });
     }
-    if (slotsRes.error && /does not exist/i.test(slotsRes.error.message ?? "")) {
+    if (
+      slotsRes.error &&
+      /does not exist/i.test(slotsRes.error.message ?? "")
+    ) {
       slotsRes = await supabase
         .from("load_slots")
         .select("id")
@@ -299,7 +314,9 @@ export function useWeekLoads(weekId, initial = null) {
 
     if (slotErr) {
       console.error(slotErr.message);
-      setLoads(list.map((r) => ({ ...r, load_slots: null, load_slot_id: null })));
+      setLoads(
+        list.map((r) => ({ ...r, load_slots: null, load_slot_id: null })),
+      );
       setReady(true);
       return;
     }

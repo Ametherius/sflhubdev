@@ -1,5 +1,6 @@
 "use client";
 import { createClient } from "@/lib/supabase/client";
+import { getAuthUser } from "@/lib/supabase/authUser";
 import { useEffect, useMemo, useState } from "react";
 
 export default function Dashboard() {
@@ -10,10 +11,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     async function getProfile() {
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
+      const { user, error: userError } = await getAuthUser(supabase);
       if (userError || !user) {
         console.log("No logged in user");
         return;

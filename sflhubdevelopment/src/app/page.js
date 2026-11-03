@@ -1,5 +1,6 @@
 "use client";
 import { createClient } from "@/lib/supabase/client";
+import { getAuthUser } from "@/lib/supabase/authUser";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
@@ -9,16 +10,14 @@ export default function Home() {
 
   useEffect(() => {
     const checkSession = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (session) {
+      const { user } = await getAuthUser(supabase);
+      if (user) {
         router.push("/dashboard");
       } else {
         router.push("/login");
       }
     };
     checkSession();
-  }, []);
+  }, [router, supabase]);
   return null;
 }

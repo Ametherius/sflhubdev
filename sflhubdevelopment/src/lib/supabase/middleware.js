@@ -9,7 +9,27 @@ function applyCookies(response, cookiesToSet) {
   return response;
 }
 
+function isPrefetch(request) {
+  const purpose = (
+    request.headers.get("purpose") ||
+    request.headers.get("sec-purpose") ||
+    ""
+  ).toLowerCase();
+  return (
+    request.headers.has("next-router-prefetch") ||
+    request.headers.has("next-router-segment-prefetch") ||
+    request.headers.get("x-middleware-prefetch") === "1" ||
+    purpose.includes("prefetch")
+  );
+}
+
 export async function updateSession(request) {
+  // Prefetch loads several pages at once. Each one would refresh the same
+  // login, and the second refresh revokes the session.
+  if (isPrefetch(request)) {
+    return NextResponse.next({ request });
+  }
+
   let response = NextResponse.next({ request });
   const pendingCookies = [];
 

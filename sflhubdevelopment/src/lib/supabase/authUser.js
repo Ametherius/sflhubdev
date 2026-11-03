@@ -17,10 +17,6 @@ export function isAuthSessionMissingError(err) {
   );
 }
 
-function isRetryableAuthError(err) {
-  return isAuthLockError(err) || isAuthSessionMissingError(err);
-}
-
 const inflight = new Map();
 
 function share(key, fn) {
@@ -36,15 +32,16 @@ function share(key, fn) {
 
 /**
  * Who is signed in.
- * In the browser this reads the cookie session once and shares that result,
- * so the schedule hooks do not each make a network auth call.
+ * In the browser this reads the cookie already stored for this tab.
+ * It does not call getSession(), which would refresh the login and race
+ * the middleware refresh.
  * On the server it verifies the user with Supabase Auth.
  */
 export async function getAuthUser(supabase) {
   if (typeof window === "undefined") {
     return readServerUser(supabase);
   }
-  return share("browser-session", () => readBrowserSession(supabase));
+  return share("browser-session", () => Promise.resolve(readBrowserSession()));
 }
 
 async function readServerUser(supabase) {
@@ -59,34 +56,59 @@ async function readServerUser(supabase) {
   }
 }
 
-async function readBrowserSession(supabase) {
-  const maxAttempts = 3;
-  let lastError = null;
-
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    try {
-      const { data, error } = await supabase.auth.getSession();
-      if (data?.session?.user) {
-        return { user: data.session.user, error: null, aborted: false };
-      }
-      lastError = error ?? null;
-      if (attempt < maxAttempts - 1) {
-        await new Promise((r) => setTimeout(r, 50 * (attempt + 1)));
-        continue;
-      }
-      return { user: null, error: lastError, aborted: false };
-    } catch (err) {
-      lastError = err;
-      if (isRetryableAuthError(err) && attempt < maxAttempts - 1) {
-        await new Promise((r) => setTimeout(r, 50 * (attempt + 1)));
-        continue;
-      }
-      if (isAuthLockError(err)) {
-        return { user: null, error: null, aborted: true };
-      }
-      throw err;
-    }
+function authCookieName() {
+  try {
+    const host = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname;
+    return `sb-${host.split(".")[0]}-auth-token`;
+  } catch {
+    return null;
   }
+}
 
-  return { user: null, error: lastError, aborted: false };
+function readCookie(name) {
+  const parts = document.cookie ? document.cookie.split("; ") : [];
+  for (const part of parts) {
+    const eq = part.indexOf("=");
+    if (eq === -1) continue;
+    const key = decodeURIComponent(part.slice(0, eq));
+    if (key !== name) continue;
+    return decodeURIComponent(part.slice(eq + 1));
+  }
+  return null;
+}
+
+function stringFromBase64URL(value) {
+  const base64 = value.replace(/-/g, "+").replace(/_/g, "/");
+  const pad = base64.length % 4 === 0 ? "" : "=".repeat(4 - (base64.length % 4));
+  const binary = atob(base64 + pad);
+  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
+}
+
+function readBrowserSession() {
+  try {
+    const key = authCookieName();
+    if (!key) return { user: null, error: null, aborted: false };
+
+    let raw = readCookie(key);
+    if (!raw) {
+      const chunks = [];
+      for (let i = 0; ; i++) {
+        const chunk = readCookie(`${key}.${i}`);
+        if (!chunk) break;
+        chunks.push(chunk);
+      }
+      raw = chunks.length > 0 ? chunks.join("") : null;
+    }
+    if (!raw) return { user: null, error: null, aborted: false };
+
+    const json = raw.startsWith("base64-")
+      ? stringFromBase64URL(raw.slice("base64-".length))
+      : raw;
+    const session = JSON.parse(json);
+    const user = session?.user?.id ? session.user : null;
+    return { user, error: null, aborted: false };
+  } catch (err) {
+    return { user: null, error: err, aborted: false };
+  }
 }
