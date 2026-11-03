@@ -12,32 +12,22 @@ export function useScheduleWeeks(initialWeeks) {
   const supabase = useMemo(() => createClient(), []);
 
   const refreshWeeks = useCallback(async () => {
-    const { error: userError, aborted } = await getAuthUser(supabase);
-    if (userError) return;
+    const { user, error: userError, aborted } = await getAuthUser(supabase);
+    // An unauthenticated retry comes back empty under RLS and would wipe the
+    // weeks the server already rendered.
+    if (userError || aborted || !user) return;
 
     const { data, error } = await supabase
       .from("schedule_weeks")
       .select("id, week_start_date, created_at")
       .order("week_start_date", { ascending: false });
 
-    const shouldRetry = aborted && (error || !(data?.length));
-    if (shouldRetry) {
-      await new Promise((r) => setTimeout(r, 200));
-      const retry = await supabase
-        .from("schedule_weeks")
-        .select("id, week_start_date, created_at")
-        .order("week_start_date", { ascending: false });
-      if (!retry.error) {
-        setWeeks(retry.data ?? []);
-        return;
-      }
-    }
-
     if (error) {
       console.error(error.message);
       return;
     }
-    setWeeks(data ?? []);
+    if (!data?.length) return;
+    setWeeks(data);
   }, [supabase]);
 
   const createWeek = useCallback(

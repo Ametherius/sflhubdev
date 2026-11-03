@@ -1,6 +1,7 @@
 "use client";
 
 import { createClient } from "@/lib/supabase/client";
+import { getAuthUser } from "@/lib/supabase/authUser";
 import {
   assignmentFromLive,
   assignmentFromSnapshot,
@@ -41,6 +42,9 @@ export function useWeekAssignments(
       setExcludedInUseIds(new Set());
       return;
     }
+    const { user, error: userError, aborted } = await getAuthUser(supabase);
+    if (userError || aborted || !user) return;
+
     const { data, error } = await supabase
       .from("schedule_assignments")
       .select(ASSIGNMENT_SELECT)
@@ -64,6 +68,9 @@ export function useWeekAssignments(
       setExcludedInUseIds(new Set());
       return;
     }
+    const { user, error: userError, aborted } = await getAuthUser(supabase);
+    if (userError || aborted || !user) return;
+
     const { data, error } = await supabase
       .from("schedule_week_unit_exclusions")
       .select("in_use_unit_id")

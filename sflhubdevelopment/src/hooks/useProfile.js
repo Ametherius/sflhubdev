@@ -5,13 +5,18 @@ import { useUser } from "@/hooks/useUser";
 import { useEffect, useMemo, useState } from "react";
 
 export function useProfile() {
-  const [activeUser] = useUser();
+  const [activeUser, userReady] = useUser();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const supabase = useMemo(() => createClient(), []);
 
   useEffect(() => {
     let cancelled = false;
+
+    if (!userReady) {
+      setLoading(true);
+      return;
+    }
 
     if (!activeUser?.id) {
       setProfile(null);
@@ -42,7 +47,7 @@ export function useProfile() {
     return () => {
       cancelled = true;
     };
-  }, [activeUser?.id, supabase]);
+  }, [activeUser?.id, userReady, supabase]);
 
   return [profile, loading];
 }

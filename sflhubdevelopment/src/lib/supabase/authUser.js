@@ -8,30 +8,51 @@ export function isAuthLockError(err) {
   );
 }
 
-/** getUser that does not throw on auth storage lock contention. */
+/** Cookie session not readable yet, or wiped by an overlapping getUser(). */
+export function isAuthSessionMissingError(err) {
+  const name = err?.name ?? "";
+  const msg = String(err?.message ?? err ?? "");
+  return (
+    name === "AuthSessionMissingError" || /auth session missing/i.test(msg)
+  );
+}
+
+function isRetryableAuthError(err) {
+  return isAuthLockError(err) || isAuthSessionMissingError(err);
+}
+
+/**
+ * getUser that waits out lock races and a cold cookie read after cache clears.
+ * A missing session on the first try is often the cookie store still starting.
+ */
 export async function getAuthUser(supabase) {
-  const maxAttempts = 3;
+  const maxAttempts = 4;
+  let lastError = null;
+
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
       const { data, error } = await supabase.auth.getUser();
-      if (error && isAuthLockError(error)) {
-        if (attempt < maxAttempts - 1) {
-          await new Promise((r) => setTimeout(r, 80 * (attempt + 1)));
-          continue;
-        }
-        return { user: null, error: null, aborted: true };
+      if (!error && data?.user) {
+        return { user: data.user, error: null, aborted: false };
+      }
+      lastError = error ?? null;
+      if (error && isRetryableAuthError(error) && attempt < maxAttempts - 1) {
+        await new Promise((r) => setTimeout(r, 120 * (attempt + 1)));
+        continue;
       }
       return { user: data?.user ?? null, error: error ?? null, aborted: false };
     } catch (err) {
+      lastError = err;
+      if (isRetryableAuthError(err) && attempt < maxAttempts - 1) {
+        await new Promise((r) => setTimeout(r, 120 * (attempt + 1)));
+        continue;
+      }
       if (isAuthLockError(err)) {
-        if (attempt < maxAttempts - 1) {
-          await new Promise((r) => setTimeout(r, 80 * (attempt + 1)));
-          continue;
-        }
         return { user: null, error: null, aborted: true };
       }
       throw err;
     }
   }
-  return { user: null, error: null, aborted: true };
+
+  return { user: null, error: lastError, aborted: false };
 }

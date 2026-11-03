@@ -67,8 +67,9 @@ export default function ScheduleClient({
   exclusions: initialExclusions = [],
 }) {
   const confirm = useConfirm();
-  const { canEdit } = usePermissions();
+  const { canEdit, loading: permissionsLoading } = usePermissions();
   const readOnly = !canEdit;
+  const showViewOnly = !permissionsLoading && readOnly;
   const [drivers, refreshDrivers] = useDrivers();
   const [units, refreshUnits] = useUnits();
   const [activeUser] = useUser();
@@ -813,7 +814,7 @@ export default function ScheduleClient({
     <div className="flex h-full min-h-0 w-full max-w-full flex-col overflow-hidden">
       <div className="shrink-0 py-6 text-center text-3xl font-bold text-white">
         <h2>Weekly Schedule</h2>
-        {readOnly ? (
+        {showViewOnly ? (
           <p className="mt-2 text-sm font-normal text-amber-200/90">
             View only — contact an admin for edit access.
           </p>

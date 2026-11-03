@@ -1,12 +1,21 @@
 "use client";
 
 import { createClient } from "@/lib/supabase/client";
+import { getAuthUser, isAuthSessionMissingError } from "@/lib/supabase/authUser";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import ButtonDark from "./buttonDark";
 
 const inputClass =
   "w-full rounded-lg border-2 border-green-950 p-2 font-bold text-green-950";
+
+const SESSION_MISSING_MESSAGE =
+  "Your sign-in was cleared with the browser data. Log out, sign in again, then reopen profile settings.";
+
+function sessionErrorMessage(error) {
+  if (isAuthSessionMissingError(error)) return SESSION_MISSING_MESSAGE;
+  return error?.message ?? "You must be signed in.";
+}
 
 export default function ProfileSettingsModal({ open, onClose }) {
   const supabase = useMemo(() => createClient(), []);
@@ -33,15 +42,12 @@ export default function ProfileSettingsModal({ open, onClose }) {
     setLoadingProfile(true);
 
     (async () => {
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
+      const { user, error: userError } = await getAuthUser(supabase);
       if (cancelled) return;
       if (userError || !user) {
         setName("");
         setLoadingProfile(false);
-        setError(userError?.message ?? "You must be signed in.");
+        setError(sessionErrorMessage(userError));
         return;
       }
 
@@ -100,14 +106,11 @@ export default function ProfileSettingsModal({ open, onClose }) {
     }
 
     setSaving(true);
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
+    const { user, error: userError } = await getAuthUser(supabase);
 
     if (userError || !user) {
       setSaving(false);
-      setError(userError?.message ?? "You must be signed in.");
+      setError(sessionErrorMessage(userError));
       return;
     }
 

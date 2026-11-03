@@ -95,8 +95,8 @@ export function useWeekLoads(weekId, initial = null) {
       setLegacySlotIndex(false);
       return;
     }
-    const { user, error: userError } = await getAuthUser(supabase);
-    if (userError || !user) {
+    const { user, error: userError, aborted } = await getAuthUser(supabase);
+    if (userError || aborted || !user) {
       setReady(true);
       return;
     }

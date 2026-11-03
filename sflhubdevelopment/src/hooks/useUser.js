@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 
 export function useUser() {
   const [activeUser, setActiveUser] = useState(null);
+  const [ready, setReady] = useState(false);
   const supabase = useMemo(() => createClient(), []);
 
   useEffect(() => {
@@ -17,15 +18,22 @@ export function useUser() {
       if (userError || !user) {
         console.log("No User");
         setActiveUser(null);
-        return;
+      } else {
+        setActiveUser(user);
       }
-      setActiveUser(user);
+      setReady(true);
     })();
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setActiveUser(session?.user ?? null);
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session?.user) {
+        setActiveUser(session.user);
+        return;
+      }
+      if (event === "SIGNED_OUT") {
+        setActiveUser(null);
+      }
     });
 
     return () => {
@@ -34,5 +42,5 @@ export function useUser() {
     };
   }, [supabase]);
 
-  return [activeUser];
+  return [activeUser, ready];
 }
