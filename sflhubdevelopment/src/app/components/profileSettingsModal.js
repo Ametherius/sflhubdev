@@ -60,9 +60,10 @@ export default function ProfileSettingsModal({ open, onClose }) {
       if (cancelled) return;
       if (profileError) {
         setError(profileError.message);
-        setName("");
+        setName(user.email ?? "");
       } else {
-        setName(data?.first_name ?? "");
+        const savedName = String(data?.first_name ?? "").trim();
+        setName(savedName || user.email || "");
       }
       setLoadingProfile(false);
     })();
