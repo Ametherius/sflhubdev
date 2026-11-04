@@ -27,7 +27,7 @@ export function useUser() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session?.user) {
+      if (session?.user?.id && !session.user.__isUserNotAvailableProxy) {
         setActiveUser(session.user);
         return;
       }

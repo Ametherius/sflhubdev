@@ -24,6 +24,7 @@ import NewPlannerSlotModal from "./newPlannerSlotModal";
 import PlannerDayGrid from "./plannerDayGrid";
 import PlannerRow from "./plannerRow";
 import BrokerPanel from "./brokerPanel";
+import { useLoadSheets } from "@/hooks/useLoadSheets";
 
 function nextSortOrder(existingDaySlots, cols) {
   return (
@@ -69,6 +70,7 @@ export default function PlannerClient({
   const [division, setDivision] = useState("Canadian Grain");
   const [openPanel, setOpenPanel] = useState(null);
   const skipInitialSlotFetch = useRef(true);
+  const [loadsheets, refreshLoadSheets] = useLoadSheets();
 
   const slotCols = useMemo(
     () => slotColumnsProp ?? plannerSlotColumns(initialSlots?.[0] ?? null),
