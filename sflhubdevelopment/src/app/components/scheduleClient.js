@@ -1115,6 +1115,7 @@ export default function ScheduleClient({
             canEdit ? (unitRow) => setDeleteUnitRow(unitRow) : undefined
           }
           canEdit={canEdit}
+          onCreate={canEdit ? () => setNewUnitModalOpen(true) : undefined}
         />
       )}
       {openPanel === "assigned" && (
@@ -1144,6 +1145,7 @@ export default function ScheduleClient({
           onEdit={setEditDriver}
           onDelete={handleDeleteDriver}
           canEdit={canEdit}
+          onCreate={canEdit ? () => setNewDriverModalOpen(true) : undefined}
         />
       )}
 

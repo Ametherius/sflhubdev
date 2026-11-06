@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { FaTimes } from "react-icons/fa";
 import UnitCard from "./unitCard";
+import AddButton from "./addButton";
 
 export default function UnitsPanel({
   units,
@@ -10,6 +11,7 @@ export default function UnitsPanel({
   onEdit,
   onDelete,
   canEdit,
+  onCreate,
 }) {
   const [searchUnits, setSearchUnits] = useState("");
   const searchResults = units.filter((u) => {
@@ -31,10 +33,11 @@ export default function UnitsPanel({
       <div className="text-center text-green-950 text-2xl font-bold my-2">
         <h2>Units List</h2>
       </div>
-      <div className="flex justify-center">
+      <div className="flex justify-center my-2 gap-2 items-center">
+        <AddButton onClick={onCreate} />
         <input
           type="search"
-          className="rounded-md border-2 border-green-950 p-2 text-green-950 w-full mx-5 my-2"
+          className="rounded-md border-2 border-green-950 p-2 text-green-950 w-full my-2"
           placeholder="Search Units..."
           value={searchUnits}
           onChange={(e) => setSearchUnits(e.target.value)}

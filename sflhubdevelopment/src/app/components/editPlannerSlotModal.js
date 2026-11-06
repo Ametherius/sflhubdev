@@ -35,7 +35,7 @@ export default function EditPlannerSlotModal({
   const [unloaded, setUnloaded] = useState(false);
   const [completed, setCompleted] = useState(false);
   const [rejected, setRejected] = useState(false);
-
+cd 
   useEffect(() => {
     if (!open || !slot) return;
     setOrigin(String(slot[slotCols.origin] ?? "").trim());

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { FaTimes } from "react-icons/fa";
 import DriverCard from "./driverCard";
+import AddButton from "./addButton";
 
 export default function DriversPanel({
   canEdit,
@@ -8,6 +9,7 @@ export default function DriversPanel({
   onEdit,
   onDelete,
   drivers,
+  onCreate,
 }) {
   const [searchDrivers, setSearchDrivers] = useState("");
 
@@ -26,7 +28,8 @@ export default function DriversPanel({
           Drivers List
         </h2>
       </div>
-      <div className="flex justify-center my-2">
+      <div className="flex justify-center items-center gap-2 my-2">
+        <AddButton onClick={onCreate} />
         <input
           type="search"
           value={searchDrivers}
