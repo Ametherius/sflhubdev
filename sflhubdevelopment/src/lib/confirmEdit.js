@@ -98,6 +98,18 @@ export function changeUnitConfirmOptions(
   };
 }
 
+export function restoreDeletedConfirmOptions(driverName, unitLabel, weekLabel) {
+  const who = [driverName, unitLabel ? `unit ${unitLabel}` : ""]
+    .filter(Boolean)
+    .join(" on ");
+  return {
+    title: "Restore this delete?",
+    message: `Put ${who} back on the week of ${weekLabel}, including the loads that were deleted with them?`,
+    confirmLabel: "Restore",
+    cancelLabel: "Cancel",
+  };
+}
+
 export function removeWeekAssignmentConfirmOptions({ pastWeek = false } = {}) {
   return {
     title: "Delete unit from this week?",

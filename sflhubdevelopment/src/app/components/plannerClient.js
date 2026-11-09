@@ -25,6 +25,7 @@ import PlannerDayGrid from "./plannerDayGrid";
 import PlannerRow from "./plannerRow";
 import BrokerPanel from "./brokerPanel";
 import { useLoadSheets } from "@/hooks/useLoadSheets";
+import { useAssigned } from "@/hooks/useAssigned";
 
 function nextSortOrder(existingDaySlots, cols) {
   return (
@@ -71,6 +72,9 @@ export default function PlannerClient({
   const [openPanel, setOpenPanel] = useState(null);
   const skipInitialSlotFetch = useRef(true);
   const [loadsheets, refreshLoadSheets] = useLoadSheets();
+  const [assigned, refreshAssigned] = useAssigned();
+
+  // console.log("Assigned units:", assigned);
 
   const slotCols = useMemo(
     () => slotColumnsProp ?? plannerSlotColumns(initialSlots?.[0] ?? null),
@@ -601,60 +605,6 @@ export default function PlannerClient({
         />
       )}
 
-      {/* <div
-        className={`fixed top-0 right-0 bg-white w-90 h-screen z-50 ${canOpen ? "" : "hidden"} overflow-y-scroll`}
-      >
-        <div className="p-3 text-2xl flex font-bold text-green-950">
-          <button
-            className="text-green-950 mr-2 cursor-pointer"
-            type="button"
-            onClick={() => setCanOpen(false)}
-          >
-            <FaTimes />
-          </button>
-          <h2>Canadian Grain Brokers</h2>
-        </div>
-
-        <div className="flex flex-col items-center">
-          {canGrainBrokers.map(renderBrokerListItem)}
-        </div>
-      </div>
-      <div
-        className={`fixed top-0 right-0 bg-white w-90 h-screen z-50 ${usOpen ? "" : "hidden"} overflow-y-scroll`}
-      >
-        <div className="p-3 text-2xl flex font-bold text-green-950">
-          <button
-            className="text-green-950 mr-10 cursor-pointer"
-            type="button"
-            onClick={() => setUsOpen(false)}
-          >
-            <FaTimes />
-          </button>
-          <h2>US Grain Brokers</h2>
-        </div>
-
-        <div className="flex flex-col items-center">
-          {usGrainBrokers.map(renderBrokerListItem)}
-        </div>
-      </div>
-      <div
-        className={`fixed top-0 right-0 bg-white w-90 h-screen z-50 ${cattleOpen ? "" : "hidden"} overflow-y-scroll`}
-      >
-        <div className="p-3 text-2xl flex font-bold text-green-950">
-          <button
-            className="text-green-950 mr-14 cursor-pointer"
-            type="button"
-            onClick={() => setCattleOpen(false)}
-          >
-            <FaTimes />
-          </button>
-          <h2>Cattle Brokers</h2>
-        </div>
-
-        <div className="flex flex-col items-center">
-          {cattleBrokers.map(renderBrokerListItem)}
-        </div>
-      </div> */}
       <EditPlannerSlotModal
         open={editSlotTarget != null}
         onClose={() => setEditSlotTarget(null)}
@@ -663,6 +613,9 @@ export default function PlannerClient({
         canEdit={canEdit && plannerSchemaReady}
         saving={savingSlotEdit}
         onSubmit={handleUpdateSlot}
+        loadsheets={loadsheets}
+        assigned={assigned}
+        division={division}
       />
 
       <NewBrokerModal
@@ -682,6 +635,8 @@ export default function PlannerClient({
         }
         saving={savingSlot}
         onSubmit={handleCreateSlot}
+        loadsheets={loadsheets}
+        division={division}
       />
 
       {!plannerSchemaReady ? (

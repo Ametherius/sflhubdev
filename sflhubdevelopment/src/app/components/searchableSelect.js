@@ -157,7 +157,9 @@ export default function SearchableSelect({
         aria-label={label}
       >
         {filteredOptions.length === 0 ? (
-          <li className="px-3 py-2 text-sm text-green-900/70">{emptyMessage}</li>
+          <li className="px-3 py-2 text-sm text-green-900/70">
+            {emptyMessage}
+          </li>
         ) : (
           filteredOptions.map((option, index) => {
             const key = getOptionValue(option);

@@ -9,6 +9,7 @@ import {
   FaPlus,
   FaTimes,
   FaTruck,
+  FaUndo,
   FaUser,
 } from "react-icons/fa";
 import { useDrivers } from "@/hooks/useDrivers";
@@ -56,6 +57,7 @@ import { useMotiveWeekMiles } from "@/hooks/useMotiveWeekMiles";
 import { compareAssignedRows } from "@/lib/divisionSort";
 import DriversPanel from "./driversPanel";
 import UnitsPanel from "./unitsPanel";
+import RestoreDeletedModal from "./restoreDeletedModal";
 
 export default function ScheduleClient({
   weeks: initialWeeks = [],
@@ -65,6 +67,7 @@ export default function ScheduleClient({
   loads: initialLoads = [],
   snapshots: initialSnapshots = [],
   exclusions: initialExclusions = [],
+  trailers: initialTrailers = [],
 }) {
   const confirm = useConfirm();
   const { canEdit, loading: permissionsLoading } = usePermissions();
@@ -92,6 +95,7 @@ export default function ScheduleClient({
   const [searchUnits, setSearchUnits] = useState("");
   const [searchSchedule, setSearchSchedule] = useState("");
   const [assignModal, setAssignModal] = useState(false);
+  const [restoreOpen, setRestoreOpen] = useState(false);
   const [assignWeekIds, setAssignWeekIds] = useState([]);
   const [addToLiveBoard, setAddToLiveBoard] = useState(true);
   const [assignSaving, setAssignSaving] = useState(false);
@@ -810,6 +814,16 @@ export default function ScheduleClient({
     setAssignModal(false);
   }
 
+  async function handleArchiveRestored(weekId) {
+    await refreshWeeks();
+    if (weekId && String(weekId) !== String(resolvedWeekId)) {
+      setSelectedWeekId(weekId);
+      return;
+    }
+    await refreshSnapshots();
+    await refreshLoads();
+  }
+
   return (
     <div className="flex h-full min-h-0 w-full max-w-full flex-col overflow-hidden">
       <div className="shrink-0 py-6 text-center text-3xl font-bold text-white">
@@ -968,6 +982,13 @@ export default function ScheduleClient({
           />
         </div>
       </Modal>
+
+      {restoreOpen ? (
+        <RestoreDeletedModal
+          onClose={() => setRestoreOpen(false)}
+          onRestored={handleArchiveRestored}
+        />
+      ) : null}
 
       <Modal
         className={`fixed p-6 z-50 rounded-lg bottom-0 right-0 max-w-lg ${changeUnitRow ? "" : "hidden"}`}
@@ -1171,6 +1192,11 @@ export default function ScheduleClient({
               Icon={FaPlus}
               text="Assign Unit"
               onClick={() => setAssignModal(!assignModal)}
+            />
+            <BtnWhite
+              Icon={FaUndo}
+              text="Undo delete"
+              onClick={() => setRestoreOpen(true)}
             />
             <BtnWhite
               Icon={FaCalendar}

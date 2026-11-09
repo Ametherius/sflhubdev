@@ -34,11 +34,15 @@ export default function AssignedCard({
       ? "m-0 flex h-auto min-h-0 w-[22rem] min-w-[22rem] max-w-[22rem] shrink-0 flex-col rounded-none border-0 border-r border-green-950/25 bg-white p-5 shadow-none lg:h-full"
       : "m-1 ml-3 w-90 rounded-lg rounded-r-none bg-white p-5";
 
+  const [first, last] = name.split(" ");
+
   return (
     <div className={shell}>
       <div className="grid grid-cols-2 border-b-2 border-green-950">
-        <div className="flex justify-center text-xl font-bold text-green-950">
-          <h1>{name}</h1>
+        <div className="flex text-xl font-bold text-green-950">
+          <h1>
+            {first} {last.slice(0, 1)}.
+          </h1>
         </div>
         <div className="flex justify-end text-xl font-bold text-green-950">
           <h1>Unit: {unit}</h1>

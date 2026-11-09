@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { FaTimes } from "react-icons/fa";
 import ButtonDark from "./buttonDark";
+import SearchableSelect from "./searchableSelect";
 
 export default function NewPlannerSlotModal({
   open,
@@ -13,11 +14,13 @@ export default function NewPlannerSlotModal({
   bulk = false,
   saving = false,
   onSubmit,
+  loadsheets,
 }) {
   const [brokerId, setBrokerId] = useState("");
   const [origin, setOrigin] = useState("");
   const [endUser, setEndUser] = useState("");
   const [slotCount, setSlotCount] = useState(2);
+  const [sheet, setSheet] = useState("");
 
   const chinookFeeders = [
     "Vulcan-Richardson",
@@ -104,6 +107,30 @@ export default function NewPlannerSlotModal({
         ) : null}
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+          <SearchableSelect
+            options={loadsheets ?? []}
+            placeholder="Search Loadsheets..."
+            emptyMessage="No matches found"
+            value={sheet}
+            open={open}
+            label="Select Loadsheet"
+            onChange={(id) => {
+              setSheet(id);
+              const selected = (loadsheets ?? []).find(
+                (s) => String(s.id) === String(id),
+              );
+              if (!selected) return;
+              setOrigin(String(selected.origin ?? "").trim());
+              setEndUser(String(selected.end_user ?? "").trim());
+            }}
+            getOptionValue={(s) => String(s.id)}
+            getOptionLabel={(s) => {
+              const broker = String(s.broker ?? "").trim();
+              const origin = String(s.origin ?? "").trim();
+              const endUser = String(s.end_user ?? "").trim();
+              return [broker, origin, endUser].filter(Boolean).join(" - ");
+            }}
+          />
           {bulk ? (
             <label className="block text-sm font-medium">
               Number of slots
@@ -136,34 +163,18 @@ export default function NewPlannerSlotModal({
           </label>
           <label className="block text-sm font-medium">
             Origin
-            {isChinookFeeders ? (
-              <select
-                className={selectClass}
-                value={origin}
-                onChange={(e) => setOrigin(e.target.value)}
-                required
-              >
-                <option value="">Select Origin...</option>
-                {chinookFeeders.map((o) => (
-                  <option key={o} value={o}>
-                    {o}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <input
-                className={inputClass}
-                value={origin}
-                onChange={(e) => setOrigin(e.target.value)}
-                placeholder="Origin"
-              />
-            )}
+            <input
+              className={inputClass}
+              value={origin}
+              onChange={(e) => setOrigin(e.target.value)}
+              placeholder="Origin"
+            />
           </label>
           <label className="block text-sm font-medium">
             End user
             <input
               className={inputClass}
-              value={isChinookFeeders ? "Chinook Feeders" : endUser}
+              value={endUser}
               onChange={(e) => setEndUser(e.target.value)}
               placeholder="End user"
             />
