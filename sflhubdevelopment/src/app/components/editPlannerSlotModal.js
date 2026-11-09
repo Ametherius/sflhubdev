@@ -81,7 +81,8 @@ export default function EditPlannerSlotModal({
   const inputClass =
     "mt-1 w-full rounded-lg border border-green-950/25 bg-white px-3 py-2 text-sm text-green-950 outline-none focus:border-green-950/50 disabled:cursor-not-allowed disabled:bg-green-950/5";
   const checkboxClass = "h-4 w-4 rounded border-green-950/30 text-green-950";
-  const labelClass = "flex flex-1 gap-1 text-sm";
+  const labelClass =
+    "flex shrink-0 items-center gap-1.5 whitespace-nowrap text-sm";
   return (
     <div
       className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-4"
@@ -106,14 +107,19 @@ export default function EditPlannerSlotModal({
         >
           <FaTimes />
         </button>
-        <h2 id="edit-planner-slot-title" className="mb-4 text-xl font-bold">
-          Planner slot
-        </h2>
-
-        <div className="absolute top-0 left-1/2 transform -translate-x-1/2">
-          <fieldset className="flex gap-4" disabled={!canEdit || saving}>
-            <legend className="text-sm w-auto font-medium float-left">
-              Status
+        <div className="mb-4 flex items-center justify-between gap-4 pr-8">
+          <h2
+            id="edit-planner-slot-title"
+            className="shrink-0 text-xl font-bold"
+          >
+            Planner slot
+          </h2>
+          <fieldset
+            className="flex flex-nowrap items-center gap-3 rounded-lg border border-green-950/15 px-3 py-1.5"
+            disabled={!canEdit || saving}
+          >
+            <legend className="contents">
+              <span className="text-sm font-medium">Status</span>
             </legend>
             <label className={labelClass}>
               <input
