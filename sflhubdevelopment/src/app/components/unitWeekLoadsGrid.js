@@ -150,6 +150,7 @@ function LoadSplitCard({
   onEditLoadsheet,
   slotInvoiced = false,
   readOnly = false,
+  highlighted = false,
 }) {
   const slotTitle = slotLabel(slot);
   const saveGenRef = useRef(0);
@@ -348,10 +349,18 @@ function LoadSplitCard({
 
   return (
     <div
-      className={`${rootGrow} relative w-full min-w-0 overflow-hidden rounded-lg border border-neutral-400/90 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.08)]`}
+      className={`${rootGrow} relative w-full min-w-0 overflow-hidden rounded-lg border-2 shadow-[0_1px_3px_rgba(0,0,0,0.08)] ${
+        highlighted
+          ? "border-amber-500 bg-amber-50 outline outline-2 outline-offset-1 outline-amber-500"
+          : "border-neutral-400/90 bg-white"
+      }`}
     >
       <div className={innerRow}>
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col border-r border-neutral-300 bg-white">
+        <div
+          className={`flex min-h-0 min-w-0 flex-1 flex-col border-r border-neutral-300 ${
+            highlighted ? "bg-amber-50" : "bg-white"
+          }`}
+        >
           <input
             type="text"
             className={locationFieldClass}
@@ -423,7 +432,11 @@ function LoadSplitCard({
             </div>
           </div>
         </div>
-        <div className="flex w-[10rem] max-w-[12rem] min-h-0 shrink-0 flex-col bg-green-950 p-2">
+        <div
+          className={`flex w-[10rem] max-w-[12rem] min-h-0 shrink-0 flex-col p-2 ${
+            highlighted ? "bg-amber-700" : "bg-green-950"
+          }`}
+        >
           <textarea
             className="min-h-[60px] flex-1 resize-y rounded-sm border border-white/90 bg-[#40916c]/35 p-2 text-sm leading-snug outline-none placeholder:text-white/60 focus:bg-[#40916c]/55"
             value={loadNote}
@@ -479,6 +492,8 @@ export default function UnitWeekLoadsGrid({
   onUpdated,
   onLoadPatched,
   onLoadSheetsUpdated,
+  previewDayIso = null,
+  previewSlotId = null,
 }) {
   const supabase = useMemo(() => createClient(), []);
   const [assignTarget, setAssignTarget] = useState(null);
@@ -653,9 +668,19 @@ export default function UnitWeekLoadsGrid({
         </div>
       ) : null}
       <div className={gridShell} style={embeddedGridStyle}>
-        {days.map((d) => (
+        {days.map((d) => {
+          const isPreviewDay =
+            previewDayIso != null &&
+            d.iso === String(previewDayIso).slice(0, 10) &&
+            previewSlotId != null &&
+            String(previewSlotId).trim() !== "";
+          return (
           <div key={d.iso} className={dayColShell}>
-            <div className={dayHeaderShell}>
+            <div
+              className={`${dayHeaderShell}${
+                isPreviewDay ? " ring-2 ring-amber-300" : ""
+              }`}
+            >
               {embeddedInRow &&
               !readOnly &&
               weekId &&
@@ -699,11 +724,14 @@ export default function UnitWeekLoadsGrid({
                     : undefined;
                 const rowKey = row?.id ?? `empty-${d.iso}-${slot.id}`;
                 const slotInvoiced = resolveLoadInvoiced(row);
+                const isPreviewSlot =
+                  isPreviewDay && String(slot.id) === String(previewSlotId);
                 return (
                   <LoadSplitCard
                     key={`${d.iso}-${slot.id ?? `pad-${slot.sort_order}`}-${rowKey}`}
                     fillColumn={embeddedInRow}
                     readOnly={readOnly}
+                    highlighted={isPreviewSlot}
                     row={row}
                     slotInvoiced={slotInvoiced}
                     scheduleLoadId={row?.id ?? null}
@@ -747,7 +775,8 @@ export default function UnitWeekLoadsGrid({
               })}
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
       <AssignLoadsheetModal
         open={!readOnly && assignTarget != null}

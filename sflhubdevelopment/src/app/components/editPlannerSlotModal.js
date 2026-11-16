@@ -13,6 +13,8 @@ import { useEffect, useMemo, useState } from "react";
 import { FaTimes } from "react-icons/fa";
 import ButtonDark from "./buttonDark";
 import SearchableSelect from "./searchableSelect";
+import { loadBelongsToAssignment } from "@/lib/scheduleAssignmentDisplay";
+import UnitWeekLoadsGrid from "./unitWeekLoadsGrid";
 
 export default function EditPlannerSlotModal({
   open,
@@ -25,6 +27,11 @@ export default function EditPlannerSlotModal({
   loadsheets,
   assigned,
   division,
+  weekRows,
+  loads,
+  loadSlots,
+  weekId,
+  weekStartISO,
 }) {
   const slotCols = useMemo(
     () => slotColsProp ?? plannerSlotColumns(slot),
@@ -48,6 +55,19 @@ export default function EditPlannerSlotModal({
       .toLowerCase()
       .includes(String(division).trim().toLowerCase()),
   );
+
+  const selectedAssignment = (weekRows ?? []).find(
+    (row) => String(row.inUseUnitId) === String(unit),
+  );
+  const rowLoads = (loads ?? []).filter((load) =>
+    loadBelongsToAssignment(load, selectedAssignment),
+  );
+
+  const daySlots = [...(loadSlots ?? [])]
+    .sort((a, b) => (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0))
+    .slice(0, 3);
+
+  const [scheduleSlotId, setScheduleSlotId] = useState("");
 
   useEffect(() => {
     if (!open || !slot) return;
@@ -73,6 +93,11 @@ export default function EditPlannerSlotModal({
       unloaded,
       completed,
       rejected,
+      loadsheetId: sheet,
+      loadSlotId: scheduleSlotId,
+      inUseUnitId: selectedAssignment?.inUseUnitId ?? null,
+      scheduleAssignmentId: selectedAssignment?.scheduleAssignmentId ?? null,
+      planDate: String(slot[slotCols.planDate] ?? "").slice(0, 10),
     });
   }
 
@@ -85,7 +110,7 @@ export default function EditPlannerSlotModal({
     "flex shrink-0 items-center gap-1.5 whitespace-nowrap text-sm";
   return (
     <div
-      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-4"
+      className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-black/60 p-4"
       role="presentation"
       onMouseDown={(ev) => {
         // mouseDown (not click): opening click's mouseup must not close the dialog.
@@ -206,7 +231,24 @@ export default function EditPlannerSlotModal({
                 disabled={!canEdit || saving}
               />
             </label>
-            <div className="mt-2 flex justify-end gap-2 border-t border-green-950/15 pt-4">
+            <div className="flex justify-center">
+              <select
+                className={inputClass}
+                value={scheduleSlotId}
+                onChange={(e) => setScheduleSlotId(e.target.value)}
+              >
+                <option value="">Select Slot</option>
+                {daySlots.map((slot) => {
+                  const name = String(slot.name ?? slot.label ?? "").trim();
+                  return (
+                    <option key={slot.id} value={slot.id}>
+                      {name || `Load ${slot.sort_order}`}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+            <div className="mt-2 flex justify-end gap-2 border-t absolute top-0 left-1/4 transform -translate-x-1/2 border-green-950/15 pt-4">
               <button
                 type="button"
                 className="rounded-full px-4 py-2 text-sm font-semibold text-green-950 hover:bg-green-950/10"
@@ -270,6 +312,24 @@ export default function EditPlannerSlotModal({
             </label>
           </div>
         </form>
+        {selectedAssignment ? (
+          <div className="mt-4 overflow-x-scroll min-w-0 w-full bg-white p-2">
+            <UnitWeekLoadsGrid
+              embeddedInRow
+              readOnly
+              weekStartISO={weekStartISO}
+              weekId={weekId}
+              inUseUnitId={selectedAssignment.inUseUnitId}
+              scheduleAssignmentId={selectedAssignment.scheduleAssignmentId}
+              loads={rowLoads}
+              allWeekLoads={loads}
+              loadSlots={loadSlots}
+              loadSheets={loadsheets}
+              previewDayIso={String(slot[slotCols.planDate] ?? "").slice(0, 10)}
+              previewSlotId={scheduleSlotId}
+            />
+          </div>
+        ) : null}
       </div>
     </div>
   );

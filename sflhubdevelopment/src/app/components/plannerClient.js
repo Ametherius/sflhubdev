@@ -26,6 +26,15 @@ import PlannerRow from "./plannerRow";
 import BrokerPanel from "./brokerPanel";
 import { useLoadSheets } from "@/hooks/useLoadSheets";
 import { useAssigned } from "@/hooks/useAssigned";
+import { useWeekAssignments } from "@/hooks/useWeekAssignments";
+import { useWeekLoads } from "@/hooks/useWeekLoads";
+import { useLoadSlots } from "@/hooks/useLoadSlots";
+import { calcOptionsFromSheet } from "@/lib/loadCategory";
+import {
+  buildScheduleLoadPayload,
+  insertLoadsheetCopy,
+} from "@/lib/loadsheetCopy";
+import { persistScheduleLoad } from "@/lib/scheduleLoadsPersist";
 
 function nextSortOrder(existingDaySlots, cols) {
   return (
@@ -92,6 +101,9 @@ export default function PlannerClient({
   );
 
   const weekStartISO = activeWeek?.week_start_date ?? null;
+  const [weekRows] = useWeekAssignments(resolveWeekId, assigned, weekStartISO);
+  const [loads, refreshLoads] = useWeekLoads(resolveWeekId);
+  const [loadslots] = useLoadSlots();
 
   const slotsForWeek = useMemo(() => {
     if (!resolveWeekId) return [];
@@ -300,6 +312,11 @@ export default function PlannerClient({
     unloaded,
     completed,
     rejected,
+    loadsheetId,
+    loadSlotId,
+    inUseUnitId,
+    scheduleAssignmentId,
+    planDate,
   }) {
     if (!editSlotTarget?.id || !plannerSchemaReady) return;
     setSavingSlotEdit(true);
@@ -348,6 +365,85 @@ export default function PlannerClient({
       setSlots((prev) =>
         prev.map((s) => (s.id === editSlotTarget.id ? nextRow : s)),
       );
+
+      if (loadsheetId && loadSlotId && (inUseUnitId || scheduleAssignmentId)) {
+        const selectedSheet = (loadsheets ?? []).find(
+          (s) => String(s.id) === String(loadsheetId),
+        );
+        if (!selectedSheet) {
+          alert("Selected load sheet was not found.");
+          return;
+        }
+
+        let sheet = selectedSheet;
+        const thisWeek = String(weekStartISO ?? "").slice(0, 10);
+        const sheetWeek = String(selectedSheet.week_start ?? "").slice(0, 10);
+        if (!(thisWeek && sheetWeek === thisWeek)) {
+          const copied = await insertLoadsheetCopy(
+            supabase,
+            selectedSheet,
+            loadsheets,
+            { weekStart: thisWeek || null },
+          );
+          if (copied.error || !copied.data) {
+            alert(
+              copied.error?.message ??
+                "Could not copy load sheet for this week.",
+            );
+            return;
+          }
+          sheet = { ...selectedSheet, ...copied.data };
+          await refreshLoadSheets();
+        }
+
+        const day = String(planDate ?? "").slice(0, 10);
+        const existing = (loads ?? []).find((l) => {
+          const sid = l.load_slot_id ?? l.load_slots?.id;
+          if (String(l.load_date ?? "").slice(0, 10) !== day) return false;
+          if (String(sid) !== String(loadSlotId)) return false;
+          if (inUseUnitId != null && String(inUseUnitId).trim() !== "") {
+            return String(l.in_use_unit_id ?? "") === String(inUseUnitId);
+          }
+          return (
+            String(l.schedule_assignment_id ?? "") ===
+            String(scheduleAssignmentId)
+          );
+        });
+
+        const calc = calcOptionsFromSheet(sheet);
+        const payload = buildScheduleLoadPayload({
+          loadsheetId: sheet.id,
+          loadNumber: sheet.load_number,
+          origin: sheet.origin,
+          endUser: sheet.end_user,
+          mt: sheet.mt,
+          rate: sheet.rate,
+          fsc: sheet.fsc,
+          broker: sheet.broker,
+          flatRate: calc.flatRate,
+          loadCategory: calc.loadCategory,
+          usdCadRate: calc.usdCadRate,
+          kms: sheet.kms,
+          invoiced: false,
+        });
+
+        const saved = await persistScheduleLoad(supabase, {
+          scheduleLoadId: existing?.id ?? null,
+          weekId: resolveWeekId,
+          weekStartISO,
+          loadDate: day,
+          loadSlotId,
+          inUseUnitId,
+          scheduleAssignmentId,
+          payload,
+        });
+        if (saved.error) {
+          alert(saved.error.message);
+          return;
+        }
+        await refreshLoads();
+      }
+
       setEditSlotTarget(null);
     } finally {
       setSavingSlotEdit(false);
@@ -616,6 +712,11 @@ export default function PlannerClient({
         loadsheets={loadsheets}
         assigned={assigned}
         division={division}
+        weekRows={weekRows}
+        loads={loads}
+        weekId={resolveWeekId}
+        weekStartISO={weekStartISO}
+        loadSlots={loadslots}
       />
 
       <NewBrokerModal
