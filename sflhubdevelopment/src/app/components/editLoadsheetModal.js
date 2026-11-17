@@ -362,6 +362,7 @@ export default function EditLoadsheetModal({
         usdCadRate: overrides.usdCadRate ?? usdCadRate,
         invoiced:
           overrides.invoiced !== undefined ? overrides.invoiced : invoiced,
+        weekStart,
       };
 
       const cat = normalizeLoadCategory(values.loadCategory, false);
@@ -732,6 +733,14 @@ export default function EditLoadsheetModal({
     setUnlinking(false);
     if (error) {
       alert(error.message);
+      return;
+    }
+    const { error: plannerError } = await supabase
+      .from("planner_slots")
+      .delete()
+      .eq("schedule_load_id", scheduleLoadId);
+    if (plannerError) {
+      alert(plannerError.message);
       return;
     }
     await onScheduleUnlinked?.();

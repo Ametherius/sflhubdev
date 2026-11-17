@@ -287,6 +287,33 @@ export default function PlannerClient({
     if (!slot?.id || !plannerSchemaReady) return;
     setDeletingSlotId(slot.id);
     try {
+      if (slot.schedule_load_id) {
+        const { error: clearError } = await supabase
+          .from("schedule_loads")
+          .update({
+            loadsheet_id: null,
+            load_number: null,
+            load_note: null,
+            origin: null,
+            end_user: null,
+            mt: null,
+            rate: null,
+            fsc: null,
+            load_total: null,
+            kms: null,
+            invoiced: false,
+            load_category: null,
+            usd_cad_rate: null,
+            field_text_colors: {},
+          })
+          .eq("id", slot.schedule_load_id);
+
+        if (clearError) {
+          alert(clearError.message);
+          return;
+        }
+        await refreshLoads();
+      }
       const { error } = await supabase
         .from("planner_slots")
         .delete()
@@ -442,6 +469,12 @@ export default function PlannerClient({
           return;
         }
         await refreshLoads();
+        await supabase
+          .from("planner_slots")
+          .update({ schedule_load_id: saved.data.id })
+          .eq("id", editSlotTarget.id);
+
+        nextRow.schedule_load_id = saved.data.id;
       }
 
       setEditSlotTarget(null);
