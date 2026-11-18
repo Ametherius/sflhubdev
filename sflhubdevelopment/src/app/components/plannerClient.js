@@ -627,6 +627,17 @@ export default function PlannerClient({
     [brokers],
   );
 
+  const tankerBrokers = useMemo(
+    () =>
+      brokers.filter(
+        (b) =>
+          String(b.division ?? "")
+            .trim()
+            .toLowerCase() === "tanker",
+      ),
+    [brokers],
+  );
+
   function renderBrokerListItem(b) {
     const isHidden = hiddenBrokerIds.has(String(b.id));
     return (
@@ -695,6 +706,12 @@ export default function PlannerClient({
           type="button"
           onClick={() => togglePanel("cattle")}
         />
+        <BtnWhite
+          Icon={FaList}
+          text="Tanker Brokers"
+          type="button"
+          onClick={() => togglePanel("tanker")}
+        />
       </div>
 
       {openPanel === "can" && (
@@ -725,6 +742,18 @@ export default function PlannerClient({
         <BrokerPanel
           title="Cattle Brokers List"
           brokers={cattleBrokers}
+          onClose={() => setOpenPanel(null)}
+          hiddenBrokerIds={hiddenBrokerIds}
+          canEdit={canEdit}
+          onHide={handleHideBroker}
+          onDelete={handleDeleteBroker}
+          onUnhide={handleUnhideBroker}
+        />
+      )}
+      {openPanel === "tanker" && (
+        <BrokerPanel
+          title="Tanker Brokers List"
+          brokers={tankerBrokers}
           onClose={() => setOpenPanel(null)}
           hiddenBrokerIds={hiddenBrokerIds}
           canEdit={canEdit}
@@ -798,6 +827,9 @@ export default function PlannerClient({
           </option>
           <option className="text-green-950 bg-white" value="Cattle">
             Cattle
+          </option>
+          <option className="text-green-950 bg-white" value="Tanker">
+            Tanker
           </option>
         </select>
         <select

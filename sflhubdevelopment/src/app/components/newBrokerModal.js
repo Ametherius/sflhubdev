@@ -16,7 +16,7 @@ export default function NewBrokerModal({ open, onClose, onCreated }) {
   const [division, setDivision] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const divisions = ["Canadian Grain", "Cattle", "US Grain"];
+  const divisions = ["Canadian Grain", "Cattle", "US Grain", "Tanker"];
 
   useEffect(() => {
     if (!open) return;

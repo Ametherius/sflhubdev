@@ -735,14 +735,6 @@ export default function EditLoadsheetModal({
       alert(error.message);
       return;
     }
-    const { error: plannerError } = await supabase
-      .from("planner_slots")
-      .delete()
-      .eq("schedule_load_id", scheduleLoadId);
-    if (plannerError) {
-      alert(plannerError.message);
-      return;
-    }
     await onScheduleUnlinked?.();
     onClose();
   }

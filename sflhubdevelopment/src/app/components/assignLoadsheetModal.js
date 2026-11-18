@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { buildPlannerSlotInsert } from "@/lib/plannerSlots";
 import { FaTimes } from "react-icons/fa";
 import ButtonDark from "./buttonDark";
 import { createClient } from "@/lib/supabase/client";
@@ -505,83 +504,6 @@ export default function AssignLoadsheetModal({
     return { sheet: { ...selectedSheet, ...data }, error: null };
   }
 
-  async function ensurePlannerSlotFromSchedule(saved, sheet, targetUnitId) {
-    const brokerName = String(sheet?.broker ?? "").trim();
-    if (!brokerName || !saved?.id || !weekId) return;
-
-    const { data: brokers, error: brokerError } = await supabase
-      .from("brokers")
-      .select("id, name");
-    if (brokerError) {
-      alert(brokerError.message);
-      return;
-    }
-
-    const broker = (brokers ?? []).find(
-      (b) =>
-        String(b.name ?? "")
-          .trim()
-          .toLowerCase() === brokerName.toLowerCase(),
-    );
-    if (!broker) return;
-
-    const unitRow = (assignableUnits ?? []).find(
-      (u) =>
-        targetUnitId != null && String(u.inUseUnitId) === String(targetUnitId),
-    );
-    const [driverName = "", unitNumber = ""] = String(
-      unitRow?.label ?? "",
-    ).split(" · ");
-    const planDate = String(saved.load_date ?? "").slice(0, 10);
-
-    const { data: existing, error: existingError } = await supabase
-      .from("planner_slots")
-      .select("id, sort_order, schedule_load_id")
-      .eq("broker_id", broker.id)
-      .eq("plan_date", planDate);
-    if (existingError) {
-      alert(existingError.message);
-      return;
-    }
-
-    const already = (existing ?? []).find(
-      (slot) => String(slot.schedule_load_id) === String(saved.id),
-    );
-    if (already) {
-      const { error } = await supabase
-        .from("planner_slots")
-        .update({
-          origin: sheet.origin ?? null,
-          end_user: sheet.end_user ?? null,
-          driver_name: driverName || null,
-          unit_number: unitNumber || null,
-        })
-        .eq("id", already.id);
-      if (error) alert(error.message);
-      return;
-    }
-
-    const sortOrder =
-      (existing ?? []).reduce(
-        (max, slot) => Math.max(max, Number(slot.sort_order) || 0),
-        0,
-      ) + 1;
-
-    const row = buildPlannerSlotInsert({
-      brokerId: broker.id,
-      weekId,
-      planDate,
-      sortOrder,
-      origin: String(sheet.origin ?? ""),
-      endUser: String(sheet.end_user ?? ""),
-      unitNumber,
-      driverName,
-    });
-    row.schedule_load_id = saved.id;
-
-    const { error } = await supabase.from("planner_slots").insert(row);
-    if (error) alert(error.message);
-  }
   async function persistToCell(
     targetDayIso,
     targetUnitId,
@@ -612,7 +534,7 @@ export default function AssignLoadsheetModal({
       invoiced: false,
     });
 
-    const result = await persistScheduleLoad(supabase, {
+    return persistScheduleLoad(supabase, {
       scheduleLoadId: row?.id ?? null,
       weekId,
       weekStartISO,
@@ -622,12 +544,6 @@ export default function AssignLoadsheetModal({
       scheduleAssignmentId: targetAssignmentId,
       payload,
     });
-
-    if (result.data?.id) {
-      await ensurePlannerSlotFromSchedule(result.data, sheet, targetUnitId);
-    }
-
-    return result;
   }
 
   async function handleApply(e) {
